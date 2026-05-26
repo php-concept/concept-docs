@@ -1,0 +1,41 @@
+[data-bs-theme="dark"] {
+    --bs-primary: #38bdf8;
+    --bs-primary-rgb: 56, 189, 248;
+    --bs-link-color: #38bdf8;
+    --bs-link-hover-color: #7dd3fc;
+}
+
+#docs-sidebar .nav-link.active {
+    border-left: 2px solid var(--bs-primary);
+    margin-left: -2px;
+    padding-left: calc(1rem + 1px);
+}
+
+#docs-content h2,
+#docs-content h3 {
+    scroll-margin-top: 5.5rem;
+}
+
+.docs-toc-wrap .position-sticky {
+    top: 5.5rem;
+}
+
+.docs-code-wrap {
+    display: grid;
+}
+
+.docs-code-wrap > pre {
+    grid-area: 1 / 1;
+    margin-bottom: 0;
+    border-radius: 5px;
+}
+
+.docs-code-wrap > .docs-copy-btn {
+    grid-area: 1 / 1;
+    justify-self: end;
+    align-self: start;
+    z-index: 1;
+    margin: 0.375rem;
+    line-height: 1;
+    padding: 0.35rem 0.45rem;
+}

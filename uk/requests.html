@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="uk" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Запити та валідація — Concept Core Documentation">
+    <title>Запити та валідація - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="requests">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Відкрити навігацію">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link py-1" href="../en/requests.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link py-1 active" href="../uk/requests.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link py-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Запити та валідація</h1>
+
+                <p>
+                    Вхідні дані HTTP (query, body форми, JSON) валідуються через класи
+                    <strong>FormRequest</strong>. Після успішної перевірки ви працюєте з масивом
+                    <code>validated()</code> або, за бажанням, з типізованим <strong>DTO</strong>,
+                    зібраним бібліотекою <a href="https://valinor.cuyz.io/latest/" target="_blank" rel="noopener">Valinor</a>.
+                </p>
+                <p>
+                    Валідатор — <a href="https://github.com/rakitphp/validation" target="_blank" rel="noopener">Rakit Validation</a>
+                    (адаптер у Concept Core). Див. також:
+                    <a href="controllers.html#method-args">контролери → аргументи методу</a>,
+                    <a href="middleware.html#core-middleware">HandleValidationExceptionMiddleware</a>.
+                </p>
+
+                <h2 id="flow" class="border-bottom pb-2 mb-3 mt-5">Як це працює</h2>
+                <ol>
+                    <li>У action контролера оголошується тип <code>MyRequest $request</code> (нащадок <code>FormRequest</code>).</li>
+                    <li><code>RouteStrategy</code> створює FormRequest з контейнера і викликає <code>validate()</code> <em>до</em> входу в метод.</li>
+                    <li>Якщо правила не виконані — <code>ValidationException</code> → middleware повертає 422 (JSON) або redirect назад із flash.</li>
+                    <li>Якщо все гаразд — виконується метод контролера; дані читаються через <code>validated()</code> або <code>toDto()</code>.</li>
+                </ol>
+
+                <h2 id="with-or-without-dto" class="border-bottom pb-2 mb-3 mt-5">З DTO і без DTO</h2>
+                <p>Обидва підходи підтримуються. DTO не обов’язковий.</p>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Підхід</th>
+                                <th>Коли зручно</th>
+                                <th>У контролері</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>З DTO</strong></td>
+                                <td>Типізований контракт, передача в сервіс</td>
+                                <td><code>$dto = $request-&gt;toDto();</code></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Без DTO</strong></td>
+                                <td>
+                                    Пряма вставка / оновлення в БД масивом <code>validated()</code>
+                                </td>
+                                <td><code>-&gt;create($request-&gt;validated())</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="example-with-dto" class="mt-4">Приклад з DTO</h3>
+                <pre class="mb-4"><code class="language-php">class CreateProjectRequest extends FormRequest
+{
+    protected ?string $dtoClass = CreateProjectDto::class;
+
+    public function rules(): array { /* ... */ }
+}
+
+// Контролер
+/** @var CreateProjectDto $data */
+$data = $request-&gt;toDto();
+$this-&gt;projectModel-&gt;newQuery()-&gt;create([
+    ProjectModel::FIELD_TITLE =&gt; $data-&gt;title,
+    // ...
+]);</code></pre>
+
+                <h3 id="example-without-dto" class="mt-4">Приклад без DTO</h3>
+                <p>
+                    <code>UpdateProjectStatusRequest</code> — без <code>$dtoClass</code>.
+                    Масив <code>validated()</code> одразу передають у <code>create()</code> / <code>update()</code>
+                    (за потреби через нормалізатор):
+                </p>
+                <pre class="mb-4"><code class="language-php">class UpdateProjectStatusRequest extends FormRequest
+{
+    public function rules(): array
+    {
+        return [
+            'status' =&gt; ['required', 'in:' . implode(',', array_column(ProjectStatus::cases(), 'value'))],
+        ];
+    }
+}
+
+// Один ключ — оновлення в БД
+$project-&gt;update([
+    ProjectModel::FIELD_STATUS =&gt; $request-&gt;validated()['status'],
+]);
+
+// Кілька полів — create() цілим масивом (після except / rules)
+$this-&gt;postModel-&gt;newQuery()-&gt;create(
+    $this-&gt;normalizePayload($request-&gt;validated())
+);</code></pre>
+                <p class="small text-body-secondary">
+                    У контролері можна викликати <code>validated()</code> навіть якщо в FormRequest задано
+                    <code>$dtoClass</code> — DTO тоді просто не обов’язковий (<code>toDto()</code> не використовують).
+                </p>
+
+                <h2 id="create-form-request" class="border-bottom pb-2 mb-3 mt-5">Створення FormRequest</h2>
+                <p>
+                    Розмістіть клас у <code>Requests/</code> компонента або застосунку
+                    (наприклад <code>Components/UserCabinet/Requests/LoginRequest.php</code>).
+                    Успадкуйте <code>Concept\Core\Http\Requests\FormRequest</code> і реалізуйте
+                    <code>rules()</code>. Реєстрація в контейнері не потрібна — спрацьовує автовайринг.
+                </p>
+
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+namespace Concept\Components\UserCabinet\Requests;
+
+use Concept\Components\AuthAdmin\Dto\LoginDto;
+use Concept\Core\Http\Requests\FormRequest;
+
+/** @extends FormRequest&lt;LoginDto&gt; */
+class LoginRequest extends FormRequest
+{
+    protected ?string $dtoClass = LoginDto::class;
+
+    /** Поля, які не потраплять у validated() (навіть якщо пройшли валідацію) */
+    protected array $except = [];
+
+    /** Якщо не порожній — у validated() лишаться лише ці ключі */
+    protected array $only = [];
+
+    public function rules(): array
+    {
+        return [
+            'email' =&gt; ['required', 'email'],
+            'password' =&gt; ['required'],
+            'remember' =&gt; ['nullable', 'boolean'],
+        ];
+    }
+
+    public function aliases(): array
+    {
+        return [
+            'email' =&gt; 'Email Address',
+            'password' =&gt; 'Password',
+        ];
+    }
+}</code></pre>
+
+                <h3 id="rules" class="mt-4">Правила <code>rules()</code></h3>
+                <p>Два формати (як у Rakit):</p>
+                <ul>
+                    <li>рядок: <code>'name' =&gt; 'required|min:3'</code></li>
+                    <li>масив: <code>'email' =&gt; ['required', 'email', 'unique:users,email']</code></li>
+                </ul>
+                <p>
+                    Доступні стандартні правила Rakit (<code>required</code>, <code>email</code>, <code>min</code>,
+                    <code>max</code>, <code>same</code>, <code>in</code>, <code>nullable</code>, <code>boolean</code> тощо).
+                    У skeleton додано правила БД: <code>unique</code>, <code>exists</code> (див. <a href="#custom-rules">власні правила</a>).
+                </p>
+
+                <h3 id="aliases" class="mt-4">Псевдоніми <code>aliases()</code></h3>
+                <p>
+                    Людські назви полів у повідомленнях про помилки («Email Address» замість «email»).
+                    Необов’язковий метод — за замовчуванням порожній масив.
+                </p>
+
+                <h3 id="except-only" class="mt-4"><code>$except</code> і <code>$only</code></h3>
+                <ul>
+                    <li>
+                        <code>$except</code> — виключити поля з результату <code>validated()</code>
+                        (наприклад <code>password_confirmation</code> після правила <code>same:password</code>)
+                    </li>
+                    <li>
+                        <code>$only</code> — білий список ключів у <code>validated()</code>
+                        (рідко; зазвичай достатньо ключів із <code>rules()</code>)
+                    </li>
+                    <li>
+                        <code>_csrf_token</code> виключається глобально з <code>validated()</code>,
+                        навіть якщо потрапив у body
+                    </li>
+                </ul>
+                <p>
+                    <code>validated()</code> повертає лише ключі, присутні в <code>rules()</code>
+                    (перетин із валідними даними), мінус <code>except</code> і глобальні виключення.
+                    Викликати <code>validated()</code> можна лише після <code>validate()</code>
+                    (у контролері валідація вже відбулася; інакше — <code>ValidationLogicException</code>).
+                </p>
+
+                <h3 id="all-method" class="mt-4">Звідки беруться дані: <code>all()</code></h3>
+                <p>
+                    <code>all()</code> об’єднує <strong>query string</strong> і <strong>parsed body</strong>
+                    (поля форми або JSON після <code>ParseJsonBodyMiddleware</code>).
+                    Саме ці дані йдуть у валідатор. Для API з JSON підключіть відповідний middleware на групу маршрутів.
+                </p>
+
+                <h3 id="dto-class" class="mt-4">Властивість <code>$dtoClass</code></h3>
+                <ul>
+                    <li><code>protected ?string $dtoClass = MyDto::class;</code> — увімкнути мапінг у DTO</li>
+                    <li><code>null</code> або відсутність — працює лише <code>validated()</code>, <code>toDto()</code> поверне <code>null</code></li>
+                </ul>
+                <p>
+                    PHPDoc <code>@extends FormRequest&lt;LoginDto&gt;</code> допомагає IDE/static analysis;
+                    для запитів без DTO — <code>@extends FormRequest&lt;null&gt;</code> або без generic.
+                </p>
+
+                <h3 id="route-params" class="mt-4">Параметри маршруту</h3>
+                <p>
+                    Сегменти URL (<code>{id:number}</code>) зазвичай передають окремим аргументом action:
+                    <code>update(UpdateUserRequest $request, int $id)</code>.
+                    У підкласі FormRequest доступний захищений <code>getRouteParam('id')</code> —
+                    якщо потрібно підставити id у правила (наприклад <code>unique:users,email,{id}</code>).
+                </p>
+
+                <h3 id="logging" class="mt-4">Логування</h3>
+                <p>
+                    При <code>log.validation_data = true</code> у конфігурації FormRequest логує вхідні дані
+                    та результат валідації (див. <a href="configuration.html">Configuration</a>).
+                    У production зазвичай вимкнено.
+                </p>
+
+                <h2 id="controller-usage" class="border-bottom pb-2 mb-3 mt-5">Використання в контролері</h2>
+                <p>Оголосіть FormRequest у сигнатурі методу — валідація відбудеться автоматично:</p>
+                <pre class="mb-4"><code class="language-php">public function store(StoreUserRequest $request): ResponseInterface
+{
+    // Варіант 1: масив
+    $this-&gt;userModel-&gt;newQuery()-&gt;create(
+        $this-&gt;normalizeUserPayload($request-&gt;validated())
+    );
+
+    return $this-&gt;response-&gt;redirectByName('admin.users');
+}
+
+public function login(LoginRequest $request): ResponseInterface
+{
+    // Варіант 2: DTO
+    $loginDto = $request-&gt;toDto();
+    if ($loginDto) {
+        $this-&gt;auth-&gt;attempt($loginDto-&gt;email, $loginDto-&gt;password, $loginDto-&gt;remember);
+    }
+    // ...
+}</code></pre>
+                <p>
+                    <code>toDto()</code> викликайте після успішної валідації (у методі контролера це вже гарантовано).
+                    Перевіряйте <code>null</code>, якщо <code>$dtoClass</code> не задано або Caster недоступний.
+                </p>
+
+                <h2 id="validation-errors" class="border-bottom pb-2 mb-3 mt-5">Помилки валідації</h2>
+                <p>При невдалій валідації:</p>
+                <ul>
+                    <li><strong>JSON / API</strong> — <code>422</code>, тіло через <code>jsonError()</code> з масивом помилок</li>
+                    <li><strong>HTML-форма</strong> — flash <code>error</code>, <code>_validation_errors</code>, <code>_validation_data</code>, redirect <code>back()</code></li>
+                </ul>
+                <p>
+                    <code>ShareViewDataMiddleware</code> передає в Twig змінні
+                    <code>errors</code> та <code>old</code> (попередній ввід):
+                </p>
+                <pre class="mb-4"><code class="language-twig">&lt;label for="email"&gt;Email&lt;/label&gt;
+&lt;input id="email" type="email" name="email" required
+       value="{{ old.email|default('') }}"
+       class="input {{ errors.email is defined and errors.email ? 'is-invalid' : '' }}"
+       aria-describedby="email-error"&gt;
+{% if errors.email is defined and errors.email is not empty %}
+    &lt;div class="field-error" id="email-error" role="alert"&gt;
+        {{ errors.email is iterable ? errors.email|join(', ') : errors.email }}
+    &lt;/div&gt;
+{% endif %}</code></pre>
+
+                <h3 id="cast-errors" class="mt-4">Помилки мапінгу DTO</h3>
+                <p>
+                    Якщо <code>toDto()</code> не може зібрати об’єкт (невідповідність типів після валідації),
+                    кидається <code>ValidationCastException</code> (обгортка над Valinor <code>MappingError</code>).
+                    Це не те саме, що помилки правил — обробляє загальний error handler, не validation middleware.
+                    Тому правила FormRequest мають узгоджуватися з типами в DTO (наприклад <code>boolean</code> для <code>bool $remember</code>).
+                </p>
+
+                <h2 id="custom-rules" class="border-bottom pb-2 mb-3 mt-5">Власні правила валідації</h2>
+                <p>Реєстрація в <code>config/validator.php</code>:</p>
+                <pre class="mb-4"><code class="language-php">return [
+    'validator' =&gt; [
+        'rules' =&gt; [
+            'unique' =&gt; UniqueRule::class,
+            'exists' =&gt; ExistsRule::class,
+        ],
+    ],
+];</code></pre>
+                <p>
+                    Клас правила реалізує <code>RuleInterface</code>, успадковує <code>Concept\Core\Components\Validator\Rule</code>.
+                    У правилах: <code>'email' =&gt; ['unique:users,email']</code>,
+                    <code>'email' =&gt; ['unique:users,email,5,id']</code> (except id при update).
+                </p>
+
+                <h2 id="dto" class="border-bottom pb-2 mb-3 mt-5">DTO (Data Transfer Object)</h2>
+                <p>
+                    DTO — immutable об’єкт з readonly-властивостями для вже перевірених даних.
+                    Базовий клас <code>Concept\Core\Dto\Dto</code> реалізує <code>toArray()</code> через cast об’єкта в масив.
+                </p>
+
+                <h3 id="create-dto" class="mt-4">Як створити DTO</h3>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+namespace Concept\Components\AuthAdmin\Dto\User;
+
+use Concept\Core\Dto\Contracts\DtoInterface;
+use Concept\Core\Dto\Dto;
+
+class StoreUserDto extends Dto implements DtoInterface
+{
+    public function __construct(
+        public readonly string $name,
+        public readonly string $email,
+        public readonly string $password,
+        public readonly string $status,
+        public readonly bool $is_admin = false,
+        public readonly ?string $verification_token = null,
+    ) {}
+}</code></pre>
+                <ul>
+                    <li>Імена властивостей збігаються з ключами у <code>validated()</code> (snake_case у формах → snake_case у DTO)</li>
+                    <li>Типи в конструкторі мають відповідати тому, що поверне валідатор + Valinor casting</li>
+                    <li>Необов’язкові поля — default у конструкторі або <code>?type</code></li>
+                    <li>Поля з <code>$except</code> не потраплять у DTO</li>
+                </ul>
+
+                <h3 id="valinor" class="mt-4">Valinor і <code>Caster</code></h3>
+                <p>
+                    Мапінг виконує <code>Concept\Core\Components\Caster\Caster</code> на базі
+                    <a href="https://valinor.cuyz.io/latest/" target="_blank" rel="noopener">Valinor</a>
+                    (<code>cuyz/valinor</code> у залежностях core; можливий внутрішній форк з тим самим API
+                    <code>CuyZ\Valinor</code> — тоді актуальна та сама документація).
+                    Описує мапінг масивів у об’єкти, strict types, вкладені структури — це застосовно до DTO Concept Core.
+                </p>
+                <ul>
+                    <li><code>allowScalarValueCasting()</code> — рядок <code>"1"</code> → <code>int</code> / <code>bool</code> за потреби</li>
+                    <li><code>allowSuperfluousKeys()</code> — зайві ключі в масиві не ламають мапінг (зручно для форм)</li>
+                    <li>Кеш мапера: <code>storage/cache/valinor</code> (швидший повторний мапінг)</li>
+                </ul>
+                <p>Корисні розділи документації Valinor:</p>
+                <ul>
+                    <li><a href="https://valinor.cuyz.io/latest/how-to/map-input-data/" target="_blank" rel="noopener">How to map input data</a></li>
+                    <li><a href="https://valinor.cuyz.io/latest/how-to/handle-invalid-input/" target="_blank" rel="noopener">Handle invalid input</a></li>
+                    <li><a href="https://valinor.cuyz.io/latest/reference/feature-flags/" target="_blank" rel="noopener">Feature flags</a> (casting, superfluous keys)</li>
+                </ul>
+
+                <h3 id="to-dto-internals" class="mt-4">Що робить <code>toDto()</code></h3>
+                <pre class="mb-4"><code class="language-php">// Спрощено
+if ($this-&gt;dtoClass === null || !$this-&gt;caster) {
+    return null;
+}
+return $this-&gt;caster-&gt;cast($this-&gt;validated(), $this-&gt;dtoClass);</code></pre>
+                <p>
+                    Спочатку Rakit перевіряє <strong>правила</strong>, потім Valinor збирає <strong>структуру</strong>.
+                    Валідація бізнес-логіки (унікальність email у БД) — у <code>rules()</code>;
+                    приведення типів — у DTO/Valinor.
+                </p>
+
+                <h2 id="checklist" class="border-bottom pb-2 mb-3 mt-5">Чеклист</h2>
+                <ol>
+                    <li>Створити <code>Requests/MyActionRequest.php</code> з <code>rules()</code> і за потреби <code>aliases()</code>.</li>
+                    <li>За потреби — <code>Dto/MyActionDto.php</code> і <code>protected ?string $dtoClass = ...</code>.</li>
+                    <li>Додати type-hint у контролер: <code>public function store(MyActionRequest $request)</code>.</li>
+                    <li>Переконатися, що глобальний <code>HandleValidationExceptionMiddleware</code> підключений у маршрутах.</li>
+                    <li>У Twig використовувати <code>errors</code> / <code>old</code> для повторного показу форми.</li>
+                </ol>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        FormRequest відповідає за вхідні дані запиту. Авторизація («чи може цей user») —
+                        у <a href="middleware.html">middleware</a> або сервісах, не в <code>rules()</code>,
+                        якщо для цього потрібен контекст сесії поза полями форми.
+                    </p>
+                </div>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-uk.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

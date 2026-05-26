@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="uk" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Встановлення Concept Core через Composer">
+    <title>Встановлення - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="installation">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Відкрити навігацію">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link py-1" href="../en/installation.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link py-1 active" href="installation.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link py-1" href="../index.html" title="Головна"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Закрити"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Встановлення</h1>
+
+                <h2 id="meet-php" class="border-bottom pb-2 mb-3 mt-5">Знайомство з Concept</h2>
+                <p>
+                    Найкращий спосіб почати — skeleton-застосунок, який уже містить
+                    <code>php-concept/core</code> та робочий bootstrap.
+                </p>
+
+                <h2 id="requirements" class="border-bottom pb-2 mb-3 mt-5">Вимоги до сервера</h2>
+                <p>Concept Core потребує:</p>
+                <ul>
+                    <li>PHP 8.4 або новіший</li>
+                    <li>Composer 2.x</li>
+                    <li>Розширення: <code>mbstring</code>, <code>json</code>, <code>pdo</code></li>
+                </ul>
+
+                <h2 id="composer" class="border-bottom pb-2 mb-3 mt-5">Встановлення через Composer</h2>
+                <pre class="mb-4"><code class="language-bash">composer require php-concept/core:^1.0</code></pre>
+
+                <h2 id="bootstrap" class="border-bottom pb-2 mb-3 mt-5">Bootstrap застосунку</h2>
+                <p>Створіть екземпляр застосунку у front controller (наприклад, <code>public/index.php</code>):</p>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+use Concept\Core\App;
+
+$app = App::create(
+    rootPath: dirname(__DIR__),
+    paths: [
+        'config' =&gt; 'config',
+        'storage' =&gt; 'storage',
+        'routes' =&gt; 'routes',
+    ],
+);
+
+$app-&gt;registerServiceProviders([
+    $app-&gt;getRootPath() . '/bootstrap/providers/app.php',
+]);
+
+$app-&gt;run();</code></pre>
+
+                <h2 id="next-steps" class="border-bottom pb-2 mb-3 mt-5">Наступні кроки</h2>
+                <p>
+                    Після встановлення налаштуйте середовище в
+                    <a href="configuration.html">Конфігурація</a> та зареєструйте маршрути.
+                </p>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/bash.min.js"></script>
+    <script src="../assets/js/nav-uk.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

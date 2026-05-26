@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html lang="uk" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Варіанти структури каталогів проєкту на Concept Core">
+    <title>Структура каталогів - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="directory-structure">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Відкрити навігацію">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link py-1" href="../en/directory-structure.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link py-1 active" href="directory-structure.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link py-1" href="../index.html" title="Головна"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Структура каталогів</h1>
+
+                <p>
+                    Concept Core не нав’язує жодну структуру каталогів. Розташування <strong>усіх</strong> папок —
+                    включно з <code>src</code>, <code>config</code>, <code>storage</code>, <code>database</code> —
+                    можна змінити на свій смак у <a href="setup.html#paths-php"><code>bootstrap/paths.php</code></a>
+                    і в PSR-4 автозавантаженні <code>composer.json</code>.
+                </p>
+                <p>
+                    Нижче наведено <strong>рекомендовану кореневу структуру</strong> проєкту та два поширені підходи
+                    до організації коду всередині папки <code>src</code>. Це орієнтири, а не обов’язковий стандарт.
+                </p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Кореневі каталоги (<code>public</code>, <code>bootstrap</code>, <code>config</code> тощо) —
+                        рекомендована угода для старту. Їх можна перейменувати або перенести, якщо оновити
+                        <a href="setup.html#paths-php"><code>paths.php</code></a> і налаштування веб-сервера.
+                    </p>
+                </div>
+
+                <h2 id="project-root" class="border-bottom pb-2 mb-3 mt-5">Рекомендована коренева структура</h2>
+                <pre class="mb-4"><code class="language-text">project/
+├── public/           # document root, index.php
+├── bootstrap/        # app.php, paths.php, providers/
+├── bin/              # console.php
+├── config/           # PHP-конфіг + config/{env}/
+├── routes/           # маршрути (підключаються з config)
+├── resources/views/  # спільні Twig-шаблони (layouts)
+├── database/         # міграції/сидери за замовчуванням
+├── storage/          # logs, cache
+├── src/              # код застосунку (організація — варіанти нижче)
+└── tests/</code></pre>
+                <p>
+                    Шлях до кожного з цих каталогів задається в
+                    <a href="setup.html#paths-php"><code>paths.php</code></a>
+                    (<code>CONFIG_DIR</code>, <code>SRC_DIR</code>, <code>LOGS_DIR</code>…).
+                    Наприклад, код можна тримати в <code>app/</code> замість <code>src/</code> — достатньо змінити
+                    <code>PathManager::SRC_DIR</code> і namespace у Composer.
+                </p>
+
+                <h2 id="src-variants" class="border-bottom pb-2 mb-3 mt-5">Організація коду в каталозі src</h2>
+                <p>Далі — два типові варіанти. Обидва сумісні з Concept Core.</p>
+
+                <h2 id="variant-layered" class="border-bottom pb-2 mb-3 mt-5">1. Шарова MVC (package by layer)</h2>
+                <p>
+                    Класична <strong>шарова архітектура</strong> (layered architecture): код групується за
+                    <em>типом</em> (контролери, моделі, запити), а не за модулем. У PHP-спільноті це часто називають
+                    <strong>package by layer</strong> — протилежність до «package by feature».
+                </p>
+                <p>
+                    Шари лежать безпосередньо в каталозі з кодом (наприклад <code>src/</code>), без проміжних папок
+                    на кшталт <code>App</code> чи <code>Components</code>:
+                </p>
+                <pre class="mb-4"><code class="language-text">src/
+├── Controllers/       # Concept\App\Controllers\*
+├── Models/            # Concept\App\Models\*
+├── Requests/          # FormRequest, DTO-запити
+├── Validation/
+│   └── Rules/
+├── Extensions/
+│   └── Twig/
+├── Services/          # опційно: бізнес-логіка
+└── Middlewares/       # опційно: HTTP middleware</code></pre>
+                <p><strong>Коли обирати:</strong> невеликі застосунки, один домен, мало модулів; команда звикла до класичного MVC (Symfony 2–4, ранній Laravel).</p>
+                <p><strong>Мінуси:</strong> при зростанні проєкту складно знайти «все про замовлення» — файли розкидані по шарах.</p>
+                <p><strong>Composer (приклад):</strong></p>
+                <pre class="mb-4"><code class="language-json">"autoload": {
+    "psr-4": {
+        "Concept\\": "src/"
+    }
+}</code></pre>
+                <p>
+                    <code>paths.php</code>: <code>PathManager::SRC_DIR => 'src'</code>
+                    (<a href="setup.html#paths-php">деталі</a>).
+                </p>
+
+                <h2 id="variant-components" class="border-bottom pb-2 mb-3 mt-5">2. Компоненти (модульний моноліт)</h2>
+                <p>
+                    <strong>Модульний моноліт</strong> з підключаємими компонентами: спільне ядро застосунку +
+                    ізольовані функціональні модулі. Це поєднання
+                    <em>package by feature</em> (всередині кожного компонента) і шарів MVC.
+                    Підтримується системою компонентів Concept Core.
+                </p>
+                <pre class="mb-4"><code class="language-text">src/
+├── App/                          # спільний код застосунку
+│   ├── Controllers/              # глобальні контролери
+│   ├── Models/                   # BaseModel, спільні трейти
+│   ├── Requests/
+│   ├── Validation/Rules/
+│   └── Extensions/Twig/
+└── Components/                   # функціональні модулі
+    ├── AuthAdmin/
+    │   ├── Controllers/
+    │   ├── Models/
+    │   ├── Views/                # Twig модуля
+    │   ├── routes.php
+    │   ├── config.php
+    │   ├── Database/Migrations/
+    │   └── AuthAdminComponent.php
+    ├── UserCabinet/
+    └── ProjectManager/</code></pre>
+                <p>
+                    Компоненти реєструються в <code>config/components.php</code>, можуть мати власні маршрути,
+                    views, міграції та assets. Каталог <code>App</code> — для спільних речей (базові моделі,
+                    Twig extensions, правила валідації).
+                </p>
+                <p><strong>Коли обирати:</strong> кілька підсистем (адмінка, кабінет, публічна частина), потрібно
+                    вмикати або вимикати модулі через конфіг, різні команди працюють над окремими компонентами.</p>
+
+                <h2 id="compare" class="border-bottom pb-2 mb-3 mt-5">Порівняння</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>Шарова MVC</th>
+                                <th>Компоненти</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Академічна назва</td>
+                                <td>Layered / package by layer</td>
+                                <td>Modular monolith, package by feature</td>
+                            </tr>
+                            <tr>
+                                <td>Розмір проєкту</td>
+                                <td>Малий — середній</td>
+                                <td>Середній — великий</td>
+                            </tr>
+                            <tr>
+                                <td>Маршрути</td>
+                                <td><code>routes/web.php</code></td>
+                                <td>+ <code>routes.php</code> у кожному компоненті</td>
+                            </tr>
+                            <tr>
+                                <td>Concept Core</td>
+                                <td>Повна підтримка</td>
+                                <td>+ підсистема компонентів</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h2 id="views-storage" class="border-bottom pb-2 mb-3 mt-5">Де зберігати views і дані</h2>
+                <p>Шляхи знову ж налаштовуються в <a href="setup.html#paths-php"><code>paths.php</code></a>.</p>
+                <ul>
+                    <li><strong>Спільні layouts</strong> — типово <code>resources/views/</code> (<code>VIEWS_DIR</code>).</li>
+                    <li><strong>Шаблони модуля</strong> — у варіанті з компонентами: каталог <code>Views/</code> всередині модуля.</li>
+                    <li><strong>Міграції</strong> — типово <code>database/migrations</code>; додаткові шляхи в <code>config/migrations.php</code>.</li>
+                    <li><strong>Логи, кеш</strong> — типово <code>storage/</code> (<code>LOGS_DIR</code>, <code>CACHE_DIR</code>).</li>
+                </ul>
+
+                <h2 id="choose" class="border-bottom pb-2 mb-3 mt-5">Що обрати</h2>
+                <ul>
+                    <li><strong>Шарова MVC</strong> — простий старт, один домен, мало модулів.</li>
+                    <li><strong>Компоненти</strong> — кілька підсистем, потрібна ізоляція модулів і підтримка ядра Concept.</li>
+                </ul>
+                <p>
+                    Структуру можна змінити в будь-який момент: оновіть
+                    <a href="setup.html#paths-php"><code>paths.php</code></a>, <code>composer.json</code> і конфіг.
+                </p>
+                <p>
+                    Далі: <a href="request-lifecycle.html">життєвий цикл запиту</a> та
+                    <a href="setup.html">налаштування</a> точок входу.
+                </p>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/json.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-uk.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

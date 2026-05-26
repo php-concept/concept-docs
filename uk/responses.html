@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="uk" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Відповіді — Concept Core Documentation">
+    <title>Відповіді - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="responses">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Відкрити навігацію">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link py-1" href="../en/responses.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link py-1 active" href="../uk/responses.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link py-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Відповіді</h1>
+
+                <p>
+                    Кожен action контролера повертає <code>Psr\Http\Message\ResponseInterface</code> (PSR-7).
+                    Після <code>Router::dispatch()</code> ядро викликає <code>SapiEmitter</code> (Laminas) —
+                    заголовки та тіло потрапляють у PHP SAPI (FPM, Apache, built-in server).
+                </p>
+                <p>
+                    Див. також:
+                    <a href="controllers.html">контролери</a>,
+                    <a href="request-lifecycle.html#response">життєвий цикл → відповідь</a>,
+                    <a href="views.html">Views</a> (Twig).
+                </p>
+
+                <h2 id="factories" class="border-bottom pb-2 mb-3 mt-5">Дві фабрики</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Інтерфейс</th>
+                                <th>Клас</th>
+                                <th>Призначення</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>ResponseFactoryInterface</code></td>
+                                <td><code>Concept\Core\Http\ResponseFactory</code></td>
+                                <td>JSON, redirect, порожня відповідь, <code>back()</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>ViewResponseFactoryInterface</code></td>
+                                <td><code>Concept\Core\Components\View\ViewResponseFactory</code></td>
+                                <td>HTML через Twig</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Обидві реєструються в <code>HttpServiceProvider</code>. У контролері — через конструктор (автовайринг):</p>
+                <pre class="mb-4"><code class="language-php">public function __construct(
+    private readonly ResponseFactoryInterface $response,
+    private readonly ViewResponseFactoryInterface $viewResponse,
+) {}</code></pre>
+
+                <h2 id="html" class="border-bottom pb-2 mb-3 mt-5">HTML (Twig)</h2>
+                <pre class="mb-4"><code class="language-php">return $this-&gt;viewResponse-&gt;create('@cabinet/index', [
+    'user' =&gt; $user,
+    'projects' =&gt; $projects,
+]);</code></pre>
+                <ul>
+                    <li><code>@cabinet/index</code> — логічне ім’я шаблону (префікс компонента)</li>
+                    <li>Другий аргумент — локальні змінні для цього action</li>
+                    <li>Третій аргумент — HTTP-код (за замовчуванням <code>200</code>)</li>
+                </ul>
+                <p>
+                    <code>ViewResponseFactory</code> зливає дані з атрибута запиту
+                    <code>RequestAttribute::VIEW_PAYLOAD</code> (flash, <code>errors</code>, <code>old</code>, CSRF
+                    з <a href="middleware.html#core-middleware">ShareViewDataMiddleware</a>), потім рендерить Twig
+                    і виставляє <code>Content-Type: text/html</code>.
+                    Детальніше про шаблони — <a href="views.html">Представлення</a>.
+                </p>
+
+                <h2 id="json" class="border-bottom pb-2 mb-3 mt-5">JSON</h2>
+                <h3 id="json-raw" class="mt-4">Довільний JSON — <code>json()</code></h3>
+                <pre class="mb-4"><code class="language-php">return $this-&gt;response-&gt;json([
+    'token' =&gt; bin2hex(random_bytes(32)),
+]);</code></pre>
+                <p>Тіло — ваш масив як є; статус за замовчуванням <code>200</code>.</p>
+
+                <h3 id="json-success" class="mt-4">Узгоджений успіх — <code>jsonSuccess()</code></h3>
+                <pre class="mb-4"><code class="language-php">return $this-&gt;response-&gt;jsonSuccess(['id' =&gt; $user-&gt;getId()]);
+
+// Відповідь (приклад)
+// { "status": "success", "code": 200, "data": { "id": 42 } }</code></pre>
+
+                <h3 id="json-error" class="mt-4">Узгоджена помилка — <code>jsonError()</code></h3>
+                <pre class="mb-4"><code class="language-php">return $this-&gt;response-&gt;jsonError(
+    'Resource not found',
+    HttpStatusCode::NOT_FOUND
+);
+
+// З масивом помилок (наприклад валідація)
+return $this-&gt;response-&gt;jsonError(
+    'Validation failed',
+    HttpStatusCode::UNPROCESSABLE_ENTITY,
+    ['email' =&gt; ['The email field is required.']]
+);
+
+// { "status": "error", "code": 422, "message": "...", "errors": { ... } }</code></pre>
+                <p>Ключ <code>errors</code> додається лише якщо масив не порожній.</p>
+
+                <h3 id="json-api" class="mt-4">API-маршрути</h3>
+                <p>
+                    Для JSON-запитів підключайте на групу маршрутів (за потреби):
+                    <code>ParseJsonBodyMiddleware</code> (body → <code>getParsedBody()</code>),
+                    <code>ForceJsonResponseMiddleware</code> (Accept/Content-Type JSON).
+                    Детальніше — <a href="middleware.html#core-middleware">middleware ядра</a>.
+                </p>
+                <p>
+                    <code>RequestFormat::expectsJson()</code> визначає, чи клієнт очікує JSON
+                    (<code>Accept: application/json</code> або <code>X-Requested-With: XMLHttpRequest</code>).
+                    Так само обробляється <a href="requests.html#validation-errors">помилка валідації</a> у middleware.
+                </p>
+
+                <h2 id="redirects" class="border-bottom pb-2 mb-3 mt-5">Редіректи</h2>
+
+                <h3 id="redirect-url" class="mt-4"><code>redirect($url)</code></h3>
+                <pre class="mb-4"><code class="language-php">return $this-&gt;response-&gt;redirect('/cabinet/profile', HttpStatusCode::FOUND);</code></pre>
+                <p>Жорсткий шлях або повний URL. Статус за замовчуванням — <code>302 Found</code>.</p>
+
+                <h3 id="redirect-named" class="mt-4"><code>redirectByName()</code></h3>
+                <pre class="mb-4"><code class="language-php">return $this-&gt;response-&gt;redirectByName('admin.users');
+return $this-&gt;response-&gt;redirectByName('admin.user.edit', ['id' =&gt; $user-&gt;getId()]);</code></pre>
+                <p>
+                    URL будується через <code>UrlGeneratorInterface::path()</code> — відносний шлях за
+                    <a href="routing.html#named-routes">іменованим маршрутом</a>. Зручно після POST (PRG).
+                </p>
+
+                <h3 id="redirect-back" class="mt-4"><code>back()</code></h3>
+                <p>Безпечний повернення «назад» (не open redirect):</p>
+                <ol class="small">
+                    <li><strong>Referer</strong> — якщо внутрішній (той самий host або відносний <code>/...</code>)</li>
+                    <li><strong><code>SAFE_BACK_URL</code></strong> — атрибут запиту з <code>StorePreviousUrlMiddleware</code></li>
+                    <li><strong>Fallback</strong> — аргумент методу (за замовчуванням <code>/</code>)</li>
+                </ol>
+                <pre class="mb-4"><code class="language-php">return $this-&gt;response-&gt;back();
+return $this-&gt;response-&gt;back(HttpStatusCode::FOUND, '/cabinet');</code></pre>
+                <p>
+                    Після невдалої валідації <code>HandleValidationExceptionMiddleware</code> викликає
+                    <code>back()</code> для HTML-форм (flash + старі дані).
+                </p>
+
+                <h2 id="empty" class="border-bottom pb-2 mb-3 mt-5">Порожня та довільна відповідь</h2>
+                <pre class="mb-4"><code class="language-php">use Concept\Core\Http\Protocol\HttpStatusCode;
+
+$response = $this-&gt;response-&gt;createResponse(HttpStatusCode::NO_CONTENT);
+// або CREATED, NOT_FOUND тощо — без тіла</code></pre>
+                <p>
+                    <code>createResponse()</code> — з PSR-17; для кастомного тіла запишіть у
+                    <code>$response-&gt;getBody()</code> і додайте заголовки через <code>withHeader()</code>.
+                    У звичайному коді достатньо методів фабрики вище.
+                </p>
+
+                <h2 id="status-codes" class="border-bottom pb-2 mb-3 mt-5">Коди статусу</h2>
+                <p>Константи в <code>Concept\Core\Http\Protocol\HttpStatusCode</code>:</p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Константа</th><th>Код</th><th>Типове використання</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>OK</code></td><td>200</td><td>Успішна відповідь</td></tr>
+                            <tr><td><code>CREATED</code></td><td>201</td><td>Створення ресурсу</td></tr>
+                            <tr><td><code>NO_CONTENT</code></td><td>204</td><td>Успіх без тіла</td></tr>
+                            <tr><td><code>FOUND</code></td><td>302</td><td>Redirect (за замовчуванням)</td></tr>
+                            <tr><td><code>NOT_FOUND</code></td><td>404</td><td>Ресурс не знайдено</td></tr>
+                            <tr><td><code>UNPROCESSABLE_ENTITY</code></td><td>422</td><td>Валідація FormRequest</td></tr>
+                            <tr><td><code>PAGE_EXPIRED</code></td><td>419</td><td>CSRF (<code>CsrfException</code>)</td></tr>
+                            <tr><td><code>INTERNAL_SERVER_ERROR</code></td><td>500</td><td>Необроблена помилка</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p><code>getReasonPhrase($code)</code> — текст для reason phrase PSR-7.</p>
+
+                <h2 id="patterns" class="border-bottom pb-2 mb-3 mt-5">Типові сценарії</h2>
+
+                <h3 id="pattern-prg" class="mt-4">POST → redirect (PRG)</h3>
+                <pre class="mb-4"><code class="language-php">public function store(StoreUserRequest $request): ResponseInterface
+{
+    $this-&gt;userModel-&gt;newQuery()-&gt;create(
+        $this-&gt;normalizeUserPayload($request-&gt;validated())
+    );
+    $this-&gt;flashBag-&gt;add('success', 'User successfully created');
+
+    return $this-&gt;response-&gt;redirectByName('admin.users');
+}</code></pre>
+
+                <h3 id="pattern-not-found" class="mt-4">Не знайдено → flash + redirect</h3>
+                <pre class="mb-4"><code class="language-php">if (!($user instanceof UserModel)) {
+    $this-&gt;flashBag-&gt;add('error', 'User not found');
+    return $this-&gt;response-&gt;redirectByName('admin.users');
+}
+
+return $this-&gt;viewResponse-&gt;create('@auth-admin/users/show', ['user' =&gt; $user]);</code></pre>
+
+                <h3 id="pattern-api" class="mt-4">JSON endpoint</h3>
+                <pre class="mb-4"><code class="language-php">public function generateTokenApi(): ResponseInterface
+{
+    return $this-&gt;response-&gt;json([
+        'token' =&gt; bin2hex(random_bytes(32)),
+    ]);
+}</code></pre>
+
+                <h2 id="framework-responses" class="border-bottom pb-2 mb-3 mt-5">Відповіді без контролера</h2>
+                <p>Частина відповідей формується в middleware або error handler:</p>
+                <ul>
+                    <li><strong>Валідація</strong> — <code>HandleValidationExceptionMiddleware</code>: JSON 422 або <code>back()</code></li>
+                    <li><strong>CSRF</strong> — <code>CsrfException</code> (код 419), обробка error handler</li>
+                    <li><strong>Production / API помилки</strong> — Whoops + <code>jsonError()</code> за <code>RequestFormat</code></li>
+                </ul>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Не повертайте <code>echo</code> або <code>header()</code> з контролера — лише
+                        <code>ResponseInterface</code>. Інакше emitter і middleware (наприклад DebugBar) не зможуть
+                        коректно обробити відповідь.
+                    </p>
+                </div>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-uk.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

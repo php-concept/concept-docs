@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="uk" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Контролери — Concept Core Documentation">
+    <title>Контролери - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="controllers">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Відкрити навігацію">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link py-1" href="../en/controllers.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link py-1 active" href="../uk/controllers.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link py-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Контролери</h1>
+
+                <p>
+                    Контролер — клас, який обробляє HTTP-запит після middleware і повертає
+                    <code>Psr\Http\Message\ResponseInterface</code>. У Concept Core немає обов’язкового
+                    базового класу: це звичайний PHP-клас із публічними методами, прив’язаними до маршрутів.
+                </p>
+                <p>
+                    Див. також:
+                    <a href="routing.html">маршрутизація</a>,
+                    <a href="request-lifecycle.html#controller">життєвий цикл → контролер</a>,
+                    <a href="middleware.html">middleware</a>.
+                </p>
+
+                <h2 id="routing" class="border-bottom pb-2 mb-3 mt-5">Прив’язка до маршруту</h2>
+                <p>Callable маршруту — масив <code>[Клас::class, 'метод']</code>:</p>
+                <pre class="mb-4"><code class="language-php">use Concept\App\Controllers\IndexController;
+
+$router->get('/', [IndexController::class, 'index'])->setName('home');
+$router->get('/projects/{id:number}', [CabinetProjectController::class, 'show'])
+    ->setName('cabinet.project.show');</code></pre>
+                <p>
+                    League Route бере контролер із DI-контейнера; залежності конструктора підставляються автоматично
+                    (<a href="#autowiring">автовайринг</a>). Метод action викликає <code>RouteStrategy</code>.
+                </p>
+
+                <h2 id="structure" class="border-bottom pb-2 mb-3 mt-5">Де розміщувати</h2>
+                <p>Типові варіанти (шляхи налаштовуються через <a href="setup.html#paths-php">paths.php</a>):</p>
+                <ul>
+                    <li><strong>Застосунок</strong> — <code>App/Controllers/</code> для сторінок «ядра» сайту</li>
+                    <li><strong>Компонент</strong> — <code>Components/{Name}/Controllers/</code>, маршрути в <code>Component/routes.php</code></li>
+                </ul>
+                <p>Один контролер — одна зона відповідальності (кабінет, адмін, публічна вітрина). Складну логіку виносьте в <code>Services/</code>.</p>
+
+                <h2 id="example" class="border-bottom pb-2 mb-3 mt-5">Мінімальний приклад</h2>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+namespace Concept\App\Controllers;
+
+use Concept\Core\Components\View\Contracts\ViewResponseFactoryInterface;
+use Psr\Http\Message\ResponseInterface;
+
+final class IndexController
+{
+    public function __construct(
+        private readonly ViewResponseFactoryInterface $viewResponse,
+    ) {}
+
+    public function index(): ResponseInterface
+    {
+        return $this->viewResponse->create('@frontend/index');
+    }
+}</code></pre>
+                <p>
+                    Шаблон <code>@frontend/index</code> — логічне ім’я Twig (префікс компонента/модуля).
+                    Детальніше — у розділі <a href="views.html">Views</a>.
+                </p>
+
+                <h2 id="autowiring" class="border-bottom pb-2 mb-3 mt-5">Автовайринг і конструктор</h2>
+                <p>
+                    Під час bootstrap створюється <strong>League Container</strong> із делегатом
+                    <code>ReflectionContainer</code>: якщо клас не зареєстрований явно, контейнер аналізує
+                    конструктор і рекурсивно створює залежності за type-hint.
+                </p>
+                <pre class="mb-4"><code class="language-php">// Concept\Core\App::__construct()
+$this-&gt;container-&gt;delegate(new ReflectionContainer(cacheResolutions: true));</code></pre>
+                <p>
+                    Для маршруту <code>[UserController::class, 'index']</code> League Route робить приблизно
+                    <code>$container-&gt;get(UserController::class)</code> — один екземпляр контролера на запит
+                    (shared за замовчуванням для того самого класу в межах одного HTTP-запиту).
+                </p>
+
+                <h3 id="constructor-deps" class="mt-4">Що передавати в конструктор</h3>
+                <p>Оголошуйте залежності явно — через типи параметрів. Контролер «просить» те, що йому потрібно:</p>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Тип залежності</th>
+                                <th>Приклад</th>
+                                <th>Коментар</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Контракти ядра</td>
+                                <td><code>ResponseFactoryInterface</code>, <code>ConfigInterface</code></td>
+                                <td>Реєстрація в service providers Concept Core</td>
+                            </tr>
+                            <tr>
+                                <td>Сервіси застосунку / компонента</td>
+                                <td><code>UserAuthService</code>, <code>AuthService</code></td>
+                                <td>Бізнес-логіка; краще залежність від інтерфейсу, якщо є</td>
+                            </tr>
+                            <tr>
+                                <td>Моделі, репозиторії</td>
+                                <td><code>UserModel</code>, <code>ProjectModel</code></td>
+                                <td>Допустимо в MVC-стилі; для складних доменів — обгортка-сервіс</td>
+                            </tr>
+                            <tr>
+                                <td>Інфраструктура HTTP/сесії</td>
+                                <td><code>FlashBagInterface</code></td>
+                                <td>Для flash-повідомлень після redirect</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <pre class="mb-4"><code class="language-php">public function __construct(
+    private readonly ResponseFactoryInterface $response,
+    private readonly ViewResponseFactoryInterface $viewResponse,
+    private readonly UserAuthService $auth,
+    private readonly FlashBagInterface $flashBag,
+    private readonly ProjectModel $projectModel,
+) {}</code></pre>
+                <p>
+                    Якщо клас не резолвиться (немає binding, циклічна залежність) — помилка контейнера на етапі запиту.
+                    Власні реалізації реєструйте в <code>ServiceProvider</code> компонента або застосунку
+                    (детальніше — <a href="service-container.html">Контейнер сервісів</a>,
+                    <a href="service-providers.html">Service providers</a>).
+                </p>
+
+                <h3 id="service-locator" class="mt-4">Не використовуйте контейнер як service locator</h3>
+                <p>
+                    У контейнері зареєстровано <code>ContainerInterface</code>, але <strong>не інжектуйте його в контролер</strong>
+                    і не викликайте <code>$this-&gt;container-&gt;get(...)</code> у методах action.
+                    Це приховує реальні залежності, ускладнює тести й рефакторинг.
+                </p>
+
+                <div>
+                    <div>
+                        <p class="small text-body-secondary mb-1">Погано (service locator)</p>
+                        <pre class="mb-0"><code class="language-php">public function __construct(
+    private readonly ContainerInterface $container,
+) {}
+
+public function index(): ResponseInterface
+{
+    $auth = $this-&gt;container-&gt;get(UserAuthService::class);
+    // ...
+}</code></pre>
+                    </div>
+                    <div>
+                        <p class="small text-body-secondary mb-1">Добре (явні залежності)</p>
+                        <pre class="mb-0"><code class="language-php">public function __construct(
+    private readonly UserAuthService $auth,
+    private readonly ViewResponseFactoryInterface $viewResponse,
+) {}
+
+public function index(): ResponseInterface
+{
+    $user = $this-&gt;auth-&gt;user();
+    // ...
+}</code></pre>
+                    </div>
+                </div>
+
+                <h3 id="avoid-in-constructor" class="mt-4">Що краще не передавати в конструктор</h3>
+                <ul>
+                    <li>
+                        <code>ContainerInterface</code>, <code>League\Container\Container</code> —
+                        антипатерн service locator (див. вище)
+                    </li>
+                    <li>
+                        <code>Router</code> — для URL є <code>UrlGeneratorInterface</code> / <code>redirectByName()</code>
+                    </li>
+                    <li>
+                        Суперглобали (<code>$_GET</code>, <code>$_POST</code>) — лише через FormRequest або PSR-7
+                    </li>
+                </ul>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Контейнер у <code>App::getContainer()</code> — для bootstrap, CLI і service providers.
+                        У контролерах, middleware і сервісах домену покладайтеся на constructor injection конкретних типів.
+                    </p>
+                </div>
+
+                <h2 id="responses" class="border-bottom pb-2 mb-3 mt-5">Відповіді</h2>
+                <p>Кожен action повертає <code>ResponseInterface</code>. Дві основні фабрики:</p>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Інтерфейс</th>
+                                <th>Коли використовувати</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>ViewResponseFactoryInterface</code></td>
+                                <td>HTML: <code>create('@cabinet/index', ['user' =&gt; $user])</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>ResponseFactoryInterface</code></td>
+                                <td>JSON, redirect, <code>back()</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <pre class="mb-4"><code class="language-php">// Redirect за іменем маршруту
+return $this->response->redirectByName('cabinet.login');
+
+// JSON (API)
+return $this->response->jsonSuccess(['id' =&gt; $id]);
+
+// Flash + redirect після POST
+$this-&gt;flashBag-&gt;set('success', 'Збережено');
+return $this-&gt;response-&gt;redirectByName('admin.users');</code></pre>
+                <p>
+                    Повний опис — <a href="responses.html">Відповіді</a>;
+                    Twig-шаблони — <a href="views.html">Views</a>.
+                </p>
+
+                <h2 id="method-args" class="border-bottom pb-2 mb-3 mt-5">Аргументи методу</h2>
+                <p><code>RouteStrategy</code> заповнює параметри action у такому пріоритеті:</p>
+                <ol>
+                    <li><strong>FormRequest</strong> — створення з контейнера, валідація до входу в метод</li>
+                    <li><strong>ServerRequestInterface</strong> — поточний PSR-7 запит</li>
+                    <li><strong>Параметри URL</strong> — ім’я параметра = ім’я в <code>{id:number}</code>, з приведенням типів через <code>Caster</code></li>
+                    <li><strong>Значення за замовчуванням</strong> у сигнатурі PHP</li>
+                </ol>
+                <pre class="mb-4"><code class="language-php">public function show(int $id): ResponseInterface { /* ... */ }
+
+public function update(UpdateUserRequest $request, int $id): ResponseInterface { /* ... */ }
+
+public function handle(ServerRequestInterface $request): ResponseInterface { /* ... */ }</code></pre>
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Сервіси (<code>UserModel</code>, <code>ResponseFactoryInterface</code> тощо) — через
+                        <a href="#autowiring">конструктор (автовайринг)</a>, не через <code>ContainerInterface::get()</code>.
+                        У параметри методу — лише FormRequest, <code>ServerRequestInterface</code> і сегменти URL.
+                    </p>
+                </div>
+
+                <h2 id="form-request" class="border-bottom pb-2 mb-3 mt-5">FormRequest</h2>
+                <p>
+                    Type-hint нащадка <code>FormRequest</code> у action — автоматична валідація до входу в метод.
+                    Дані: <code>validated()</code> або <code>toDto()</code> (опційно).
+                    Повний опис — у розділі <a href="requests.html">Запити та валідація</a>.
+                </p>
+
+                <h2 id="route-params" class="border-bottom pb-2 mb-3 mt-5">Параметри маршруту</h2>
+                <p>
+                    Сегмент <code>{id:number}</code> потрапляє в метод як <code>int $id</code> (якщо імена збігаються).
+                    Той самий <code>id</code> доступний і як атрибут запиту:
+                    <code>$request-&gt;getAttribute('id')</code>.
+                </p>
+                <pre class="mb-4"><code class="language-php">$router-&gt;get('/edit/{id:number}', [UserController::class, 'edit'])
+    -&gt;setName('admin.user.edit');</code></pre>
+
+                <h2 id="auth" class="border-bottom pb-2 mb-3 mt-5">Авторизація</h2>
+                <p>
+                    Перевірку доступу зазвичай виносять у <a href="middleware.html#auth-middleware">middleware</a>
+                    на групу маршрутів. У контролері залишають бізнес-перевірки (наприклад, «проєкт належить користувачу»).
+                </p>
+                <pre class="mb-4"><code class="language-php">$project = $this-&gt;findUserProject($user, $id);
+if ($project === null) {
+    $this-&gt;flashBag-&gt;add('error', 'Not found.');
+    return $this-&gt;response-&gt;redirectByName('cabinet.projects');
+}</code></pre>
+
+                <h2 id="patterns" class="border-bottom pb-2 mb-3 mt-5">Рекомендовані патерни</h2>
+                <ul>
+                    <li><strong>Тонкий контролер</strong> — orchestration: запит → сервіс → відповідь</li>
+                    <li><strong>Один action — одна відповідальність</strong> — <code>showLogin</code>, <code>login</code>, не «універсальний» метод</li>
+                    <li><strong>POST/PUT/DELETE</strong> — FormRequest + redirect (PRG), не повторний рендер форми</li>
+                    <li><strong>Іменовані маршрути</strong> — <code>redirectByName()</code> замість жорстких URL</li>
+                </ul>
+
+                <h2 id="alternatives" class="border-bottom pb-2 mb-3 mt-5">Closure та invokable</h2>
+                <p>
+                    Маршрут може вказувати на closure або клас з <code>__invoke</code> — підтримується League Route.
+                    У продакшн-коді переважно використовують класи контролерів для тестованості та DI.
+                </p>
+
+                <h2 id="telemetry" class="border-bottom pb-2 mb-3 mt-5">Діагностика</h2>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php route:list</code></pre>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-uk.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

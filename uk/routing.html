@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="uk" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Маршрутизація — Concept Core Documentation">
+    <title>Маршрутизація - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="routing">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Відкрити навігацію">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link py-1" href="../en/routing.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link py-1 active" href="../uk/routing.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link py-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Маршрутизація</h1>
+
+                <p>
+                    Concept Core використовує <a href="https://github.com/thephpleague/route" rel="noopener">League Route</a>
+                    поверх PSR-7. Маршрути описуються у PHP-файлах; один спільний екземпляр
+                    <code>Router</code> обслуговує весь застосунок.
+                </p>
+                <p>
+                    Контекст: <a href="request-lifecycle.html">життєвий цикл запиту</a>,
+                    <a href="configuration.html">config/routes.php</a>.
+                </p>
+
+                <h2 id="registration" class="border-bottom pb-2 mb-3 mt-5">Підключення файлів маршрутів</h2>
+                <p>У <code>config/routes.php</code> перелічіть шляхи до файлів, які підключає <code>HttpServiceProvider</code>:</p>
+                <pre class="mb-4"><code class="language-php">return [
+    'routes' => [
+        dirname(__DIR__) . '/routes/web.php',
+    ],
+];</code></pre>
+                <p>
+                    Додаткові файли з компонентів підключаються під час
+                    <code>ComponentsServiceProvider::boot()</code> — кожен компонент може повернути шлях до
+                    власного <code>routes.php</code> (див. <a href="directory-structure.html#variant-components">структура з компонентами</a>).
+                </p>
+                <p>У кожному файлі маршрутів доступна змінна <code>$router</code> (тип <code>League\Route\Router</code>):</p>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+use League\Route\Router;
+
+/** @var Router $router */
+
+$router->get('/path', $handler);</code></pre>
+
+                <h2 id="handlers" class="border-bottom pb-2 mb-3 mt-5">Обробники (handlers)</h2>
+                <p>League Route підтримує кілька форм callable:</p>
+
+                <h3 id="controller" class="mt-4">Контролер [Class, method]</h3>
+                <p>Рекомендований варіант — метод контролера, який резолвиться з DI-контейнера:</p>
+                <pre class="mb-4"><code class="language-php">use Concept\App\Controllers\IndexController;
+
+$router->get('/', [IndexController::class, 'index'])->setName('home');</code></pre>
+                <p>
+                    Аргументи методу підставляє <code>RouteStrategy</code> (FormRequest, <code>ServerRequestInterface</code>,
+                    параметри URL, сервіси з контейнера). Детальніше — <a href="controllers.html">Контролери</a>.
+                </p>
+
+                <h3 id="closure">Closure</h3>
+                <pre class="mb-4"><code class="language-php">$router->get('/health', fn () =&gt; new Response(/* ... */));</code></pre>
+                <p>Для простих endpoint-ів; для складної логіки краще винести в контролер.</p>
+
+                <h2 id="methods" class="border-bottom pb-2 mb-3 mt-5">HTTP-методи</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead><tr><th>Метод Router</th><th>HTTP</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>get()</code></td><td>GET</td></tr>
+                            <tr><td><code>post()</code></td><td>POST</td></tr>
+                            <tr><td><code>put()</code></td><td>PUT</td></tr>
+                            <tr><td><code>patch()</code></td><td>PATCH</td></tr>
+                            <tr><td><code>delete()</code></td><td>DELETE</td></tr>
+                            <tr><td><code>map()</code></td><td>кілька методів</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h2 id="parameters" class="border-bottom pb-2 mb-3 mt-5">Параметри URL</h2>
+                <p>Сегменти в фігурних дужках потрапляють у атрибути запиту та в аргументи контролера:</p>
+                <pre class="mb-4"><code class="language-php">$router->get('/admin/users/edit/{id:number}', [UserController::class, 'edit']);</code></pre>
+                <p>
+                    Суфікс <code>:number</code> — обмеження League Route (лише цифри).
+                    Інші: <code>:alpha</code>, <code>:alphanum</code>, <code>:segment</code> тощо.
+                    Без суфікса — довільний сегмент (<code>{token}</code>).
+                </p>
+                <p>У контролері параметр з тією ж назвою та типом (через Caster):</p>
+                <pre class="mb-4"><code class="language-php">public function edit(int $id): ResponseInterface</code></pre>
+
+                <h2 id="groups" class="border-bottom pb-2 mb-3 mt-5">Групи маршрутів</h2>
+                <p>Спільний префікс URI та middleware для групи:</p>
+                <pre class="mb-4"><code class="language-php">use League\Route\RouteGroup;
+use Concept\Components\AuthAdmin\Middlewares\AuthMiddleware;
+
+$router->group('/admin', function (RouteGroup $route) {
+    $route->get('/', [AdminController::class, 'index'])->setName('admin.home');
+    $route->get('/logout', [AdminController::class, 'logout'])->setName('admin.logout');
+})->lazyMiddleware(AuthMiddleware::class);</code></pre>
+                <p>
+                    URL <code>/admin</code> та <code>/admin/logout</code> проходять через <code>AuthMiddleware</code>.
+                    Вкладені групи підтримуються.
+                </p>
+
+                <h2 id="middleware" class="border-bottom pb-2 mb-3 mt-5">Middleware на маршрутах</h2>
+                <p><strong>Глобальний</strong> — для всіх маршрутів у файлі (зазвичай на початку <code>routes/web.php</code>):</p>
+                <pre class="mb-4"><code class="language-php">$router->lazyMiddleware(VerifyCsrfTokenMiddleware::class);
+$router->lazyMiddleware(ShareViewDataMiddleware::class);</code></pre>
+                <p><strong>На групу або маршрут</strong> — ланцюжок доповнюється для збігів у цій області:</p>
+                <pre class="mb-4"><code class="language-php">$router->post('/projects/store', [ProjectController::class, 'store'])
+    ->setName('projects.store')
+    ->lazyMiddleware(ActiveUserMiddleware::class);</code></pre>
+                <p>
+                    <code>lazyMiddleware</code> — клас резолвиться з контейнера під час запиту.
+                    Детальніше — <a href="middleware.html">Middleware</a>.
+                </p>
+
+                <h2 id="named-routes" class="border-bottom pb-2 mb-3 mt-5">Іменовані маршрути</h2>
+                <p>Кожному маршруту можна задати ім’я для генерації URL:</p>
+                <pre class="mb-4"><code class="language-php">$router->get('/login', [CabinetController::class, 'showLogin'])->setName('cabinet.login');</code></pre>
+                <p>У PHP (через <code>UrlGeneratorInterface</code>):</p>
+                <pre class="mb-4"><code class="language-php">$url = $urlGenerator->route('cabinet.login');
+$path = $urlGenerator->path('admin.user.edit', ['id' =&gt; 5]);</code></pre>
+                <p>У Twig (розширення <code>UrlExtension</code>):</p>
+                <pre class="mb-4"><code class="language-twig">{{ route('cabinet.login') }}
+{{ path('admin.user.edit', { id: user.id }) }}
+{{ base_url() }}</code></pre>
+
+                <h2 id="components-routes" class="border-bottom pb-2 mb-3 mt-5">Маршрути компонентів</h2>
+                <p>
+                    Компонент реалізує <code>ComponentInterface::routes()</code> і повертає абсолютний шлях до файлу.
+                    Приклад: <code>src/Components/AuthAdmin/routes.php</code> з префіксами <code>/admin</code>,
+                    <code>/admin/users</code>.
+                </p>
+                <p>
+                    Усі маршрути потрапляють в один <code>Router</code> — уникайте дублювання імен
+                    (<code>setName</code>) між файлами.
+                </p>
+
+                <h2 id="cli" class="border-bottom pb-2 mb-3 mt-5">Перегляд маршрутів (CLI)</h2>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php route:list
+php bin/console.php route:list -F   # повні імена middleware</code></pre>
+                <p>Виводить метод, URI, ім’я, handler і middleware для кожного зареєстрованого маршруту.</p>
+
+                <h2 id="tips" class="border-bottom pb-2 mb-3 mt-5">Поради</h2>
+                <ul>
+                    <li>Тримайте публічні маршрути в <code>routes/web.php</code>, модульні — у <code>Component/routes.php</code>.</li>
+                    <li>Завжди іменуйте маршрути, які з’являються у шаблонах або редіректах.</li>
+                    <li>POST/PUT/DELETE з формами — разом із <code>VerifyCsrfTokenMiddleware</code> і CSRF-полем.</li>
+                    <li>Захищені зони оформлюйте <code>group()</code> + auth-middleware, а не перевіркою в кожному контролері.</li>
+                </ul>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-uk.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

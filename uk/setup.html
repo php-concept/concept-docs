@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="uk" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Налаштування bootstrap, точки входу та структури каталогів">
+    <title>Налаштування - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="setup">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Відкрити навігацію">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link py-1" href="../en/setup.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link py-1 active" href="setup.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link py-1" href="../index.html" title="Головна"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Закрити"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Налаштування</h1>
+
+                <p>
+                    Перед роботою з <a href="configuration.html">конфігурацією</a> (<code>config/</code>, <code>.env</code>)
+                    варто зрозуміти, як застосунок запускається: точка входу HTTP, bootstrap і консоль.
+                    У skeleton це три зони: <code>public/</code>, <code>bootstrap/</code> та <code>bin/</code>.
+                </p>
+
+                <h2 id="overview" class="border-bottom pb-2 mb-3 mt-5">Загальна схема</h2>
+                <pre class="mb-4"><code class="language-text">HTTP-запит → public/index.php → bootstrap/app.php → провайдери → $app->run()
+CLI-команда  → bin/console.php  → bootstrap (paths + app) → провайдери console → Symfony Console</code></pre>
+
+                <h2 id="public-index" class="border-bottom pb-2 mb-3 mt-5">public/index.php</h2>
+                <p>Єдина публічна точка входу для веб-сервера (Apache, Nginx, PHP built-in server). Document root віртуального хоста має вказувати на <code>public/</code>.</p>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+use Concept\Core\App;
+
+require_once __DIR__ . '/../vendor/autoload.php';
+
+/** @var App $app */
+$app = require_once __DIR__ . '/../bootstrap/app.php';
+
+$app->run();</code></pre>
+                <ul>
+                    <li><strong>autoload</strong> — Composer PSR-4 (<code>vendor/autoload.php</code>).</li>
+                    <li><strong>bootstrap/app.php</strong> — створює <code>App</code>, реєструє провайдери для HTTP.</li>
+                    <li><strong>run()</strong> — обробка PSR-7 запиту, маршрутизація, відповідь.</li>
+                </ul>
+                <p>У <code>public/</code> також лежать статичні файли (<code>assets/</code>, <code>vendor/bootstrap</code> після publish) — вони віддаються напряму веб-сервером, без PHP.</p>
+
+                <h2 id="bootstrap" class="border-bottom pb-2 mb-3 mt-5">Каталог bootstrap/</h2>
+                <p>Код ініціалізації застосунку, спільний для HTTP і CLI (через <code>paths.php</code>).</p>
+                <pre class="mb-4"><code class="language-text">bootstrap/
+├── app.php              # HTTP: App + провайдери app.php
+├── paths.php            # мапа логічних шляхів → каталоги проєкту
+└── providers/
+    ├── app.php          # провайдери для веб-запитів
+    └── console.php      # провайдери для консолі</code></pre>
+
+                <h3 id="bootstrap-app" class="mt-4">bootstrap/app.php</h3>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+use Concept\Core\App;
+
+$rootPath = dirname(__DIR__);
+/** @var array&lt;string, string&gt; $paths */
+$paths = include $rootPath . '/bootstrap/paths.php';
+$app = App::create($rootPath, $paths);
+
+$providerFiles = [
+    $rootPath . '/bootstrap/providers/app.php',
+];
+$app->registerServiceProviders($providerFiles);
+
+return $app;</code></pre>
+                <ul>
+                    <li><code>$rootPath</code> — абсолютний шлях до кореня проєкту (батьківська папка для <code>bootstrap/</code>).</li>
+                    <li><code>paths.php</code> — повертає масив для <code>PathManager</code> (див. нижче).</li>
+                    <li><code>App::create()</code> — контейнер, ранній error handler, реєстрація <code>PathManager</code>.</li>
+                    <li><code>registerServiceProviders()</code> — кожен файл у списку має повертати масив класів провайдерів.</li>
+                </ul>
+
+                <h3 id="bootstrap-providers-app">bootstrap/providers/app.php</h3>
+                <p>Набір сервіс-провайдерів ядра для HTTP: конфіг, помилки, події, HTTP, сесія, лог, Twig, валідація, БД, компоненти тощо. Порядок у масиві важливий — залежності реєструються раніше за залежні сервіси.</p>
+                <p>Щоб додати власний провайдер для вебу — зареєструйте клас у цьому масиві або підключіть окремий файл у <code>$providerFiles</code> у <code>app.php</code>.</p>
+
+                <h3 id="bootstrap-providers-console">bootstrap/providers/console.php</h3>
+                <p>Скорочений набір для CLI: без View/Validation HTTP-стеку, з <code>ConsoleServiceProvider</code>. Використовується з <code>bin/console.php</code>.</p>
+
+                <h2 id="paths-php" class="border-bottom pb-2 mb-3 mt-5">bootstrap/paths.php</h2>
+                <p>
+                    Центральне місце, де ви <strong>задаєте фізичну структуру проєкту</strong>.
+                    Файл повертає асоціативний масив: <em>логічний ключ</em> → <em>відносний шлях від кореня проєкту</em>.
+                    Ядро звертається до каталогів лише через <code>PathManager::get($key)</code>, а не через жорстко прошиті рядки.
+                </p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Структуру папок можна визначити на свій смак: перейменуйте каталоги, рознесіть код по монорепо
+                        або перенесіть логи в <code>var/log</code> — достатньо змінити значення в <code>paths.php</code>,
+                        якщо ключі залишаються константами <code>PathManager</code>.
+                    </p>
+                </div>
+
+                <p>Приклад із skeleton:</p>
+                <pre class="mb-4"><code class="language-php">&lt;?php
+
+use Concept\Core\Components\Path\PathManager;
+
+return [
+    PathManager::BOOTSTRAP_DIR => 'bootstrap',
+    PathManager::SRC_DIR => 'src',
+    PathManager::CONFIG_DIR => 'config',
+    PathManager::MIGRATIONS_DIR => 'database/migrations',
+    PathManager::SEEDERS_DIR => 'database/seeders',
+    PathManager::PUBLIC_DIR => 'public',
+    PathManager::STORAGE_DIR => 'storage',
+    PathManager::LOGS_DIR => 'storage/logs',
+    PathManager::CACHE_DIR => 'storage/cache',
+    PathManager::RESOURCES_DIR => 'resources',
+    PathManager::VIEWS_DIR => 'resources/views',
+    PathManager::ERRORS_FALLBACK_VIEWS_DIR => 'resources/views/errors/fallback',
+];</code></pre>
+
+                <h3 id="paths-keys" class="mt-4">Ключі PathManager</h3>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Константа (ключ масиву)</th>
+                                <th>Шлях у skeleton</th>
+                                <th>Хто використовує</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>BOOTSTRAP_DIR</code></td><td><code>bootstrap</code></td><td>Резерв для bootstrap-ресурсів</td></tr>
+                            <tr><td><code>SRC_DIR</code></td><td><code>src</code></td><td>Код застосунку (PSR-4)</td></tr>
+                            <tr><td><code>CONFIG_DIR</code></td><td><code>config</code></td><td>PHP-конфіг, оверрайди <code>config/{env}/</code></td></tr>
+                            <tr><td><code>MIGRATIONS_DIR</code></td><td><code>database/migrations</code></td><td>Міграції БД</td></tr>
+                            <tr><td><code>SEEDERS_DIR</code></td><td><code>database/seeders</code></td><td>Сидери</td></tr>
+                            <tr><td><code>PUBLIC_DIR</code></td><td><code>public</code></td><td>Document root, статика</td></tr>
+                            <tr><td><code>STORAGE_DIR</code></td><td><code>storage</code></td><td>Записувані дані застосунку</td></tr>
+                            <tr><td><code>LOGS_DIR</code></td><td><code>storage/logs</code></td><td>Monolog, debug-лог</td></tr>
+                            <tr><td><code>CACHE_DIR</code></td><td><code>storage/cache</code></td><td>Кеш Twig, Valinor тощо</td></tr>
+                            <tr><td><code>RESOURCES_DIR</code></td><td><code>resources</code></td><td>Ресурси, не тільки views</td></tr>
+                            <tr><td><code>VIEWS_DIR</code></td><td><code>resources/views</code></td><td>Шаблони Twig (базовий шлях)</td></tr>
+                            <tr><td><code>ERRORS_FALLBACK_VIEWS_DIR</code></td><td><code>resources/views/errors/fallback</code></td><td>Fallback-шаблони помилок (production)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="paths-api" class="mt-4">API PathManager</h3>
+                <pre class="mb-4"><code class="language-php">// Абсолютний шлях: /var/www/my-app/config
+$pathManager->get(PathManager::CONFIG_DIR);
+
+// З підшляхом: /var/www/my-app/storage/cache/views
+$pathManager->get(PathManager::CACHE_DIR, 'views');
+
+// Довільний шлях від кореня проєкту
+$pathManager->root('custom/dir');</code></pre>
+                <p>
+                    Другий аргумент <code>get()</code> — підкаталог усередині зареєстрованого шляху (наприклад <code>view.cache_dir</code> у конфігу
+                    додається до <code>CACHE_DIR</code>).
+                </p>
+
+                <h3 id="paths-custom" class="mt-4">Власна структура каталогів</h3>
+                <p>Приклад: логи та кеш у <code>var/</code>, код у <code>app/</code>:</p>
+                <pre class="mb-4"><code class="language-php">return [
+    PathManager::SRC_DIR => 'app',
+    PathManager::CONFIG_DIR => 'etc/config',
+    PathManager::LOGS_DIR => 'var/log',
+    PathManager::CACHE_DIR => 'var/cache',
+    PathManager::VIEWS_DIR => 'app/Resources/views',
+    // ... інші ключі за потреби
+];</code></pre>
+                <p>Після зміни шляхів:</p>
+                <ul>
+                    <li>оновіть <code>composer.json</code> → <code>autoload.psr-4</code>, якщо змінили <code>SRC_DIR</code>;</li>
+                    <li>переконайтеся, що веб-сервер дивиться на актуальний <code>PUBLIC_DIR</code>;</li>
+                    <li>у <code>config/migrations.php</code> та <code>view.php</code> шляхи узгоджені з новою структурою.</li>
+                </ul>
+                <p class="small text-body-secondary">
+                    Додавати нові ключі в <code>PathManager</code> у ядрі потрібно лише якщо новий тип шляху використовуватиме саме core;
+                    для власного коду достатньо <code>$pathManager->root('my/custom/path')</code>.
+                </p>
+
+                <h2 id="bin" class="border-bottom pb-2 mb-3 mt-5">bin/console.php</h2>
+                <p>Точка входу для CLI (міграції, сидери, <code>route:list</code>, <code>view:clear</code>).</p>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+use Concept\Core\App;
+use Symfony\Component\Console\Application as ConsoleApplication;
+
+require __DIR__ . '/../vendor/autoload.php';
+
+$rootPath = dirname(__DIR__);
+$paths = include $rootPath . '/bootstrap/paths.php';
+$app = App::create($rootPath, $paths);
+
+$providerFiles = [
+    $rootPath . '/bootstrap/providers/console.php',
+];
+$app->registerServiceProviders($providerFiles);
+
+$container = $app->getContainer();
+$console = $container->get(ConsoleApplication::class);
+
+$console->run();</code></pre>
+                <p>Запуск із кореня проєкту (як у <code>composer.json</code> → script <code>console</code>):</p>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php</code></pre>
+                <p>Відмінності від HTTP:</p>
+                <ul>
+                    <li>той самий <code>paths.php</code> і <code>App::create()</code>;</li>
+                    <li>інший список провайдерів — <code>bootstrap/providers/console.php</code>;</li>
+                    <li>замість <code>$app->run()</code> — Symfony Console <code>Application</code> з контейнера.</li>
+                </ul>
+
+                <h2 id="checklist" class="border-bottom pb-2 mb-3 mt-5">Чеклист нового проєкту</h2>
+                <ol>
+                    <li>Скопіювати skeleton або створити структуру з <code>public/index.php</code>, <code>bootstrap/</code>, <code>bin/console.php</code>.</li>
+                    <li>Налаштувати <code>bootstrap/paths.php</code> під свої каталоги.</li>
+                    <li>Підключити потрібні провайдери в <code>bootstrap/providers/app.php</code> та <code>console.php</code>.</li>
+                    <li>Налаштувати веб-сервер на <code>public/</code>, створити <code>.env</code>.</li>
+                    <li>Перейти до <a href="configuration.html">Конфігурації</a> — <code>config/</code> та змінні оточення.</li>
+                </ol>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/bash.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-uk.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

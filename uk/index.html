@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="uk" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Вступ до Concept Core — ядро PHP-фреймворку">
+    <title>Вступ - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="index">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Відкрити навігацію">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link py-1" href="../en/index.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link py-1 active" href="index.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link py-1" href="../index.html" title="Головна"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Закрити"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Concept Core</h1>
+
+                <ul>
+                    <li><a href="#introduction">Вступ</a></li>
+                    <li><a href="#why-concept">Чому Concept?</a></li>
+                    <li><a href="#learning-concept">Вивчення Concept</a></li>
+                </ul>
+
+                <h2 id="introduction" class="border-bottom pb-2 mb-3 mt-5">Вступ</h2>
+                <p>
+                    Concept Core — це ядро PHP-фреймворку Concept. Воно забезпечує bootstrap застосунку,
+                    контейнер сервісів, HTTP-шар, маршрутизацію, представлення, валідацію та підключаємі компоненти.
+                </p>
+                <p>
+                    Ця документація описує пакет <code>php-concept/core</code> — фундамент для skeleton-проєктів
+                    та власних рішень.
+                </p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <h3 class="h6 alert-heading">Вперше з Concept?</h3>
+                    <p class="mb-0">
+                        Рекомендуємо почати з <a href="installation.html" class="alert-link">Встановлення</a>, потім
+                        <a href="configuration.html" class="alert-link">Конфігурація</a> та
+                        <a href="request-lifecycle.html" class="alert-link">Життєвий цикл запиту</a>.
+                    </p>
+                </div>
+
+                <h2 id="why-concept" class="border-bottom pb-2 mb-3 mt-5">Чому Concept?</h2>
+                <p>
+                    Concept створений для розробників, яким потрібен сучасний PHP-стек без зайвої ваги моноліту:
+                </p>
+                <ul>
+                    <li><strong>League Container</strong> — впровадження залежностей</li>
+                    <li><strong>League Route</strong> — HTTP-маршрутизація</li>
+                    <li><strong>Twig</strong> — шаблони</li>
+                    <li><strong>Illuminate Database</strong> — моделі в стилі Eloquent</li>
+                    <li><strong>Valinor</strong> — мапінг даних запиту в DTO</li>
+                </ul>
+
+                <h2 id="learning-concept" class="border-bottom pb-2 mb-3 mt-5">Вивчення Concept</h2>
+                <p>
+                    Перегляньте код у <code>vendor/php-concept/core</code> та skeleton-застосунок.
+                </p>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-uk.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

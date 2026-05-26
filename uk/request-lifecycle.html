@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="uk" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Життєвий цикл запиту — Concept Core Documentation">
+    <title>Життєвий цикл запиту - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="request-lifecycle">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Відкрити навігацію">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link py-1" href="../en/request-lifecycle.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link py-1 active" href="../uk/request-lifecycle.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link py-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Життєвий цикл запиту</h1>
+
+                <p>
+                    HTTP-запит проходить від веб-сервера через <code>public/index.php</code>, bootstrap провайдерів
+                    і диспетчеризацію League Route. Нижче — повний ланцюжок з урахуванням middleware,
+                    компонентів і обробки помилок.
+                </p>
+                <p>
+                    Передумови: <a href="setup.html">налаштування</a> точок входу,
+                    <a href="configuration.html">конфігурація</a>.
+                </p>
+
+                <h2 id="overview" class="border-bottom pb-2 mb-3 mt-5">Огляд</h2>
+                <pre class="mb-4"><code class="language-text">Веб-сервер → public/index.php
+    → vendor/autoload.php
+    → bootstrap/app.php (App::create, провайдери)
+    → App::run()
+        → Router::dispatch(PSR-7 Request)
+            → глобальний middleware (CSRF, сесія, views…)
+            → middleware маршруту (якщо є)
+            → RouteStrategy → контролер / closure
+        → SapiEmitter → відповідь клієнту</code></pre>
+
+                <h2 id="entry" class="border-bottom pb-2 mb-3 mt-5">1. Точка входу</h2>
+                <p>
+                    <code>public/index.php</code> — єдиний файл, на який має дивитися document root.
+                    Він не містить бізнес-логіки:
+                </p>
+                <pre class="mb-4"><code class="language-php">require_once __DIR__ . '/../vendor/autoload.php';
+$app = require_once __DIR__ . '/../bootstrap/app.php';
+$app->run();</code></pre>
+
+                <h2 id="bootstrap-phase" class="border-bottom pb-2 mb-3 mt-5">2. Bootstrap (до run)</h2>
+                <p><code>bootstrap/app.php</code> виконує:</p>
+                <ol>
+                    <li><code>App::create($rootPath, $paths)</code> — контейнер League, <code>PathManager</code>, ранній Whoops (з <code>APP_DEBUG</code> з оточення).</li>
+                    <li><code>registerServiceProviders()</code> — підключення списку з <code>bootstrap/providers/app.php</code>.</li>
+                </ol>
+                <p>Кожен провайдер реєструє сервіси в контейнері; провайдери з <code>BootableServiceProviderInterface</code> також викликають <code>boot()</code>.</p>
+
+                <h3 id="providers-order" class="mt-4">Порядок провайдерів (HTTP)</h3>
+                <p>Типовий порядок у <code>bootstrap/providers/app.php</code>:</p>
+                <ol class="small">
+                    <li><strong>Config</strong> — конфіг, <code>.env</code>, часовий пояс</li>
+                    <li><strong>ErrorHandler</strong> — Whoops (HTML / JSON / production fallback)</li>
+                    <li><strong>Event</strong> — диспетчер подій</li>
+                    <li><strong>Http</strong> — PSR-7 запит, Router, фабрики відповідей</li>
+                    <li><strong>Session</strong> — Symfony Session (стартує при першому зверненні)</li>
+                    <li><strong>Log, View, Validation, Database, Caster</strong></li>
+                    <li><strong>Components</strong> — реєстрація модулів (див. крок 3)</li>
+                </ol>
+
+                <h3 id="components-boot" class="mt-4">Що робить ComponentsServiceProvider::boot()</h3>
+                <p>Під час <code>boot()</code> (ще до <code>run()</code>), якщо увімкнені компоненти:</p>
+                <ul>
+                    <li>реєструються консольні команди, міграції, сидери компонентів;</li>
+                    <li>підключаються додаткові service providers компонентів;</li>
+                    <li><code>require</code> файлів <code>routes.php</code> кожного компонента — маршрути додаються в той самий <code>Router</code>;</li>
+                    <li>реєструються Twig paths, extensions, contexts для views компонентів.</li>
+                </ul>
+                <p>
+                    Глобальні маршрути з <code>routes/web.php</code> підключаються раніше — у
+                    <code>HttpServiceProvider</code> з масиву <code>config/routes.php</code>.
+                </p>
+
+                <h2 id="request-object" class="border-bottom pb-2 mb-3 mt-5">3. PSR-7 запит</h2>
+                <p>
+                    <code>ServerRequestInterface</code> створюється в контейнері через
+                    <code>Laminas\Diactoros\ServerRequestFactory::fromGlobals()</code> —
+                    дані з <code>$_SERVER</code>, <code>$_GET</code>, <code>$_POST</code>, <code>$_COOKIE</code>, <code>$_FILES</code>.
+                </p>
+                <p>
+                    Після збігу маршруту <code>RouteStrategy</code> додає параметри URL у атрибути запиту
+                    (<code>{id}</code> → <code>$request->getAttribute('id')</code>) і оновлює екземпляр у контейнері.
+                </p>
+
+                <h2 id="run" class="border-bottom pb-2 mb-3 mt-5">4. App::run()</h2>
+                <pre class="mb-4"><code class="language-php">$router = $this->container->get(Router::class);
+$request = $this->container->get(ServerRequestInterface::class);
+$response = $router->dispatch($request);
+(new SapiEmitter)->emit($response);</code></pre>
+                <p>
+                    <code>Router</code> налаштований із <code>RouteStrategy</code> — кастомна стратегія Concept Core
+                    замість стандартної League: DI параметрів контролера, FormRequest, події маршруту.
+                </p>
+
+                <h2 id="middleware" class="border-bottom pb-2 mb-3 mt-5">5. Middleware</h2>
+                <p>
+                    Глобальний middleware реєструється в файлах маршрутів через
+                    <code>$router->lazyMiddleware(ClassName::class)</code> (League Route).
+                    Middleware створюється з контейнера при обробці запиту.
+                </p>
+                <p>Приклад із <code>routes/web.php</code>:</p>
+                <ul class="small">
+                    <li><code>HandleValidationExceptionMiddleware</code> — перетворює помилки валідації на відповідь</li>
+                    <li><code>VerifyCsrfTokenMiddleware</code> — CSRF для POST/PUT/DELETE</li>
+                    <li><code>StorePreviousUrlMiddleware</code> — зберігає URL для редіректів</li>
+                    <li><code>ShareViewDataMiddleware</code> — спільні змінні для Twig</li>
+                </ul>
+                <p>
+                    Кожен middleware реалізує <code>MiddlewareInterface::process($request, $handler)</code>
+                    і викликає <code>$handler->handle($request)</code> для передачі далі по ланцюгу.
+                    Детальніше — у розділі <a href="middleware.html">Middleware</a>.
+                </p>
+
+                <h2 id="controller" class="border-bottom pb-2 mb-3 mt-5">6. Контролер і RouteStrategy</h2>
+                <p>Після middleware виконується callable маршруту, наприклад:</p>
+                <pre class="mb-4"><code class="language-php">$router->get('/', [IndexController::class, 'index'])->setName('home');</code></pre>
+                <p><code>RouteStrategy</code> розв’язує аргументи методу action:</p>
+                <ol>
+                    <li><strong>FormRequest</strong> — створення з контейнера, валідація, події <code>FormRequestValidating</code> / <code>FormRequestValidated</code></li>
+                    <li><strong>ServerRequestInterface</strong> — поточний запит</li>
+                    <li><strong>Параметри URL</strong> — з маршруту, з приведенням типів через Caster</li>
+                    <li><strong>Значення за замовчуванням</strong> — якщо оголошені в сигнатурі</li>
+                </ol>
+                <p>
+                    Залежності сервісів (<code>ViewResponseFactoryInterface</code>, моделі тощо) — через
+                    <strong>конструктор</strong> контролера (автовайринг League Container + ReflectionContainer).
+                    Детальніше — <a href="controllers.html#autowiring">Контролери → автовайринг</a>,
+                    <a href="controllers.html#method-args">аргументи методу</a>.
+                </p>
+                <p>
+                    Події <code>RouteCallableInvoking</code> / <code>RouteCallableInvoked</code> дозволяють вимірювати час виконання handler.
+                </p>
+
+                <h2 id="response" class="border-bottom pb-2 mb-3 mt-5">7. Відповідь</h2>
+                <p>Контролер повертає <code>ResponseInterface</code> (PSR-7). Типові варіанти:</p>
+                <ul>
+                    <li><code>ViewResponseFactoryInterface::create('@frontend/index')</code> — HTML через Twig</li>
+                    <li><code>ResponseFactoryInterface</code> — JSON, redirect, порожня відповідь</li>
+                </ul>
+                <p>
+                    <code>SapiEmitter</code> (Laminas) відправляє заголовки та тіло в PHP SAPI (Apache, FPM, built-in server).
+                    Детальніше — <a href="responses.html">Відповіді</a>.
+                </p>
+
+                <h2 id="errors" class="border-bottom pb-2 mb-3 mt-5">8. Обробка помилок</h2>
+                <ul>
+                    <li><strong>До bootstrap</strong> — ранній Whoops у <code>App::create()</code> (читає <code>APP_DEBUG</code> з <code>$_ENV</code>).</li>
+                    <li><strong>Після Config</strong> — <code>ErrorHandlerServiceProvider::boot()</code> перемикає Whoops: PrettyPage (debug), JSON (API), production fallback views.</li>
+                    <li><strong>Валідація</strong> — <code>ValidationException</code> з FormRequest; middleware може перехопити й повернути 422 / redirect.</li>
+                    <li><strong>CSRF</strong> — <code>CsrfException</code> при невалідному токені.</li>
+                    <li><strong>404 / метод</strong> — League Route; обробка залежить від налаштувань router.</li>
+                </ul>
+
+                <h2 id="events" class="border-bottom pb-2 mb-3 mt-5">9. Події (опційно)</h2>
+                <p>
+                    Якщо <code>app.debug</code> увімкнено, <code>EventServiceProvider</code> буферизує події framework/HTTP
+                    для debug-панелі. Підписники можна додавати на події ядра та власні події застосунку.
+                </p>
+
+                <h2 id="cli-note" class="border-bottom pb-2 mb-3 mt-5">CLI — окремий цикл</h2>
+                <p>
+                    <code>bin/console.php</code> не викликає <code>App::run()</code>.
+                    Використовує той самий <code>paths.php</code>, але провайдери з <code>bootstrap/providers/console.php</code>
+                    і Symfony Console <code>Application::run()</code>. HTTP middleware і PSR-7 запит у CLI не застосовуються.
+                </p>
+
+                <h2 id="related" class="border-bottom pb-2 mb-3 mt-5">Далі</h2>
+                <ul>
+                    <li><a href="routing.html">Маршрутизація</a> — оголошення маршрутів, імена, групи</li>
+                    <li><a href="middleware.html">Middleware</a> — власний middleware</li>
+                    <li><a href="controllers.html">Контролери</a></li>
+                    <li><a href="requests.html">Запити та валідація</a> — FormRequest</li>
+                </ul>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-uk.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

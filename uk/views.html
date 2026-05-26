@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="uk" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Представлення — Concept Core Documentation">
+    <title>Представлення - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="views">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Відкрити навігацію">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link py-1" href="../en/views.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link py-1 active" href="../uk/views.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link py-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Представлення</h1>
+
+                <p>
+                    HTML у Concept Core рендериться через <strong>Twig</strong>.
+                    Шаблони — файли <code>.twig</code> у каталозі views; у контролері відповідь збирається через
+                    <code>ViewResponseFactoryInterface::create()</code> (див. <a href="responses.html#html">Відповіді → HTML</a>).
+                </p>
+                <p>
+                    Низькорівневий рендер — <code>ViewInterface::render()</code> (сервіси, error handler).
+                    Шляхи до views налаштовуються в <code>config/view.php</code> і в <code>config.php</code> компонентів.
+                </p>
+
+                <h2 id="namespaces" class="border-bottom pb-2 mb-3 mt-5">Простори імен Twig</h2>
+                <p>
+                    Шаблон з контролера вказується як <code>@namespace/шлях/без_розширення</code>.
+                    Namespace реєструється в конфігурації:
+                </p>
+                <pre class="mb-4"><code class="language-php">// config/view.php
+'paths' =&gt; [
+    'frontend'  =&gt; '/resources/views/frontend',
+    'dashboard' =&gt; '/resources/views/dashboard',
+],
+
+// src/Components/UserCabinet/config.php
+'paths' =&gt; [
+    'cabinet' =&gt; '/src/Components/UserCabinet/Views',
+],</code></pre>
+                <p>Файл <code>src/Components/UserCabinet/Views/index.twig</code> → <code>@cabinet/index</code>.</p>
+                <p>
+                    Каталог <code>resources/views</code> (ключ <code>PathManager::VIEWS_DIR</code>) також додано
+                    як fallback без namespace — рідко потрібен, якщо всі шаблони в namespaced paths.
+                </p>
+
+                <h2 id="from-controller" class="border-bottom pb-2 mb-3 mt-5">Рендер з контролера</h2>
+                <pre class="mb-4"><code class="language-php">return $this-&gt;viewResponse-&gt;create('@frontend/index');
+
+return $this-&gt;viewResponse-&gt;create('@cabinet/index', [
+    'user' =&gt; $user,
+    'latestProject' =&gt; $latestProject,
+]);</code></pre>
+                <p>
+                    Другий аргумент — змінні лише для цього запиту. Вони зливаються з глобальним контекстом
+                    (<code>errors</code>, <code>old</code>, <code>flashes</code>, <code>csrf_token</code>) з
+                    <a href="middleware.html#core-middleware">ShareViewDataMiddleware</a>.
+                </p>
+
+                <h2 id="layouts" class="border-bottom pb-2 mb-3 mt-5">Layouts і partials</h2>
+                <p>Типова структура:</p>
+                <pre class="mb-4"><code class="language-text">resources/views/frontend/
+├── layouts/base.twig
+├── partials/_navbar.twig
+├── partials/_flash.twig
+└── index.twig
+
+src/Components/UserCabinet/Views/
+├── layouts/cabinet.twig
+├── layouts/auth.twig
+└── index.twig</code></pre>
+                <pre class="mb-4"><code class="language-twig">{# index.twig #}
+{% extends '@frontend/layouts/base.twig' %}
+
+{% block title %}Головна{% endblock %}
+
+{% block body %}
+    &lt;h1&gt;Контент&lt;/h1&gt;
+{% endblock %}</code></pre>
+                <pre class="mb-4"><code class="language-twig">{# Підключення фрагмента #}
+{% include '@frontend/partials/_flash.twig' %}</code></pre>
+                <p>
+                    Компонентні сторінки часто наслідують спільний layout іншого namespace
+                    (наприклад адмін: <code>@auth-admin/users/list.twig</code> → <code>@dashboard/layouts/base.twig</code>).
+                </p>
+
+                <h2 id="twig-urls" class="border-bottom pb-2 mb-3 mt-5">URL у шаблонах</h2>
+                <p>Розширення <code>UrlExtension</code> (<code>config/view.php</code>):</p>
+                <pre class="mb-4"><code class="language-twig">&lt;a href="{{ path('architecture') }}"&gt;Architecture&lt;/a&gt;
+&lt;a href="{{ route('cabinet.login') }}"&gt;Login&lt;/a&gt;
+&lt;a href="{{ path('admin.user.edit', { id: user.id }) }}"&gt;Edit&lt;/a&gt;
+&lt;link rel="canonical" href="{{ base_url() }}"&gt;</code></pre>
+                <ul class="small">
+                    <li><code>path()</code> — відносний шлях за іменем маршруту</li>
+                    <li><code>route()</code> — повний URL</li>
+                    <li><code>base_url()</code> — база застосунку</li>
+                </ul>
+                <p>Детальніше про імена маршрутів — <a href="routing.html#named-routes">маршрутизація</a>.</p>
+
+                <h2 id="globals" class="border-bottom pb-2 mb-3 mt-5">Глобальні змінні та flash</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Змінна</th><th>Джерело</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>errors</code></td><td>Помилки валідації (flash)</td></tr>
+                            <tr><td><code>old</code></td><td>Попередній ввід після failed validation</td></tr>
+                            <tr><td><code>flashes</code></td><td>Усі flash-повідомлення (<code>success</code>, <code>error</code>…)</td></tr>
+                            <tr><td><code>csrf_token</code></td><td>Токен для форм</td></tr>
+                            <tr><td><code>route_namespace</code></td><td>Контекст UI за префіксом URI — <a href="#route-namespace">детально</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <pre class="mb-4"><code class="language-twig">&lt;input name="email" value="{{ old.email|default('') }}"
+       class="input {{ errors.email is defined and errors.email ? 'is-invalid' : '' }}"&gt;
+{% if errors.email is defined and errors.email is not empty %}
+    &lt;div class="field-error" role="alert"&gt;
+        {{ errors.email is iterable ? errors.email|join(', ') : errors.email }}
+    &lt;/div&gt;
+{% endif %}</code></pre>
+                <p>Flash повідомлення:</p>
+                <pre class="mb-4"><code class="language-twig">{% if flashes is defined and flashes|length &gt; 0 %}
+    {% for type, messages in flashes %}
+        {% for message in messages %}
+            &lt;div class="alert alert-{{ type == 'error' ? 'danger' : type }}"&gt;{{ message }}&lt;/div&gt;
+        {% endfor %}
+    {% endfor %}
+{% endif %}</code></pre>
+                <p>Детальніше про валідацію — <a href="requests.html#validation-errors">Запити та валідація</a>.</p>
+
+                <h2 id="route-namespace" class="border-bottom pb-2 mb-3 mt-5"><code>route_namespace</code></h2>
+                <p>
+                    <code>route_namespace</code> — <strong>не</strong> те саме, що Twig-namespace шаблону
+                    (<code>@cabinet/index</code>). Це <strong>логічний контекст інтерфейсу</strong>: за поточним URL
+                    визначається, в якому «оформленні» працює сторінка (публічний сайт, адмінка, кабінет).
+                </p>
+                <p>
+                    Змінна доступна у всіх шаблонах як глобальна: її додає
+                    <code>ContextExtension</code> через <code>ViewContextResolver</code>.
+                </p>
+
+                <h3 id="route-namespace-why" class="mt-4">Навіщо</h3>
+                <p>
+                    У одному застосунку кілька зон з різними layout і стилями. При 404/500 або в спільних partial
+                    потрібно знати, <em>який набір views підключати</em>, без перевірки шляху в кожному Twig-файлі.
+                </p>
+                <p><code>route_namespace</code> відповідає: префікс URI → ім’я контексту з конфігурації.</p>
+
+                <h3 id="route-namespace-how" class="mt-4">Як визначається</h3>
+                <ol>
+                    <li>У <code>view.contexts</code> (застосунок + компоненти) задають мапу <strong>префікс URI → контекст</strong>.</li>
+                    <li>
+                        <code>ViewContextResolver</code> бере шлях запиту, перебирає префікси від найдовшого
+                        (щоб <code>/admin/users</code> збігся з <code>/admin</code>, а не з <code>/</code>).
+                    </li>
+                    <li><code>ContextExtension::getGlobals()</code> повертає <code>route_namespace</code> у Twig.</li>
+                </ol>
+                <pre class="mb-4"><code class="language-php">// config/view.php
+'contexts' =&gt; [
+    '/' =&gt; 'frontend',
+],
+
+// src/Components/AuthAdmin/config.php
+'contexts' =&gt; [
+    '/admin' =&gt; 'dashboard',
+],
+
+// src/Components/UserCabinet/config.php
+'contexts' =&gt; [
+    '/cabinet' =&gt; 'cabinet',
+    '/login' =&gt; 'cabinet',
+],</code></pre>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>URL</th><th><code>route_namespace</code></th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>/</code>, <code>/architecture</code></td><td><code>frontend</code></td></tr>
+                            <tr><td><code>/admin/users</code></td><td><code>dashboard</code></td></tr>
+                            <tr><td><code>/cabinet/profile</code></td><td><code>cabinet</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="route-namespace-errors" class="mt-4">Приклад: сторінки помилок</h3>
+                <p>
+                    У skeleton один диспетчер у <code>resources/views/errors/</code> підключає 404/500
+                    відповідного контексту:
+                </p>
+                <pre class="mb-4"><code class="language-twig">{# resources/views/errors/404.twig #}
+{% include '@' ~ (route_namespace|default('frontend')) ~ '/errors/404.twig' %}</code></pre>
+                <ul>
+                    <li><code>/unknown-page</code> → <code>frontend</code> → <code>@frontend/errors/404.twig</code> (публічний layout)</li>
+                    <li><code>/admin/missing</code> → <code>dashboard</code> → <code>@dashboard/errors/404.twig</code> (layout адмінки)</li>
+                </ul>
+                <p>
+                    Публічна 404 наслідує <code>@frontend/layouts/base.twig</code>;
+                    адмінська — <code>@dashboard/layouts/error.twig</code>.
+                    Без <code>route_namespace</code> довелося б дублювати умови «якщо /admin — один шаблон, інакше інший».
+                </p>
+
+                <h3 id="route-namespace-usage" class="mt-4">Інше використання в Twig</h3>
+                <pre class="mb-4"><code class="language-twig">{# Різний partial залежно від зони #}
+{% if route_namespace == 'dashboard' %}
+    {% include '@dashboard/partials/_sidebar.twig' %}
+{% else %}
+    {% include '@frontend/partials/_navbar.twig' %}
+{% endif %}
+
+{# Динамічний include (ignore missing — якщо partial відсутній) #}
+{% include '@' ~ route_namespace ~ '/partials/_breadcrumbs.twig' ignore missing %}</code></pre>
+
+                <h3 id="route-namespace-nuance" class="mt-4">Важливий нюанс</h3>
+                <p>
+                    Значення в <code>contexts</code> (<code>dashboard</code>, <code>frontend</code>, <code>cabinet</code>)
+                    має відповідати <strong>Twig-namespace</strong>, де реально лежать потрібні шаблони.
+                </p>
+                <p>
+                    У AuthAdmin контекст названо <code>dashboard</code>, а не <code>auth-admin</code>: сторінки помилок
+                    і спільний layout адмінки — у <code>@dashboard/</code>, а контент CRUD — у <code>@auth-admin/</code>.
+                </p>
+                <p>
+                    Для <code>/cabinet</code> контекст <code>cabinet</code>, але окремих
+                    <code>Views/errors/</code> у компоненті UserCabinet немає. Якщо потрібна своя 404 у кабінеті —
+                    додайте <code>@cabinet/errors/404.twig</code> або змініть диспетчер із fallback на
+                    <code>frontend</code>.
+                </p>
+
+                <h2 id="config" class="border-bottom pb-2 mb-3 mt-5">Конфігурація <code>config/view.php</code></h2>
+                <pre class="mb-4"><code class="language-php">return [
+    'view' =&gt; [
+        'extensions' =&gt; [
+            AppExtension::class,      // has_component()
+            ContextExtension::class,  // route_namespace
+            UrlExtension::class,      // path(), route(), base_url()
+        ],
+        'paths' =&gt; [ /* namespace =&gt; шлях від кореня проєкту */ ],
+        'contexts' =&gt; [
+            '/' =&gt; 'frontend',       // URI prefix =&gt; ім'я контексту для route_namespace
+        ],
+        'cache_dir' =&gt; 'views',      // storage/cache/views у production
+    ],
+];</code></pre>
+                <ul>
+                    <li><strong>extensions</strong> — класи <code>Twig\Extension\AbstractExtension</code>, резолвяться з DI-контейнера</li>
+                    <li><strong>paths</strong> — Twig namespaces для застосунку</li>
+                    <li><strong>contexts</strong> — префікс URI → <code>route_namespace</code> (<a href="#route-namespace">детально</a>)</li>
+                    <li><strong>cache_dir</strong> — підкаталог у <code>storage/cache</code>; при <code>app.debug</code> кеш Twig вимкнено</li>
+                </ul>
+
+                <h2 id="components" class="border-bottom pb-2 mb-3 mt-5">Views у компонентах</h2>
+                <p>
+                    У <code>Component/config.php</code> секція <code>view</code>: <code>paths</code>, <code>contexts</code>,
+                    опційно <code>extensions</code>. Під час <code>ComponentsServiceProvider::boot()</code> дані
+                    додаються до реєстрів і підхоплюються Twig при HTTP-запиті (не в CLI).
+                </p>
+                <pre class="mb-4"><code class="language-php">// AuthAdmin — власне розширення + шаблони
+'view' =&gt; [
+    'extensions' =&gt; [ TwigExtension::class ],  // auth()
+    'paths' =&gt; [
+        'auth-admin' =&gt; '/src/Components/AuthAdmin/Views',
+    ],
+    'contexts' =&gt; [
+        '/admin' =&gt; 'dashboard',
+    ],
+],</code></pre>
+                <p>
+                    У Twig: <code>{{ auth().check() }}</code> (якщо підключено розширення компонента),
+                    <code>{{ has_component('UserCabinet') }}</code> — з <code>AppExtension</code>.
+                </p>
+
+                <h2 id="extensions" class="border-bottom pb-2 mb-3 mt-5">Власне Twig-розширення</h2>
+                <pre class="mb-4"><code class="language-php">class MyExtension extends AbstractExtension
+{
+    public function getFunctions(): array
+    {
+        return [
+            new TwigFunction('format_money', [$this, 'formatMoney']),
+        ];
+    }
+
+    public function getFilters(): array
+    {
+        return [
+            new TwigFilter('excerpt', [$this, 'excerpt']),
+        ];
+    }
+}</code></pre>
+                <p>
+                    Зареєструйте клас у <code>view.extensions</code> (застосунок) або <code>view.extensions</code>
+                    компонента. У шаблоні: <code>{{ price|format_money }}</code>, <code>{{ format_money(price) }}</code>.
+                </p>
+
+                <h2 id="direct-render" class="border-bottom pb-2 mb-3 mt-5">Прямий виклик <code>ViewInterface</code></h2>
+                <pre class="mb-4"><code class="language-php">/** @var ViewInterface $view */
+$view = $container-&gt;get(ViewInterface::class);
+$html = $view-&gt;render('@frontend/errors/404', ['exception' =&gt; $e]);</code></pre>
+                <p>
+                    Розширення <code>.twig</code> додається автоматично, якщо не вказано.
+                    Події: <code>TemplateRendering</code>, <code>TemplateRendered</code> (телеметрія).
+                    У debug — <code>DebugExtension</code> і Twig Profiler.
+                </p>
+
+                <h2 id="errors" class="border-bottom pb-2 mb-3 mt-5">Сторінки помилок</h2>
+                <p>
+                    Диспетчер <code>resources/views/errors/{код}.twig</code> через
+                    <a href="#route-namespace-errors"><code>route_namespace</code></a> підключає
+                    <code>@frontend/errors/...</code> або <code>@dashboard/errors/...</code>.
+                    У production error handler рендерить той самий шлях; якщо файлу немає — fallback на <code>500</code>.
+                </p>
+                <p>
+                    Додаткові fallback-файли PHP — <code>resources/views/errors/fallback/</code>
+                    (<code>PathManager::ERRORS_FALLBACK_VIEWS_DIR</code>).
+                </p>
+
+                <h2 id="assets" class="border-bottom pb-2 mb-3 mt-5">Статика в шаблонах</h2>
+                <p>
+                    CSS/JS зазвичай лежать у <code>public/</code> і підключаються абсолютними шляхами
+                    (<code>/assets/css/frontend.css</code>, <code>/vendor/bootstrap/...</code>).
+                    Компоненти можуть публікувати assets через <code>assets</code> у <code>config.php</code>
+                    (копіювання в <code>public/components/...</code>).
+                </p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Логіку (запити до БД, права доступу) тримайте в контролерах і сервісах.
+                        У Twig — відображення, умови, цикли та допоміжні фільтри.
+                    </p>
+                </div>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-uk.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>
