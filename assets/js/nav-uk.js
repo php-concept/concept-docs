@@ -34,6 +34,14 @@ window.DOCS_NAV = {
             ]
         },
         {
+            title: 'Безпека',
+            items: [
+                { slug: 'csrf', label: 'Захист CSRF' },
+                { slug: 'data-masking', label: 'Маскування даних' },
+                { slug: 'safe-redirects', label: 'Безпечні редіректи' }
+            ]
+        },
+        {
             title: 'Архітектура',
             items: [
                 { slug: 'service-container', label: 'Контейнер сервісів' },
@@ -51,10 +59,9 @@ window.DOCS_NAV = {
         {
             title: 'Компоненти',
             items: [
-                { slug: 'config', label: 'Конфігурація' },
-                { slug: 'logger', label: 'Логування' },
-                { slug: 'validator', label: 'Валідатор' },
-                { slug: 'csrf', label: 'Захист CSRF' }
+                { slug: 'components-overview', label: 'Концепція компонентів' },
+                { slug: 'creating-components', label: 'Створення компонента' },
+                { slug: 'component-cli', label: 'CLI та assets' }
             ]
         }
     ],
@@ -74,15 +81,17 @@ window.DOCS_NAV = {
         'requests': { prev: 'controllers', next: 'responses' },
         'responses': { prev: 'requests', next: 'views' },
         'views': { prev: 'responses', next: 'database' },
-        'database': { prev: 'views', next: 'service-container' },
-        'service-container': { prev: 'database', next: 'service-providers' },
+        'database': { prev: 'views', next: 'csrf' },
+        'csrf': { prev: 'database', next: 'data-masking' },
+        'data-masking': { prev: 'csrf', next: 'safe-redirects' },
+        'safe-redirects': { prev: 'data-masking', next: 'service-container' },
+        'service-container': { prev: 'safe-redirects', next: 'service-providers' },
         'service-providers': { prev: 'service-container', next: 'events' },
         'events': { prev: 'service-providers', next: 'console' },
         'console': { prev: 'events', next: 'console-commands' },
-        'console-commands': { prev: 'console', next: 'config' },
-        'config': { prev: 'console-commands', next: 'logger' },
-        'logger': { prev: 'config', next: 'validator' },
-        'validator': { prev: 'logger', next: 'csrf' },
-        'csrf': { prev: 'validator' }
+        'console-commands': { prev: 'console', next: 'components-overview' },
+        'components-overview': { prev: 'console-commands', next: 'creating-components' },
+        'creating-components': { prev: 'components-overview', next: 'component-cli' },
+        'component-cli': { prev: 'creating-components' }
     }
 };
