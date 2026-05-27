@@ -29,7 +29,8 @@ window.DOCS_NAV = {
                 { slug: 'controllers', label: 'Контролери' },
                 { slug: 'requests', label: 'Запити та валідація' },
                 { slug: 'responses', label: 'Відповіді' },
-                { slug: 'views', label: 'Представлення' }
+                { slug: 'views', label: 'Представлення' },
+                { slug: 'database', label: 'База даних' }
             ]
         },
         {
@@ -41,14 +42,19 @@ window.DOCS_NAV = {
             ]
         },
         {
+            title: 'Консоль',
+            items: [
+                { slug: 'console', label: 'Робота з консоллю' },
+                { slug: 'console-commands', label: 'Створення команд' }
+            ]
+        },
+        {
             title: 'Компоненти',
             items: [
                 { slug: 'config', label: 'Конфігурація' },
-                { slug: 'database', label: 'База даних' },
                 { slug: 'logger', label: 'Логування' },
                 { slug: 'validator', label: 'Валідатор' },
-                { slug: 'csrf', label: 'Захист CSRF' },
-                { slug: 'console', label: 'Консоль' }
+                { slug: 'csrf', label: 'Захист CSRF' }
             ]
         }
     ],
@@ -67,15 +73,16 @@ window.DOCS_NAV = {
         'controllers': { prev: 'middleware', next: 'requests' },
         'requests': { prev: 'controllers', next: 'responses' },
         'responses': { prev: 'requests', next: 'views' },
-        'views': { prev: 'responses', next: 'service-container' },
-        'service-container': { prev: 'views', next: 'service-providers' },
+        'views': { prev: 'responses', next: 'database' },
+        'database': { prev: 'views', next: 'service-container' },
+        'service-container': { prev: 'database', next: 'service-providers' },
         'service-providers': { prev: 'service-container', next: 'events' },
-        'events': { prev: 'service-providers', next: 'config' },
-        'config': { prev: 'views', next: 'database' },
-        'database': { prev: 'config', next: 'logger' },
-        'logger': { prev: 'database', next: 'validator' },
+        'events': { prev: 'service-providers', next: 'console' },
+        'console': { prev: 'events', next: 'console-commands' },
+        'console-commands': { prev: 'console', next: 'config' },
+        'config': { prev: 'console-commands', next: 'logger' },
+        'logger': { prev: 'config', next: 'validator' },
         'validator': { prev: 'logger', next: 'csrf' },
-        'csrf': { prev: 'validator', next: 'console' },
-        'console': { prev: 'csrf' }
+        'csrf': { prev: 'validator' }
     }
 };

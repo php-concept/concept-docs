@@ -18,10 +18,10 @@
             </button>
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
-            <ul class="navbar-nav flex-row gap-1 ms-auto">
-                <li class="nav-item"><a class="nav-link py-1" href="../en/index.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1 active" href="index.html">UK</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../index.html" title="Головна"><i class="bi bi-house"></i></a></li>
+            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
+                <li class="nav-item"><a class="nav-link p-1" href="../en/index.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="index.html">УКР</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -79,6 +79,66 @@
                     <li><strong>Illuminate Database</strong> — моделі в стилі Eloquent</li>
                     <li><strong>Valinor</strong> — мапінг даних запиту в DTO</li>
                 </ul>
+
+                <h2 id="official-docs" class="border-bottom pb-2 mb-3 mt-5">Офіційна документація бібліотек</h2>
+                <p>Concept Core інтегрує ці пакети; деталі API — у їхніх docs:</p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                        <tr><th>Бібліотека</th><th>Роль у Concept Core</th><th>Документація</th></tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td>League Container</td>
+                            <td>DI, bindings, service providers</td>
+                            <td><a href="https://container.thephpleague.com/" target="_blank" rel="noopener">container.thephpleague.com</a></td>
+                        </tr>
+                        <tr>
+                            <td>League Route</td>
+                            <td>Маршрути, middleware, резолв контролерів з контейнера</td>
+                            <td><a href="https://route.thephpleague.com/" target="_blank" rel="noopener">route.thephpleague.com</a></td>
+                        </tr>
+                        <tr>
+                            <td>Twig</td>
+                            <td>Шаблони HTML</td>
+                            <td><a href="https://twig.symfony.com/doc/" target="_blank" rel="noopener">twig.symfony.com</a></td>
+                        </tr>
+                        <tr>
+                            <td>Laminas Diactoros</td>
+                            <td>PSR-7 запити/відповіді</td>
+                            <td><a href="https://docs.laminas.dev/laminas-diactoros/" target="_blank" rel="noopener">laminas-diactoros</a></td>
+                        </tr>
+                        <tr>
+                            <td>League Event</td>
+                            <td>Події ядра, телеметрія</td>
+                            <td><a href="https://event.thephpleague.com/" target="_blank" rel="noopener">event.thephpleague.com</a></td>
+                        </tr>
+                        <tr>
+                            <td>PSR-7 / PSR-15</td>
+                            <td>HTTP message, middleware</td>
+                            <td>
+                                <a href="https://www.php-fig.org/psr/psr-7/" target="_blank" rel="noopener">PSR-7</a>,
+                                <a href="https://www.php-fig.org/psr/psr-15/" target="_blank" rel="noopener">PSR-15</a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Illuminate Database</td>
+                            <td>Eloquent / Capsule, міграції</td>
+                            <td><a href="https://laravel.com/docs/eloquent" target="_blank" rel="noopener">Eloquent</a></td>
+                        </tr>
+                        <tr>
+                            <td>Symfony HttpFoundation</td>
+                            <td>Сесія, flash</td>
+                            <td><a href="https://symfony.com/doc/current/components/http_foundation.html" target="_blank" rel="noopener">HttpFoundation</a></td>
+                        </tr>
+                        <tr>
+                            <td>phpdotenv</td>
+                            <td><code>.env</code> → конфіг</td>
+                            <td><a href="https://github.com/vlucas/phpdotenv" target="_blank" rel="noopener">vlucas/phpdotenv</a></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
 
                 <h2 id="learning-concept" class="border-bottom pb-2 mb-3 mt-5">Вивчення Concept</h2>
                 <p>

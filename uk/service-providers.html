@@ -19,9 +19,9 @@
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
             <ul class="navbar-nav flex-row gap-1 ms-auto">
-                <li class="nav-item"><a class="nav-link py-1" href="../en/service-providers.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1 active" href="../uk/service-providers.html">UK</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../en/service-providers.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../uk/service-providers.html">УКР</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -31,7 +31,7 @@
             <aside class="col-lg-3 col-xl-2">
                 <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
                     <div class="offcanvas-header border-bottom d-lg-none">
-                        <h5 class="offcanvas-title" id="docsSidebarLabel">Menu</h5>
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
                     </div>
                     <div class="offcanvas-body p-0 pt-lg-4">
@@ -42,10 +42,281 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Провайдери сервісів</h1>
-                <div class="border border-secondary-subtle rounded text-center text-body-secondary p-5">
-                    <p class="mb-0">Ця сторінка є заглушкою. Зміст буде додано пізніше.</p>
+
+                <p>
+                    <strong>Service provider</strong> — клас, який реєструє сервіси в DI-контейнері під час bootstrap.
+                    У Concept Core це основний спосіб підключити конфіг, HTTP, БД, Twig, валідацію та модулі-компоненти.
+                </p>
+                <p>
+                    Реалізація — <a href="https://container.thephpleague.com/5.x/service-providers/" target="_blank" rel="noopener">League Container Service Providers</a>
+                    (<code>League\Container\ServiceProvider\AbstractServiceProvider</code>).
+                    Див. також: <a href="service-container.html">Контейнер сервісів</a>,
+                    <a href="configuration.html">конфігурація</a>.
+                </p>
+
+                <h2 id="anatomy" class="border-bottom pb-2 mb-3 mt-5">Анатомія провайдера</h2>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+namespace Concept\App\Providers;
+
+use Concept\Core\Providers\Concerns\PeeksEventDispatcher;
+use League\Container\ServiceProvider\AbstractServiceProvider;
+use League\Container\ServiceProvider\BootableServiceProviderInterface;
+
+final class BillingServiceProvider extends AbstractServiceProvider implements BootableServiceProviderInterface
+{
+    use PeeksEventDispatcher;
+
+    public function provides(string $id): bool
+    {
+        return $id === BillingGatewayInterface::class;
+    }
+
+    public function register(): void
+    {
+        $container = $this-&gt;getContainer();
+
+        $container-&gt;add(BillingGatewayInterface::class, function () {
+            return new StripeBillingGateway(/* ... */);
+        })-&gt;setShared(true);
+    }
+
+    public function boot(): void
+    {
+        // Eager-логіка одразу після register() цього провайдера
+    }
+}</code></pre>
+
+                <h3 id="register-boot" class="mt-4"><code>register()</code> і <code>boot()</code></h3>
+                <ul>
+                    <li><code>register()</code> — <code>$container-&gt;add()</code>, bindings, фабрики</li>
+                    <li>
+                        <code>boot()</code> — додаткова логіка <strong>одразу після</strong>
+                        <code>register()</code> <em>цього ж</em> провайдера (eager), а не після всіх провайдерів у файлі
+                    </li>
+                </ul>
+                <p>
+                    <code>boot()</code> має сенс лише в класі з
+                    <code>BootableServiceProviderInterface</code>. З документації League Container:
+                </p>
+                <blockquote class="border-start border-secondary border-4 ps-3 mb-4 small text-body-secondary">
+                    <p class="mb-2">
+                        In much the same way, this method has access to the container itself and can interact
+                        with it however you wish, the difference is that the boot method is invoked as soon
+                        as you register the service provider with the container meaning that everything in
+                        this method is eagerly loaded.
+                    </p>
+                    <p class="mb-0">
+                        If you wish to apply inflectors or register further service providers from this one,
+                        it must be from a bootable service provider like this one, otherwise they will be ignored.
+                    </p>
+                    <footer class="blockquote-footer mt-2">
+                        <a href="https://container.thephpleague.com/5.x/service-providers/" target="_blank" rel="noopener">League Container — Service Providers</a>
+                    </footer>
+                </blockquote>
+                <p>
+                    Порядок у <code>bootstrap/providers/app.php</code> критичний: для кожного провайдера
+                    спочатку <code>register()</code>, потім одразу <code>boot()</code>, і лише потім наступний
+                    провайдер у списку. У <code>boot()</code> провайдера N доступні сервіси лише від провайдерів
+                    <strong>вище</strong> у файлі; провайдери <strong>нижче</strong> ще не виконували
+                    <code>register()</code>.
+                </p>
+                <p>
+                    Тому <code>ComponentsServiceProvider</code> стоїть останнім: у його <code>boot()</code> вже є
+                    <code>ConfigInterface</code>, <code>Router</code>, View registries тощо — і він може
+                    <code>addServiceProvider()</code> для провайдерів компонентів, підключити <code>routes.php</code>
+                    і Twig paths.
+                </p>
+
+                <h3 id="provides" class="mt-4"><code>provides()</code></h3>
+                <p>
+                    Список id, які надає провайдер. Дозволяє <strong>відкладене</strong> завантаження (deferred):
+                    провайдер підтягується, коли вперше потрібен один із перелічених сервісів.
+                </p>
+
+                <h3 id="peeks-event" class="mt-4">Події <code>ServiceAwakening</code></h3>
+                <p>
+                    Провайдери core використовують trait <code>PeeksEventDispatcher</code>: якщо
+                    <code>EventDispatcherInterface</code> вже в контейнері, при створенні сервісу диспатчиться
+                    <code>ServiceAwakening</code> (телеметрія в debug).
+                </p>
+
+                <h2 id="registration" class="border-bottom pb-2 mb-3 mt-5">Підключення провайдерів</h2>
+                <p><code>App::registerServiceProviders()</code> підключає масив класів із PHP-файлу:</p>
+                <pre class="mb-4"><code class="language-php">foreach ($providers as $providerClassName) {
+    $provider = new $providerClassName();
+    $this-&gt;container-&gt;addServiceProvider($provider);
+}</code></pre>
+                <p>Провайдери не реєструються в autowiring — їх інстансують явно (<code>new $providerClassName()</code>).</p>
+
+                <h3 id="http-providers" class="mt-4">HTTP — <code>bootstrap/providers/app.php</code></h3>
+                <pre class="mb-4"><code class="language-php">return [
+    ConfigServiceProvider::class,
+    ErrorHandlerServiceProvider::class,
+    EventServiceProvider::class,
+    HttpServiceProvider::class,
+    SessionServiceProvider::class,
+    MaskerServiceProvider::class,
+    LogServiceProvider::class,
+    ViewServiceProvider::class,
+    ValidationServiceProvider::class,
+    DatabaseServiceProvider::class,
+    CastingServiceProvider::class,
+    DebugLoggerServiceProvider::class,
+    ComponentsServiceProvider::class,
+];</code></pre>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Провайдер</th><th>Що робить</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>ConfigServiceProvider</code></td><td><code>ConfigInterface</code>, .env, override <code>config/{APP_ENV}</code></td></tr>
+                            <tr><td><code>ErrorHandlerServiceProvider</code></td><td>Whoops після config (HTML/JSON/CLI)</td></tr>
+                            <tr><td><code>EventServiceProvider</code></td><td><code>EventDispatcherInterface</code>, telemetry buffer</td></tr>
+                            <tr><td><code>HttpServiceProvider</code></td><td>PSR-7, Router, URL generator, responses, routes з config</td></tr>
+                            <tr><td><code>SessionServiceProvider</code></td><td>Сесія, flash bag</td></tr>
+                            <tr><td><code>MaskerServiceProvider</code></td><td>Маскування чутливих даних у логах</td></tr>
+                            <tr><td><code>LogServiceProvider</code></td><td><code>LoggerInterface</code> (Monolog)</td></tr>
+                            <tr><td><code>ViewServiceProvider</code></td><td>Twig, registries paths/extensions/contexts</td></tr>
+                            <tr><td><code>ValidationServiceProvider</code></td><td>Rakit validator, custom rules з config</td></tr>
+                            <tr><td><code>DatabaseServiceProvider</code></td><td>Eloquent Capsule, migrations/seeders registries</td></tr>
+                            <tr><td><code>CastingServiceProvider</code></td><td>Valinor <code>CasterInterface</code></td></tr>
+                            <tr><td><code>DebugLoggerServiceProvider</code></td><td>Ранній debug-лог до повного logger</td></tr>
+                            <tr><td><code>ComponentsServiceProvider</code></td><td>Компоненти: routes, views, CLI, nested providers</td></tr>
+                        </tbody>
+                    </table>
                 </div>
-                <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
+                <p><strong>Порядок важливий:</strong> config → events → HTTP/view/DB → components останнім.</p>
+
+                <h3 id="cli-providers" class="mt-4">CLI — <code>bootstrap/providers/console.php</code></h3>
+                <p>
+                    <code>bin/console.php</code> викликає <code>App::create()</code> і окремий список провайдерів
+                    (без View/Validation/Casting за потреби, але з <code>ConsoleServiceProvider</code>):
+                </p>
+                <pre class="mb-4"><code class="language-php">// bin/console.php
+$app-&gt;registerServiceProviders([$rootPath . '/bootstrap/providers/console.php']);
+
+$console = $container-&gt;get(ConsoleApplication::class);
+$console-&gt;run();</code></pre>
+                <p>
+                    <code>ConsoleServiceProvider</code> читає <code>config/commands.php</code> і додає команди в
+                    Symfony Console. Команди компонентів — через <code>ComponentsServiceProvider::boot()</code>.
+                </p>
+
+                <h2 id="create-provider" class="border-bottom pb-2 mb-3 mt-5">Власний провайдер застосунку</h2>
+                <ol>
+                    <li>Створіть клас у <code>App/Providers/MyServiceProvider.php</code>.</li>
+                    <li>У <code>register()</code> — bindings для інтерфейсів застосунку.</li>
+                    <li>Додайте клас у <code>bootstrap/providers/app.php</code> <em>після</em> провайдерів, від яких залежите.</li>
+                </ol>
+                <pre class="mb-4"><code class="language-php">// bootstrap/providers/app.php
+return [
+    ConfigServiceProvider::class,
+    // ...
+    BillingServiceProvider::class,  // після ConfigServiceProvider
+    ComponentsServiceProvider::class,
+];</code></pre>
+                <p>
+                    Якщо провайдеру потрібен <code>ConfigInterface</code> — ставте його після
+                    <code>ConfigServiceProvider</code>. Якщо потрібен <code>Router</code> — після
+                    <code>HttpServiceProvider</code>.
+                </p>
+
+                <h2 id="component-providers" class="border-bottom pb-2 mb-3 mt-5">Провайдери компонентів</h2>
+                <p>
+                    Компонент оголошує провайдери в <code>Component/config.php</code>.
+                    <code>ComponentsServiceProvider::boot()</code> підключає їх динамічно:
+                </p>
+                <pre class="mb-4"><code class="language-php">// src/Components/DebugBar/config.php
+'providers' =&gt; [
+    DebugBarServiceProvider::class,
+    MaskerServiceProvider::class,  // якщо ще не в app.php
+],</code></pre>
+                <pre class="mb-4"><code class="language-php">// Concept\Core\Providers\ComponentsServiceProvider
+foreach ($registry-&gt;providers() as $providerClass) {
+    $this-&gt;getContainer()-&gt;addServiceProvider(new $providerClass());
+}</code></pre>
+                <p>
+                    Список активних компонентів — <code>config/components.php</code>
+                    (у dev може бути <code>config/dev/components.php</code> з DebugBar).
+                    Клас компонента (<code>AuthAdminComponent</code>) читає свій <code>config.php</code>.
+                </p>
+
+                <h3 id="components-boot" class="mt-4">Що робить <code>ComponentsServiceProvider::boot()</code></h3>
+                <ol>
+                    <li>Події <code>ComponentRegistering</code> для кожного модуля</li>
+                    <li>Реєстрація console-команд компонентів</li>
+                    <li>Шляхи міграцій і seeders у registries</li>
+                    <li><strong>Nested service providers</strong> компонентів</li>
+                    <li><code>require</code> файлів <code>Component/routes.php</code> (змінна <code>$router</code>)</li>
+                    <li>У HTTP (не CLI) — Twig paths, extensions, view contexts з компонентів</li>
+                </ol>
+                <p>
+                    Тому маршрути компонента з’являться лише якщо компонент увімкнено в config і
+                    <code>ComponentsServiceProvider</code> виконав <code>boot()</code>.
+                </p>
+
+                <h2 id="examples" class="border-bottom pb-2 mb-3 mt-5">Приклади з core</h2>
+
+                <h3 id="example-http" class="mt-4">HttpServiceProvider — register + boot</h3>
+                <p><code>register()</code>: PSR-7, Router + <code>RouteStrategy</code> + завантаження <code>routes/*.php</code>.</p>
+                <p><code>boot()</code>: резолвери сторінок для Illuminate Paginator.</p>
+                <p>
+                    League Route: <a href="https://route.thephpleague.com/6.x/routing/" target="_blank" rel="noopener">документація маршрутизації</a>.
+                </p>
+
+                <h3 id="example-database" class="mt-4">DatabaseServiceProvider — чому boot</h3>
+                <p>
+                    У <code>register()</code> — <code>DatabaseInterface</code>, <code>Migrator</code>, registries.
+                    У <code>boot()</code> (одразу після <code>register()</code> цього провайдера) — створення
+                    <code>CapsuleManager</code>, підключення з <code>ConfigInterface</code> (Config уже зареєстрований
+                    вище в списку), listeners SQL. Capsule додається в контейнер уже налаштованим.
+                </p>
+
+                <h3 id="example-view" class="mt-4">ViewServiceProvider — Twig</h3>
+                <p>
+                    Збирає <code>Environment</code> Twig: cache, debug, extensions з config, paths з registries.
+                    Після boot компонентів у registries з’являються додаткові namespaces.
+                </p>
+                <p>
+                    Twig: <a href="https://twig.symfony.com/doc/" target="_blank" rel="noopener">twig.symfony.com</a>,
+                    views — <a href="views.html">Представлення</a>.
+                </p>
+
+                <h3 id="example-debugbar" class="mt-4">DebugBarServiceProvider (компонент)</h3>
+                <p>
+                    Реєструє <code>CustomDebugBar</code> і <code>JavascriptRenderer</code> з колекторами телеметрії.
+                    Підключається лише якщо <code>DebugBarComponent</code> у dev-config компонентів.
+                </p>
+
+                <h2 id="patterns" class="border-bottom pb-2 mb-3 mt-5">Рекомендації</h2>
+                <ul>
+                    <li><strong>Один провайдер — одна область</strong> (Billing, Notifications), не «GodProvider»</li>
+                    <li><strong>register — лише bindings</strong>; важкі підключення — у <code>boot()</code></li>
+                    <li><strong>Залежності через <code>$container-&gt;get()</code></strong> лише всередині провайдера, не в контролерах</li>
+                    <li><strong><code>setShared(true)</code></strong> для сервісів, що мають бути singleton на запит</li>
+                    <li><strong>Не змінюйте порядок core-провайдерів</strong> без розуміння залежностей</li>
+                </ul>
+
+                <h2 id="checklist" class="border-bottom pb-2 mb-3 mt-5">Чеклист нового модуля</h2>
+                <ol>
+                    <li>Компонент у <code>config/components.php</code></li>
+                    <li>За потреби — <code>providers</code> у <code>Component/config.php</code></li>
+                    <li><code>routes.php</code>, <code>view.paths</code>, migrations — у config компонента</li>
+                    <li>Класи сервісів резолвляться через autowiring або binding у провайдері модуля</li>
+                </ol>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Якщо сервіс «не знаходиться» в контейнері — перевірте, чи провайдер у правильному файлі
+                        (<code>app.php</code> vs <code>console.php</code>), чи виконався <code>boot()</code> компонента,
+                        і чи не потрібен явний <code>add()</code> замість autowiring.
+                    </p>
+                </div>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
             </main>
 
             <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="uk" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Створення консольних команд — Concept Core Documentation">
+    <title>Створення команд - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="console-commands">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Відкрити навігацію">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
+                <li class="nav-item"><a class="nav-link py-1" href="../en/console-commands.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link py-1 active" href="../uk/console-commands.html">UK</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Створення консольних команд</h1>
+
+                <p>
+                    Команда — клас, що успадковує
+                    <code>Symfony\Component\Console\Command\Command</code>.
+                    Залежності передаються через <strong>конструктор</strong> (автовайринг контейнера);
+                    логіка — у методі <code>execute()</code>.
+                </p>
+                <p>
+                    Документація Symfony:
+                    <a href="https://symfony.com/doc/current/console.html#creating-a-command" target="_blank" rel="noopener">Creating a Command</a>,
+                    <a href="https://symfony.com/doc/current/console/input.html" target="_blank" rel="noopener">Input</a>,
+                    <a href="https://symfony.com/doc/current/console/style.html" target="_blank" rel="noopener">Output styling</a>.
+                </p>
+
+                <h2 id="minimal" class="border-bottom pb-2 mb-3 mt-5">Мінімальна команда</h2>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+namespace Concept\App\Console\Commands;
+
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
+
+final class GreetCommand extends Command
+{
+    protected function configure(): void
+    {
+        $this-&gt;setName('app:greet')
+            -&gt;setDescription('Print a greeting');
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $io = new SymfonyStyle($input, $output);
+        $io-&gt;success('Hello from Concept Core');
+
+        return Command::SUCCESS;
+    }
+}</code></pre>
+
+                <h2 id="register-app" class="border-bottom pb-2 mb-3 mt-5">Реєстрація в застосунку</h2>
+                <p>Додайте клас у <code>config/commands.php</code>:</p>
+                <pre class="mb-4"><code class="language-php">return [
+    'commands' =&gt; [
+        // ...команди ядра
+        GreetCommand::class,
+    ],
+];</code></pre>
+                <p>
+                    <code>ConsoleServiceProvider</code> робить <code>$container-&gt;get(GreetCommand::class)</code>
+                    і <code>addCommand()</code>. Якщо в конструкторі потрібні сервіси — вони резолвляться автоматично
+                    (<a href="service-container.html#autowiring">автовайринг</a>).
+                </p>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php app:greet</code></pre>
+
+                <h2 id="options" class="border-bottom pb-2 mb-3 mt-5">Аргументи та опції</h2>
+                <p>Приклад з опцією (як <code>user:list</code> у skeleton):</p>
+                <pre class="mb-4"><code class="language-php">use Symfony\Component\Console\Input\InputOption;
+
+protected function configure(): void
+{
+    $this-&gt;setName('user:list')
+        -&gt;setDescription('Display registered users')
+        -&gt;addOption('limit', 'l', InputOption::VALUE_OPTIONAL, 'Max rows', 10);
+}
+
+protected function execute(InputInterface $input, OutputInterface $output): int
+{
+    $io = new SymfonyStyle($input, $output);
+    $limit = (int) $input-&gt;getOption('limit');
+
+    $users = $this-&gt;userModel-&gt;newQuery()-&gt;limit($limit)-&gt;get();
+    $io-&gt;table(['id', 'email', 'name'], /* ... */);
+
+    return Command::SUCCESS;
+}</code></pre>
+                <p>Залежності в конструкторі:</p>
+                <pre class="mb-4"><code class="language-php">public function __construct(
+    private readonly UserModel $userModel,
+) {
+    parent::__construct();
+}</code></pre>
+
+                <h2 id="core-example" class="border-bottom pb-2 mb-3 mt-5">Приклад з ядра: DI в команді</h2>
+                <p><code>RouteListCommand</code> отримує <code>Router</code> з контейнера:</p>
+                <pre class="mb-4"><code class="language-php">public function __construct(private readonly Router $router)
+{
+    parent::__construct();
+}</code></pre>
+                <p>
+                    <code>DbMigrateCommand</code> — <code>Migrator</code> + <code>MigrationRegistry</code>.
+                    Складні команди ядра лежать у <code>Concept\Core\Console\Commands</code>.
+                </p>
+
+                <h2 id="component" class="border-bottom pb-2 mb-3 mt-5">Команда в компоненті</h2>
+                <ol>
+                    <li>Створіть <code>Components/MyModule/Commands/MyCommand.php</code></li>
+                    <li>Додайте клас у <code>commands</code> у <code>Component/config.php</code></li>
+                    <li>Переконайтеся, що компонент увімкнено в <code>config/components.php</code></li>
+                </ol>
+                <pre class="mb-4"><code class="language-php">// src/Components/AuthAdmin/config.php
+'commands' =&gt; [
+    UserListCommand::class,
+],</code></pre>
+                <p>
+                    Реєстрація відбувається в <code>ComponentsServiceProvider::registerConsoleCommands()</code>
+                    під час <code>boot()</code> — після того, як <code>ConsoleApplication</code> уже створений
+                    провайдером консолі.
+                </p>
+
+                <h2 id="output" class="border-bottom pb-2 mb-3 mt-5">Вивід і помилки</h2>
+                <pre class="mb-4"><code class="language-php">$io = new SymfonyStyle($input, $output);
+
+$io-&gt;title('Import started');
+$io-&gt;writeln('Processing...');
+$io-&gt;success('Done');
+$io-&gt;warning('Partial import');
+$io-&gt;error('Failed');
+
+// таблиця
+$io-&gt;table(['Column A', 'Column B'], $rows);
+
+// progress (довгі цикли)
+$io-&gt;progressStart(count($items));
+foreach ($items as $item) {
+    // ...
+    $io-&gt;progressAdvance();
+}
+$io-&gt;progressFinish();</code></pre>
+                <p>
+                    При винятку повертайте <code>Command::FAILURE</code> або дозвольте Symfony вивести stack trace
+                    (у dev з Whoops для CLI — plain text).
+                </p>
+
+                <h2 id="checklist" class="border-bottom pb-2 mb-3 mt-5">Чеклист</h2>
+                <ol>
+                    <li>Унікальне ім’я команди (<code>module:action</code>, наприклад <code>billing:sync</code>)</li>
+                    <li><code>configure()</code> — name, description, arguments/options</li>
+                    <li><code>execute()</code> — коротка orchestration, важке в сервісі</li>
+                    <li>Реєстрація в <code>config/commands.php</code> або <code>Component/config.php</code></li>
+                    <li>Перевірка: <code>php bin/console.php list</code> і <code>help your:command</code></li>
+                </ol>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Не дублюйте HTTP-контролери в CLI: винесіть спільну логіку в <code>Services/</code>
+                        і викличте її і з web, і з command.
+                    </p>
+                </div>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-uk.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

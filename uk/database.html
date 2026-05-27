@@ -18,10 +18,10 @@
             </button>
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
-            <ul class="navbar-nav flex-row gap-1 ms-auto">
-                <li class="nav-item"><a class="nav-link py-1" href="../en/database.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1 active" href="../uk/database.html">UK</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
+                <li class="nav-item"><a class="nav-link p-1" href="../en/database.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../uk/database.html">УКР</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -42,8 +42,191 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">База даних</h1>
-                <div class="border border-secondary-subtle rounded text-center text-body-secondary p-5">
-                    <p class="mb-0">Ця сторінка є заглушкою. Зміст буде додано пізніше.</p>
+
+                <p>
+                    Concept Core використовує <strong>Illuminate Database</strong> (Capsule + Eloquent) —
+                    той самий шар, що й у <a href="https://laravel.com/docs/eloquent" target="_blank" rel="noopener">Laravel Eloquent</a>.
+                    Підключення, моделі, міграції та сидери інтегровані через <code>DatabaseServiceProvider</code> ядра.
+                </p>
+                <p>
+                    HTTP і CLI працюють з однією конфігурацією (<code>config/db.php</code>, <code>.env</code>);
+                    схему оновлюють консольними командами <code>db:*</code> (див. <a href="console.html#built-in">Консоль</a>).
+                </p>
+
+                <h2 id="configuration" class="border-bottom pb-2 mb-3 mt-5">Підключення</h2>
+                <p>
+                    Параметри з <code>config/db.php</code> перекриваються змінними оточення
+                    (<code>DB_HOST</code> → <code>db.host</code> тощо). Детальна таблиця — у
+                    <a href="configuration.html#env-db">Конфігурація → Змінні БД</a>.
+                </p>
+                <pre class="mb-4"><code class="language-php">// config/db.php
+return [
+    'db' =&gt; [
+        'driver'   =&gt; 'mysql',
+        'host'     =&gt; '127.0.0.1',
+        'port'     =&gt; '3306',
+        'database' =&gt; 'concept_db',
+        'username' =&gt; 'root',
+        'password' =&gt; '',
+        'charset'  =&gt; 'utf8mb4',
+    ],
+];</code></pre>
+                <p>
+                    У <code>DatabaseServiceProvider::boot()</code> створюється глобальний
+                    <code>Illuminate\Database\Capsule\Manager</code>, викликається <code>bootEloquent()</code>,
+                    реєструється слухач SQL (лог при <code>app.debug</code> або <code>log.query</code>).
+                </p>
+                <p>
+                    Фасад низького рівня — <code>DatabaseInterface</code> (обгортка над Capsule), якщо потрібен доступ
+                    поза Eloquent-моделями.
+                </p>
+
+                <h2 id="models" class="border-bottom pb-2 mb-3 mt-5">Моделі Eloquent</h2>
+                <p>
+                    Додаток наслідує <code>Concept\App\Models\BaseModel</code> (розширює
+                    <code>Illuminate\Database\Eloquent\Model</code>). Компоненти оголошують моделі у власному namespace,
+                    наприклад <code>Concept\Components\AuthAdmin\Models\UserModel</code>.
+                </p>
+                <p>Рекомендовані практики в skeleton:</p>
+                <ul>
+                    <li>константи полів <code>FIELD_*</code> замість «магічних» рядків у запитах і <code>fillable</code>;</li>
+                    <li>трейт <code>IdTrait</code> для типізованого <code>getId()</code>;</li>
+                    <li><code>$fillable</code>, <code>$hidden</code>, <code>$casts</code> — як у Laravel;</li>
+                    <li>модель у конструктор контролера або сервісу — через DI контейнера (autowiring).</li>
+                </ul>
+                <pre class="mb-4"><code class="language-php">class UserModel extends BaseModel
+{
+    use IdTrait;
+
+    public const string FIELD_EMAIL = 'email';
+
+    protected $table = 'users';
+
+    protected $fillable = [self::FIELD_EMAIL, /* ... */];
+}</code></pre>
+
+                <h2 id="queries" class="border-bottom pb-2 mb-3 mt-5">Запити в коді</h2>
+                <p>
+                    Запити будуються через <code>$model-&gt;newQuery()</code> (query builder / Eloquent),
+                    не через статичні виклики на класі моделі. Це узгоджено з ін’єкцією моделі в конструктор.
+                </p>
+                <pre class="mb-4"><code class="language-php">public function __construct(
+    private readonly UserModel $userModel,
+    private readonly ConfigInterface $config,
+) {}
+
+public function index(): ResponseInterface
+{
+    $users = $this-&gt;userModel
+        -&gt;newQuery()
+        -&gt;orderBy(UserModel::FIELD_CREATED_AT, BaseModel::SORT_DESC)
+        -&gt;paginate($this-&gt;config-&gt;getInt('pagination.per_page', 10))
+        -&gt;withQueryString();
+
+    return $this-&gt;viewResponse-&gt;create('@auth-admin/users/list', ['users' =&gt; $users]);
+}</code></pre>
+                <p>
+                    Створення записів після валідації — <code>newQuery()-&gt;create([...])</code> або
+                    <code>validated()</code> з FormRequest (див. <a href="requests.html">Запити та валідація</a>).
+                    Офіційні довідники: <a href="https://laravel.com/docs/eloquent" target="_blank" rel="noopener">Eloquent</a>,
+                    <a href="https://laravel.com/docs/queries" target="_blank" rel="noopener">Query Builder</a>,
+                    <a href="https://laravel.com/docs/pagination" target="_blank" rel="noopener">Pagination</a>.
+                </p>
+
+                <h2 id="migrations" class="border-bottom pb-2 mb-3 mt-5">Міграції</h2>
+                <p>
+                    Каталоги міграцій реєструються в <code>config/migrations.php</code> (додаток) і в
+                    <code>config.php</code> компонента (секція <code>migrations.paths</code>).
+                    Під час <code>ComponentsServiceProvider::boot()</code> шляхи всіх увімкнених компонентів
+                    додаються до <code>MigrationRegistry</code>.
+                </p>
+                <pre class="mb-4"><code class="language-php">// config/migrations.php
+return [
+    'migrations' =&gt; [
+        'table' =&gt; 'migrations',
+        'paths' =&gt; ['database/migrations'],
+    ],
+];
+
+// src/Components/AuthAdmin/config.php
+'migrations' =&gt; [
+    'paths' =&gt; ['src/Components/AuthAdmin/Database/Migrations'],
+],</code></pre>
+                <p>
+                    Файл міграції — клас, що розширює <code>Migration</code>, з методами <code>up()</code> / <code>down()</code>.
+                    Для схеми використовуйте <code>CapsuleManager::schema()</code>:
+                </p>
+                <pre class="mb-4"><code class="language-php">use Illuminate\Database\Capsule\Manager as CapsuleManager;
+use Illuminate\Database\Schema\Blueprint;
+
+CapsuleManager::schema()-&gt;create('pages', function (Blueprint $table) {
+    $table-&gt;increments('id');
+    $table-&gt;string('slug', 255)-&gt;unique();
+    $table-&gt;timestamps();
+});</code></pre>
+                <p>
+                    Історія виконаних міграцій зберігається в таблиці <code>migrations</code> (ім’я з конфігу).
+                    Документація Laravel: <a href="https://laravel.com/docs/migrations" target="_blank" rel="noopener">Migrations</a>.
+                </p>
+
+                <h2 id="seeders" class="border-bottom pb-2 mb-3 mt-5">Сидери</h2>
+                <p>
+                    Класи сидерів перелічуються в <code>config/seeders.php</code> і в <code>seeders.list</code> компонента.
+                    Компонентні сидери реалізують <code>SeederInterface</code> (метод <code>run(): void</code>);
+                    додаткові сидери додатку можуть наслідувати <code>Illuminate\Database\Seeder</code>.
+                </p>
+                <pre class="mb-4"><code class="language-php">// config/seeders.php
+use Database\Seeders\PageSeeder;
+
+return [
+    'seeders' =&gt; [
+        'list' =&gt; [PageSeeder::class],
+    ],
+];</code></pre>
+                <p>
+                    <code>db:seed</code> без опцій запускає всі зареєстровані сидери;
+                    <code>db:seed -c Concept\Components\AuthAdmin\Database\Seeders\UserSeeder</code> — один клас.
+                </p>
+
+                <h2 id="cli" class="border-bottom pb-2 mb-3 mt-5">Консоль</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Команда</th><th>Призначення</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>db:migrate</code></td><td>Застосувати нові міграції</td></tr>
+                            <tr><td><code>db:rollback</code></td><td>Відкат останнього batch</td></tr>
+                            <tr><td><code>db:migration:list</code></td><td>Список міграцій і статус</td></tr>
+                            <tr><td><code>db:seed</code></td><td>Заповнення тестовими даними</td></tr>
+                            <tr><td><code>db:seeders:list</code></td><td>Зареєстровані сидери</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php db:migrate
+php bin/console.php db:seed
+php bin/console.php db:seed -c Database\Seeders\PageSeeder</code></pre>
+                <p>
+                    Перед першим <code>db:migrate</code> переконайтесь, що БД створена і
+                    <code>DB_*</code> у <code>.env</code> відповідають вашому середовищу.
+                </p>
+
+                <h2 id="layout" class="border-bottom pb-2 mb-3 mt-5">Розташування файлів</h2>
+                <pre class="mb-4"><code class="language-text">config/db.php
+config/migrations.php
+config/seeders.php
+database/migrations/          # міграції додатку
+database/seeders/             # сидери додатку (namespace Database\Seeders)
+src/App/Models/BaseModel.php
+src/Components/*/Models/
+src/Components/*/Database/Migrations/
+src/Components/*/Database/Seeders/</code></pre>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        API запитів, відношень, scope, soft deletes і cast enum — як у Laravel Eloquent;
+                        відмінності лише в bootstrap (Capsule замість повного Laravel) та реєстрації шляхів міграцій/сидерів через конфіг і компоненти.
+                    </p>
                 </div>
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>

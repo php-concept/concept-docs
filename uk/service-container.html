@@ -18,10 +18,10 @@
             </button>
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
-            <ul class="navbar-nav flex-row gap-1 ms-auto">
-                <li class="nav-item"><a class="nav-link py-1" href="../en/service-container.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1 active" href="../uk/service-container.html">UK</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
+                <li class="nav-item"><a class="nav-link p-1" href="../en/service-container.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../uk/service-container.html">УКР</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -31,7 +31,7 @@
             <aside class="col-lg-3 col-xl-2">
                 <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
                     <div class="offcanvas-header border-bottom d-lg-none">
-                        <h5 class="offcanvas-title" id="docsSidebarLabel">Menu</h5>
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
                     </div>
                     <div class="offcanvas-body p-0 pt-lg-4">
@@ -42,10 +42,262 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Контейнер сервісів</h1>
-                <div class="border border-secondary-subtle rounded text-center text-body-secondary p-5">
-                    <p class="mb-0">Ця сторінка є заглушкою. Зміст буде додано пізніше.</p>
+
+                <p>
+                    Concept Core будує застосунок навколо <strong>DI-контейнера</strong> (Dependency Injection):
+                    залежності оголошуються один раз, а класи отримують їх через конструктор або фабрики.
+                    Реалізація — <a href="https://container.thephpleague.com/" target="_blank" rel="noopener">League Container</a>
+                    з підтримкою <a href="https://www.php-fig.org/psr/psr-11/" target="_blank" rel="noopener">PSR-11</a>.
+                </p>
+                <p>
+                    Див. також:
+                    <a href="service-providers.html">Service providers</a>,
+                    <a href="controllers.html#autowiring">контролери → автовайринг</a>,
+                    <a href="request-lifecycle.html">життєвий цикл запиту</a>.
+                </p>
+
+                <h2 id="bootstrap" class="border-bottom pb-2 mb-3 mt-5">Створення контейнера</h2>
+                <p>Ланцюжок bootstrap (див. <a href="setup.html">налаштування</a>):</p>
+                <pre class="mb-4"><code class="language-php">// public/index.php
+$app = require bootstrap/app.php;
+$app-&gt;run();
+
+// bootstrap/app.php
+$app = App::create($rootPath, $paths);
+$app-&gt;registerServiceProviders([$rootPath . '/bootstrap/providers/app.php']);</code></pre>
+                <p>У <code>App::__construct()</code> одразу реєструється:</p>
+                <ul>
+                    <li><code>ReflectionContainer</code> — автовайринг (delegate)</li>
+                    <li><code>ContainerInterface::class</code> → сам контейнер (shared)</li>
+                    <li><code>App::class</code> → екземпляр застосунку</li>
+                    <li><code>PathManager</code> — шляхи з <code>bootstrap/paths.php</code></li>
+                    <li><code>Whoops</code> — ранній обробник помилок (до providers)</li>
+                </ul>
+                <pre class="mb-4"><code class="language-php">$this-&gt;container = new Container();
+$this-&gt;container-&gt;delegate(new ReflectionContainer(cacheResolutions: true));
+$this-&gt;container-&gt;add(ContainerInterface::class, fn () =&gt; $this-&gt;container)-&gt;setShared(true);</code></pre>
+
+                <h2 id="providers" class="border-bottom pb-2 mb-3 mt-5">Service providers</h2>
+                <p>
+                    Список провайдерів — у <code>bootstrap/providers/app.php</code>.
+                    Кожен клас реалізує <code>League\Container\ServiceProvider\ServiceProviderInterface</code>
+                    і реєструє сервіси в методі <code>register()</code>.
+                </p>
+                <pre class="mb-4"><code class="language-php">return [
+    ConfigServiceProvider::class,
+    ErrorHandlerServiceProvider::class,
+    EventServiceProvider::class,
+    HttpServiceProvider::class,
+    SessionServiceProvider::class,
+    // ...
+    ComponentsServiceProvider::class,  // останнім — маршрути й views компонентів
+];</code></pre>
+                <p><strong>Порядок має значення:</strong> наприклад, <code>ConfigServiceProvider</code> перед
+                    <code>HttpServiceProvider</code> (роутер читає <code>config/routes</code>),
+                    <code>ViewServiceProvider</code> перед компонентами, які додають Twig paths.</p>
+                <p>
+                    Детально — <a href="service-providers.html">Провайдери сервісів</a>.
+                    Компоненти можуть додавати провайдери через <code>ComponentsServiceProvider</code>.
+                </p>
+
+                <h3 id="register-vs-boot" class="mt-4"><code>register()</code> і <code>boot()</code></h3>
+                <ul>
+                    <li><code>register()</code> — оголошення bindings (<code>$container-&gt;add(...)</code>)</li>
+                    <li>
+                        <code>boot()</code> — eager-логіка одразу після <code>register()</code> цього провайдера
+                        (див. <a href="service-providers.html#register-boot">Провайдери → register і boot</a>)
+                    </li>
+                </ul>
+                <p>
+                    Bootable-провайдери в core: <code>HttpServiceProvider</code>, <code>DatabaseServiceProvider</code>,
+                    <code>ErrorHandlerServiceProvider</code>, <code>ComponentsServiceProvider</code>,
+                    <code>DebugLoggerServiceProvider</code>. Порядок у <code>bootstrap/providers/*.php</code> визначає,
+                    які сервіси вже доступні в <code>boot()</code> кожного з них.
+                </p>
+
+                <h3 id="provides" class="mt-4">Метод <code>provides()</code></h3>
+                <p>
+                    Якщо провайдер оголошує <code>provides(string $id): bool</code>, League Container
+                    може відкладати його завантаження, поки не знадобиться один із перелічених сервісів
+                    (<a href="https://container.thephpleague.com/5.x/service-providers/" target="_blank" rel="noopener">deferred providers</a>).
+                </p>
+
+                <h2 id="bindings" class="border-bottom pb-2 mb-3 mt-5">Реєстрація сервісів (bindings)</h2>
+
+                <h3 id="binding-closure" class="mt-4">Closure-фабрика</h3>
+                <p>Найпоширеніший спосіб у Concept Core:</p>
+                <pre class="mb-4"><code class="language-php">$container-&gt;add(ConfigInterface::class, function () use ($container) {
+    $pathManager = $container-&gt;get(PathManager::class);
+    // ...
+    return new Config($nhConfig);
+})-&gt;setShared(true);</code></pre>
+                <p>
+                    <code>setShared(true)</code> — один екземпляр на запит (singleton у межах контейнера).
+                    Без <code>setShared</code> кожен <code>get()</code> створює новий об’єкт.
+                </p>
+
+                <h3 id="binding-instance" class="mt-4">Готовий об’єкт</h3>
+                <pre class="mb-4"><code class="language-php">$container-&gt;add(PathManager::class, new PathManager($rootPath, $paths));</code></pre>
+
+                <h3 id="binding-alias" class="mt-4">Інтерфейс → реалізація</h3>
+                <p>У коді залежте від контракту; у провайдері прив’яжіть реалізацію:</p>
+                <pre class="mb-4"><code class="language-php">$container-&gt;add(LoggerInterface::class, function () use ($container) {
+    return new Logger(/* ... */);
+})-&gt;setShared(true);
+
+// У класі застосунку
+public function __construct(private readonly LoggerInterface $logger) {}</code></pre>
+
+                <h2 id="autowiring" class="border-bottom pb-2 mb-3 mt-5">Автовайринг</h2>
+                <p>
+                    Якщо для класу немає явного <code>add()</code>, спрацьовує
+                    <code>ReflectionContainer</code>: аналіз конструктора, рекурсивний <code>get()</code> для type-hint.
+                </p>
+                <ul>
+                    <li>Контролери, middleware, FormRequest, сервіси застосунку — зазвичай без ручної реєстрації</li>
+                    <li>Моделі Eloquent — теж резолвяться, якщо конструктор дозволяє</li>
+                </ul>
+                <p>
+                    Обмеження method injection у контролерах — <a href="controllers.html#method-args">лише FormRequest, PSR-7, параметри URL</a>.
+                    Усе інше — у <strong>конструктор</strong>.
+                </p>
+                <p>
+                    <a href="https://container.thephpleague.com/5.x/dependency-injection/" target="_blank" rel="noopener">League Container → Dependency Injection</a>
+                </p>
+
+                <h2 id="resolution" class="border-bottom pb-2 mb-3 mt-5">Хто викликає <code>get()</code></h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Місце</th><th>Що резолвиться</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><a href="https://route.thephpleague.com/" target="_blank" rel="noopener">League Route</a> + <code>RouteStrategy</code></td>
+                                <td>Контролер <code>[Class, 'method']</code>, middleware, FormRequest</td>
+                            </tr>
+                            <tr>
+                                <td>Service provider</td>
+                                <td>Залежності у closure <code>function () use ($container)</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>App::run()</code></td>
+                                <td><code>Router</code>, <code>ServerRequestInterface</code></td>
+                            </tr>
+                            <tr>
+                                <td>CLI <code>bin/console.php</code></td>
+                                <td><code>ConsoleApplication</code>, команди з контейнера</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
-                <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
+                <p>
+                    <code>RouteStrategy</code> передає контейнер у стратегію маршруту
+                    (<code>$strategy-&gt;setContainer($container)</code> у <code>HttpServiceProvider</code>).
+                    Документація: <a href="https://route.thephpleague.com/6.x/routing/" target="_blank" rel="noopener">Routing</a>,
+                    <a href="https://route.thephpleague.com/6.x/middleware/" target="_blank" rel="noopener">Middleware</a>.
+                </p>
+
+                <h3 id="request-rebind" class="mt-4">Оновлення запиту в контейнері</h3>
+                <p>
+                    Після збігу маршруту <code>RouteStrategy</code> додає параметри URL у запит і
+                    <strong>перезаписує</strong> binding (третій аргумент <code>true</code> — replace):
+                </p>
+                <pre class="mb-4"><code class="language-php">$container-&gt;add(ServerRequestInterface::class, $request, true);</code></pre>
+                <p>
+                    Тому <code>UrlGenerator</code>, <code>ViewResponseFactory</code> і <code>ResponseFactory::back()</code>
+                    бачать актуальний запит із атрибутами <code>{id}</code> та <code>SAFE_BACK_URL</code>.
+                </p>
+
+                <h2 id="core-services" class="border-bottom pb-2 mb-3 mt-5">Основні сервіси ядра</h2>
+                <p>Типові binding з провайдерів Concept Core (за контрактом або класом):</p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Сервіс</th><th>Провайдер</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>ConfigInterface</code></td><td>ConfigServiceProvider</td></tr>
+                            <tr><td><code>EventDispatcherInterface</code></td><td>EventServiceProvider</td></tr>
+                            <tr><td><code>ServerRequestInterface</code>, <code>Router</code></td><td>HttpServiceProvider</td></tr>
+                            <tr><td><code>UrlGeneratorInterface</code>, <code>ResponseFactoryInterface</code></td><td>HttpServiceProvider</td></tr>
+                            <tr><td><code>ViewResponseFactoryInterface</code></td><td>HttpServiceProvider</td></tr>
+                            <tr><td><code>SessionInterface</code>, <code>FlashBagInterface</code></td><td>SessionServiceProvider</td></tr>
+                            <tr><td><code>ViewInterface</code></td><td>ViewServiceProvider</td></tr>
+                            <tr><td><code>ValidatorInterface</code></td><td>ValidationServiceProvider</td></tr>
+                            <tr><td><code>DatabaseInterface</code>, <code>CapsuleManager</code></td><td>DatabaseServiceProvider</td></tr>
+                            <tr><td><code>CasterInterface</code></td><td>CastingServiceProvider</td></tr>
+                            <tr><td><code>LoggerInterface</code></td><td>LogServiceProvider</td></tr>
+                            <tr><td><code>ComponentRegistry</code></td><td>ComponentsServiceProvider</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>
+                    Twig environment збирається всередині <code>ViewInterface</code>:
+                    extensions з <code>config/view.php</code>, paths з компонентів — див.
+                    <a href="views.html">Представлення</a>.
+                </p>
+
+                <h2 id="custom-binding" class="border-bottom pb-2 mb-3 mt-5">Власний сервіс</h2>
+                <ol>
+                    <li>Створіть клас (краще інтерфейс + реалізація).</li>
+                    <li>
+                        Зареєструйте в <code>ServiceProvider</code> застосунку або компонента
+                        (<code>providers</code> у <code>config.php</code> компонента).
+                    </li>
+                    <li>Інжектуйте тип у конструктор контролера / сервісу.</li>
+                </ol>
+                <pre class="mb-4"><code class="language-php">// App/Providers/BillingServiceProvider.php
+public function register(): void
+{
+    $this-&gt;getContainer()
+        -&gt;add(BillingGatewayInterface::class, function () {
+            return new StripeBillingGateway(/* ... */);
+        })
+        -&gt;setShared(true);
+}</code></pre>
+                <p>Додайте провайдер у <code>bootstrap/providers/app.php</code> або в масив providers компонента.</p>
+
+                <h2 id="anti-patterns" class="border-bottom pb-2 mb-3 mt-5">Антипатерни</h2>
+                <h3 id="service-locator" class="mt-4">Service locator</h3>
+                <p>
+                    Не передавайте <code>ContainerInterface</code> у контролери й доменні сервіси, щоб викликати
+                    <code>$container-&gt;get()</code> «за потреби». Це приховує залежності.
+                </p>
+                <p>Повний розбір — <a href="controllers.html#service-locator">Контролери → service locator</a>.</p>
+
+                <h3 id="when-container-ok" class="mt-4">Коли <code>getContainer()</code> доречний</h3>
+                <ul>
+                    <li>Усередині <strong>service provider</strong> (<code>register()</code> / <code>boot()</code>)</li>
+                    <li>Інфраструктура: <code>ResponseFactory</code> (URL generator), <code>SeederManager</code>, error handler</li>
+                    <li>Bootstrap, CLI entrypoint, тести з підміною binding</li>
+                </ul>
+
+                <h2 id="has-get" class="border-bottom pb-2 mb-3 mt-5"><code>has()</code> і <code>get()</code></h2>
+                <pre class="mb-4"><code class="language-php">if ($container-&gt;has(LoggerInterface::class)) {
+    $logger = $container-&gt;get(LoggerInterface::class);
+}</code></pre>
+                <p>
+                    PSR-11: <code>get()</code> кидає <code>NotFoundExceptionInterface</code>, якщо сервіс не зареєстрований.
+                    У провайдерах часто спочатку перевіряють <code>has(ConfigInterface::class)</code>, щоб уникнути циклічних залежностей на ранній стадії bootstrap.
+                </p>
+
+                <h2 id="events" class="border-bottom pb-2 mb-3 mt-5">Події реєстрації</h2>
+                <p>
+                    Провайдери диспатчать <code>ServiceAwakening</code> при створенні ключових сервісів
+                    (для debug/телеметрії). Підписка — через <code>EventDispatcherInterface</code>
+                    (<a href="events.html">Події</a>).
+                </p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Контейнер — «склад» залежностей; бізнес-логіка лишається в сервісах і контролерах.
+                        Нову інтеграцію (платіжний шлюз, кеш) додавайте binding + інтерфейс, а не виклики
+                        <code>get()</code> з десятка місць.
+                    </p>
+                </div>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
             </main>
 
             <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">

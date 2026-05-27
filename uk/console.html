@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Консоль — Concept Core Documentation">
-    <title>Консоль - Concept Core Documentation</title>
+    <meta name="description" content="Робота з консоллю — Concept Core Documentation">
+    <title>Робота з консоллю - Concept Core Documentation</title>
     <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
     <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
@@ -19,9 +19,9 @@
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
             <ul class="navbar-nav flex-row gap-1 ms-auto">
-                <li class="nav-item"><a class="nav-link py-1" href="../en/console.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1 active" href="../uk/console.html">UK</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../en/console.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../uk/console.html">УКР</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -31,7 +31,7 @@
             <aside class="col-lg-3 col-xl-2">
                 <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
                     <div class="offcanvas-header border-bottom d-lg-none">
-                        <h5 class="offcanvas-title" id="docsSidebarLabel">Menu</h5>
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
                     </div>
                     <div class="offcanvas-body p-0 pt-lg-4">
@@ -41,11 +41,114 @@
             </aside>
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
-                <h1 class="display-6 fw-bold mb-4">Консоль</h1>
-                <div class="border border-secondary-subtle rounded text-center text-body-secondary p-5">
-                    <p class="mb-0">Ця сторінка є заглушкою. Зміст буде додано пізніше.</p>
+                <h1 class="display-6 fw-bold mb-4">Робота з консоллю</h1>
+
+                <p>
+                    CLI застосунку побудований на
+                    <a href="https://symfony.com/doc/current/console.html" target="_blank" rel="noopener">Symfony Console</a>.
+                    Точка входу — <code>bin/console.php</code>; команди реєструються через DI-контейнер і
+                    <code>ConsoleServiceProvider</code>.
+                </p>
+                <p>
+                    Див. також:
+                    <a href="setup.html#bin">налаштування → bin/console.php</a>,
+                    <a href="service-providers.html#cli-providers">провайдери для CLI</a>,
+                    <a href="console-commands.html">створення власних команд</a>.
+                </p>
+
+                <h2 id="run" class="border-bottom pb-2 mb-3 mt-5">Запуск</h2>
+                <p>З кореня проєкту:</p>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php
+
+# або через Composer (script у composer.json)
+composer console
+
+# довідка
+php bin/console.php list
+
+# довідка по одній команді
+php bin/console.php help db:migrate</code></pre>
+                <p>
+                    Bootstrap CLI відрізняється від HTTP: підключається
+                    <code>bootstrap/providers/console.php</code> (без View/Validation для веб-стеку, з
+                    <code>ConsoleServiceProvider</code>). Детальніше — <a href="setup.html#bootstrap-providers-console">Setup</a>.
+                </p>
+
+                <h2 id="how-it-works" class="border-bottom pb-2 mb-3 mt-5">Як це влаштовано</h2>
+                <pre class="mb-4"><code class="language-php">// bin/console.php
+$app = App::create($rootPath, $paths);
+$app-&gt;registerServiceProviders([$rootPath . '/bootstrap/providers/console.php']);
+
+$console = $app-&gt;getContainer()-&gt;get(ConsoleApplication::class);
+$console-&gt;run();</code></pre>
+                <ol>
+                    <li><code>ConsoleServiceProvider</code> створює <code>Symfony\Component\Console\Application</code></li>
+                    <li>Команди з <code>config/commands.php</code> резолвяться з контейнера і додаються в application</li>
+                    <li><code>ComponentsServiceProvider::boot()</code> додає команди з <code>config.php</code> кожного компонента</li>
+                </ol>
+
+                <h2 id="built-in" class="border-bottom pb-2 mb-3 mt-5">Команди ядра</h2>
+                <p>Реєстрація в <code>config/commands.php</code>:</p>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Команда</th><th>Призначення</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>db:migrate</code></td><td>Виконати міграції</td></tr>
+                            <tr><td><code>db:migration:list</code></td><td>Список міграцій</td></tr>
+                            <tr><td><code>db:rollback</code></td><td>Відкат останнього batch міграцій</td></tr>
+                            <tr><td><code>db:seed</code></td><td>Запуск сидерів</td></tr>
+                            <tr><td><code>db:seeders:list</code></td><td>Список зареєстрованих сидерів</td></tr>
+                            <tr><td><code>route:list</code></td><td>Таблиця маршрутів (<code>-F</code> — повні імена middleware)</td></tr>
+                            <tr><td><code>view:clear</code></td><td>Очистити кеш Twig</td></tr>
+                            <tr><td><code>component:list</code></td><td>Список увімкнених компонентів</td></tr>
+                            <tr><td><code>component:publish-assets</code></td><td>Публікація assets компонентів у <code>public/</code></td></tr>
+                        </tbody>
+                    </table>
                 </div>
-                <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
+
+                <h3 id="examples" class="mt-4">Приклади</h3>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php db:migrate
+php bin/console.php db:seed
+php bin/console.php route:list
+php bin/console.php route:list -F
+php bin/console.php component:list
+php bin/console.php view:clear</code></pre>
+
+                <h2 id="component-commands" class="border-bottom pb-2 mb-3 mt-5">Команди компонентів</h2>
+                <p>
+                    Компонент додає команди в секції <code>commands</code> свого <code>config.php</code>.
+                    Під час <code>ComponentsServiceProvider::boot()</code> вони реєструються в тому ж
+                    <code>ConsoleApplication</code>.
+                </p>
+
+                <h2 id="exit-codes" class="border-bottom pb-2 mb-3 mt-5">Коди завершення</h2>
+                <p>
+                    Команди повертають <code>Command::SUCCESS</code> (0) або <code>Command::FAILURE</code> (1).
+                    У скриптах CI перевіряйте exit code після <code>php bin/console.php ...</code>.
+                </p>
+
+                <h2 id="env" class="border-bottom pb-2 mb-3 mt-5">Оточення та конфіг</h2>
+                <p>
+                    CLI використовує той самий <code>.env</code> і <code>ConfigServiceProvider</code>, що й HTTP.
+                    <code>APP_ENV</code> визначає оверрайди <code>config/{env}/</code> і список компонентів
+                    (наприклад DebugBar лише в <code>config/dev/components.php</code>).
+                </p>
+                <p>
+                    Для міграцій і сидерів потрібне коректне підключення БД у
+                    <a href="database.html#configuration"><code>config/db.php</code></a> (або через <code>.env</code>).
+                </p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Консоль — для обслуговування (міграції, кеш, діагностика) і локальної розробки.
+                        Довготривалу бізнес-логіку краше виносити в сервіси, а в command лишати тонкий виклик.
+                    </p>
+                </div>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
             </main>
 
             <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
