@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="uk" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Безпечні редіректи — Concept Core Documentation">
+    <title>Безпечні редіректи - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="safe-redirects">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Відкрити навігацію">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
+                <li class="nav-item"><a class="nav-link p-1" href="../en/safe-redirects.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../uk/safe-redirects.html">УКР</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Безпечні редіректи</h1>
+
+                <p>
+                    Відкриті редіректи (<code>?next=https://evil.com</code>) — типова вразливість. Concept Core
+                    обмежує «назад» і fallback-URL лише внутрішніми адресами застосунку через
+                    <code>StorePreviousUrlMiddleware</code> і <code>ResponseFactory::back()</code>.
+                </p>
+
+                <h2 id="middleware" class="border-bottom pb-2 mb-3 mt-5">StorePreviousUrlMiddleware</h2>
+                <p>Middleware веде в сесії два URL:</p>
+                <ul>
+                    <li><code>SessionKey::CURRENT_URL</code> (<code>_url_current</code>) — остання GET-сторінка (не AJAX)</li>
+                    <li><code>SessionKey::PREVIOUS_URL</code> (<code>_url_previous</code>) — попередня GET-сторінка</li>
+                </ul>
+                <p>На кожен запит у атрибут PSR-7 записується «безпечний URL назад»:</p>
+                <ul>
+                    <li><strong>GET</strong> — <code>PREVIOUS_URL</code> (сторінка, з якої прийшли)</li>
+                    <li><strong>POST</strong> (і інші методи) — <code>CURRENT_URL</code> (сторінка форми)</li>
+                </ul>
+                <pre class="mb-4"><code class="language-php">// RequestAttribute::SAFE_BACK_URL на запиті
+$router->lazyMiddleware(StorePreviousUrlMiddleware::class);</code></pre>
+                <p>
+                    AJAX-запити (заголовок <code>X-Requested-With: XMLHttpRequest</code>) не оновлюють ланцюжок URL,
+                    щоб фонові poll-запити не зламали «назад» після сабміту форми.
+                </p>
+
+                <h2 id="back" class="border-bottom pb-2 mb-3 mt-5">ResponseFactory::back()</h2>
+                <p>Контролер або middleware після валідації часто робить redirect назад:</p>
+                <pre class="mb-4"><code class="language-php">return $responseFactory->back();</code></pre>
+                <p>Алгоритм вибору цілі:</p>
+                <ol>
+                    <li><strong>Referer</strong> — якщо браузер надіслав заголовок і URL внутрішній</li>
+                    <li><strong>SAFE_BACK_URL</strong> — з атрибута запиту (з middleware)</li>
+                    <li><strong>Fallback</strong> — за замовчуванням <code>/</code> (другий аргумент <code>back()</code>)</li>
+                </ol>
+                <pre class="mb-4"><code class="language-php">return $responseFactory->back(
+    status: 302,
+    fallback: '/cabinet'
+);</code></pre>
+
+                <h2 id="internal-url" class="border-bottom pb-2 mb-3 mt-5">Що вважається «внутрішнім»</h2>
+                <p>Метод <code>isInternalUrl()</code> у <code>ResponseFactory</code>:</p>
+                <ul>
+                    <li>Відносний шлях, що починається з <code>/</code>, — дозволений</li>
+                    <li>Абсолютний URL — лише якщо <code>host</code> збігається з host поточного запиту</li>
+                    <li>Зовнішні домени, <code>javascript:</code>, протоколи інших сайтів — відхиляються → fallback</li>
+                </ul>
+                <p>
+                    Це захищає від open redirect навіть якщо зловмисник підставить Referer або параметр у сесії
+                    (сесійні URL теж мають бути своїми — middleware пише лише реальні URI застосунку).
+                </p>
+
+                <h2 id="validation" class="border-bottom pb-2 mb-3 mt-5">Після помилок валідації</h2>
+                <p>
+                    <code>HandleValidationExceptionMiddleware</code> для HTML-запитів робить flash помилок і
+                    <code>back()</code> — користувач повертається на форму з тим самим URL, без довільного
+                    <code>redirect($_GET['return'])</code>.
+                </p>
+                <p>Див. <a href="requests.html">Запити та валідація</a> та <a href="middleware.html">Middleware</a>.</p>
+
+                <h2 id="named-routes" class="border-bottom pb-2 mb-3 mt-5">Іменовані маршрути</h2>
+                <p>Для фіксованих цілей безпечніше іменований redirect — host контролюється генератором URL:</p>
+                <pre class="mb-4"><code class="language-php">return $responseFactory->redirectByName('cabinet.dashboard');</code></pre>
+                <p>
+                    Використовуйте <code>back()</code> для UX «повернутися на форму», а
+                    <code>redirectByName()</code> — коли ціль завжди відома (login, dashboard).
+                </p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Не приймайте URL редіректу з ненадійного input користувача без whitelist. Якщо потрібен
+                        параметр <code>?next=</code>, порівнюйте з allowlist шляхів або імен маршрутів.
+                    </p>
+                </div>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-uk.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

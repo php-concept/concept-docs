@@ -249,7 +249,10 @@ LOG_MAX_FILES=14    → log.max_files</code></pre>
                 </div>
 
                 <h3 id="file-seeders">seeders.php</h3>
-                <p><code>seeders.list</code> — масив класів сидерів для <code>db:seed</code>.</p>
+                <p>
+                    <code>seeders.list</code> — масив класів сидерів для <code>db:seed</code> (усі разом).
+                    Один сидер: <code>db:seed -c "Fully\Qualified\SeederClass"</code> — потрібен повний FQCN.
+                </p>
 
                 <h3 id="file-commands">commands.php</h3>
                 <p><code>commands</code> — список класів консольних команд (ядро + ваші команди).</p>

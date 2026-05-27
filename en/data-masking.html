@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Data Masking — Concept Core Documentation">
+    <title>Data Masking - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="data-masking">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/data-masking.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/data-masking.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Menu</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Data Masking</h1>
+
+                <p>
+                    The core redacts sensitive values before they are written to logs, debug panels, and other
+                    diagnostics. The <code>Masker</code> component recursively processes arrays, objects, and strings
+                    using key patterns and regular expressions.
+                </p>
+                <p>
+                    Registration: <code>MaskerServiceProvider</code> in
+                    <a href="service-providers.html#http-providers">HTTP providers</a> (before
+                    <code>LogServiceProvider</code> so the logger receives the masker).
+                </p>
+
+                <h2 id="architecture" class="border-bottom pb-2 mb-3 mt-5">Architecture</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Class</th><th>Role</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>MaskerInterface</code></td><td>Contract: <code>mask(mixed $data): mixed</code></td></tr>
+                            <tr><td><code>DataMasker</code></td><td>Rule orchestrator, recursive traversal</td></tr>
+                            <tr><td><code>RegexMasker</code></td><td>Built-in string and key patterns</td></tr>
+                            <tr><td><code>MaskingRuleInterface</code></td><td>Custom rule (<code>apply</code>, <code>isSensitiveKey</code>)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h2 id="default-rules" class="border-bottom pb-2 mb-3 mt-5">Built-in rules</h2>
+                <p><strong>Keys</strong> matching sensitive name patterns are replaced with <code>***</code>:</p>
+                <ul class="small">
+                    <li><code>password</code>, <code>token</code>, <code>_csrf_token</code>, <code>secret</code></li>
+                    <li><code>api_key</code>, <code>authorization</code></li>
+                </ul>
+                <p><strong>Strings</strong> are scrubbed with regex for emails, card numbers, and <code>key=value</code> secrets.</p>
+
+                <h2 id="logger" class="border-bottom pb-2 mb-3 mt-5">Logger integration</h2>
+                <p>
+                    <code>Logger</code> registers a Monolog processor that runs
+                    <code>$masker->mask($record->context)</code> on every log entry.
+                </p>
+                <pre class="mb-4"><code class="language-php">$logger->info('User updated', [
+    'email' => 'user@example.com',
+    'password' => 'secret123',  // logged as ***
+]);</code></pre>
+                <p>Log messages themselves are not masked — keep secrets in <code>context</code> only.</p>
+
+                <h2 id="manual" class="border-bottom pb-2 mb-3 mt-5">Manual usage</h2>
+                <pre class="mb-4"><code class="language-php">use Concept\Core\Components\Masker\Contracts\MaskerInterface;
+
+/** @var MaskerInterface $masker */
+$masker = $container->get(MaskerInterface::class);
+$safe = $masker->mask($requestPayload);</code></pre>
+                <p><code>mask()</code> deep-clones arrays/objects; <code>maskRecursive()</code> mutates in place.</p>
+
+                <h2 id="custom-rules" class="border-bottom pb-2 mb-3 mt-5">Custom rules</h2>
+                <p>In your own provider (registered after <code>MaskerServiceProvider</code>), rebuild the shared binding:</p>
+                <pre class="mb-4"><code class="language-php">$masker = new DataMasker();
+$masker->addRule(new RegexMasker(
+    customPatterns: ['/iban=\d+/i' => 'iban=***'],
+    customKeyPatterns: ['/.*_pin$/i']
+));
+$container->add(MaskerInterface::class, fn () => $masker)->setShared(true);</code></pre>
+                <p>Implement <code>MaskingRuleInterface</code> for domain-specific redaction logic.</p>
+
+                <h2 id="debugbar" class="border-bottom pb-2 mb-3 mt-5">DebugBar and other tools</h2>
+                <p>
+                    The DebugBar component injects the masker into its request collector so
+                    <code>$_POST</code> and <code>$_SESSION</code> are shown redacted. Follow the same pattern in custom diagnostics.
+                </p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Masking reduces leakage via logs and dev tools; it does not encrypt data at rest or strip fields from HTTP responses.
+                    </p>
+                </div>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-en.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

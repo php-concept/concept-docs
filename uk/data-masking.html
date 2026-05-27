@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="uk" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Маскування даних — Concept Core Documentation">
+    <title>Маскування даних - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="data-masking">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Відкрити навігацію">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
+                <li class="nav-item"><a class="nav-link p-1" href="../en/data-masking.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../uk/data-masking.html">УКР</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Маскування даних</h1>
+
+                <p>
+                    Ядро приховує чутливі значення перед записом у логи, debug-панелі та інші місця, де дані
+                    можуть потрапити до сторонніх очей. Компонент <code>Masker</code> рекурсивно обробляє масиви,
+                    об’єкти та рядки за правилами ключів і regex.
+                </p>
+                <p>
+                    Реєстрація: <code>MaskerServiceProvider</code> у
+                    <a href="service-providers.html#http-providers">провайдерах HTTP</a> (перед
+                    <code>LogServiceProvider</code>, щоб логер отримав маскер).
+                </p>
+
+                <h2 id="architecture" class="border-bottom pb-2 mb-3 mt-5">Архітектура</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Клас</th><th>Роль</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>MaskerInterface</code></td><td>Контракт: <code>mask(mixed $data): mixed</code></td></tr>
+                            <tr><td><code>DataMasker</code></td><td>Оркестратор правил, рекурсія по структурах</td></tr>
+                            <tr><td><code>RegexMasker</code></td><td>Стандартні regex для рядків і шаблонів ключів</td></tr>
+                            <tr><td><code>MaskingRuleInterface</code></td><td>Власне правило (<code>apply</code>, <code>isSensitiveKey</code>)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>
+                    За замовчуванням <code>MaskerServiceProvider</code> створює <code>DataMasker</code> з одним
+                    правилом <code>RegexMasker</code>. Сервіс зареєстрований як shared singleton.
+                </p>
+
+                <h2 id="default-rules" class="border-bottom pb-2 mb-3 mt-5">Вбудовані правила</h2>
+                <p><strong>Ключі</strong> (регістронезалежні шаблони) замінюються на <code>***</code>:</p>
+                <ul class="small">
+                    <li>імена з <code>password</code>, <code>token</code>, <code>_csrf_token</code>, <code>secret</code></li>
+                    <li><code>api_key</code>, <code>authorization</code></li>
+                </ul>
+                <p><strong>Рядки</strong> проходять через regex:</p>
+                <ul class="small">
+                    <li>email → <code>***@***.***</code></li>
+                    <li>номер картки <code>9999-9999-9999-9999</code> → зірочки</li>
+                    <li>пари на кшталт <code>password=...</code>, <code>token=...</code>, <code>api_key=...</code> → значення замінюється на <code>*****</code></li>
+                </ul>
+
+                <h2 id="logger" class="border-bottom pb-2 mb-3 mt-5">Інтеграція з логером</h2>
+                <p>
+                    <code>LogServiceProvider</code> передає <code>MaskerInterface</code> у
+                    <code>Concept\Core\Components\Logger\Logger</code>. Monolog-процесор маскує
+                    <code>$record->context</code> перед записом у файл або stderr.
+                </p>
+                <pre class="mb-4"><code class="language-php">$logger->info('User updated', [
+    'email' =&gt; 'user@example.com',
+    'password' =&gt; 'secret123',  // у лог потрапить ***
+]);</code></pre>
+                <p>
+                    Повідомлення (<code>$message</code>) не маскується автоматично — не вставляйте паролі та токени
+                    у текст повідомлення, лише в <code>context</code>.
+                </p>
+
+                <h2 id="manual" class="border-bottom pb-2 mb-3 mt-5">Ручне використання</h2>
+                <pre class="mb-4"><code class="language-php">use Concept\Core\Components\Masker\Contracts\MaskerInterface;
+
+/** @var MaskerInterface $masker */
+$masker = $container-&gt;get(MaskerInterface::class);
+
+$safe = $masker-&gt;mask([
+    'login' =&gt; 'oleh',
+    'password' =&gt; 'hunter2',
+    'card' =&gt; '4111-1111-1111-1111',
+]);</code></pre>
+                <p>
+                    Метод <code>mask()</code> для масивів і об’єктів спочатку робить <code>deepClone</code>, щоб
+                    не змінювати оригінал. <code>maskRecursive()</code> змінює передану структуру на місці — корисно,
+                    коли клонування зайве.
+                </p>
+
+                <h2 id="custom-rules" class="border-bottom pb-2 mb-3 mt-5">Власні правила</h2>
+                <p>У власному провайдері (після <code>MaskerServiceProvider</code>) можна перевизначити binding:</p>
+                <pre class="mb-4"><code class="language-php">use Concept\Core\Components\Masker\Contracts\MaskerInterface;
+use Concept\Core\Components\Masker\DataMasker;
+use Concept\Core\Components\Masker\RegexMasker;
+
+$masker = new DataMasker();
+$masker-&gt;addRule(new RegexMasker(
+    customPatterns: ['/iban=\d+/i' =&gt; 'iban=***'],
+    customKeyPatterns: ['/.*_pin$/i']
+));
+
+$container-&gt;add(MaskerInterface::class, fn () =&gt; $masker)-&gt;setShared(true);</code></pre>
+                <p>Або реалізуйте <code>MaskingRuleInterface</code> для складнішої логіки (наприклад, часткове приховування телефону).</p>
+
+                <h2 id="debugbar" class="border-bottom pb-2 mb-3 mt-5">DebugBar та інші компоненти</h2>
+                <p>
+                    Компонент DebugBar інжектує <code>MaskerInterface</code> у колектор запиту — у панелі
+                    <code>$_POST</code>, <code>$_SESSION</code> тощо показуються вже замасковані значення.
+                    Будь-який власний інструмент діагностики варто будувати так само.
+                </p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Маскування не замінює шифрування в БД і не прибирає чутливі поля з HTTP-відповідей.
+                        Воно знижує ризик витоку через логи та dev-інструменти.
+                    </p>
+                </div>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-uk.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

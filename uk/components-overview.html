@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="uk" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Концепція компонентів — Concept Core Documentation">
+    <title>Концепція компонентів - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="components-overview">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Відкрити навігацію">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
+                <li class="nav-item"><a class="nav-link p-1" href="../en/components-overview.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../uk/components-overview.html">УКР</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Концепція компонентів</h1>
+
+                <p>
+                    <strong>Компонент</strong> у Concept Core — ізольований функціональний модуль застосунку
+                    (модульний моноліт): власні маршрути, шаблони, міграції, CLI-команди та опційно провайдери DI.
+                    Ядро збирає активні компоненти через <code>ComponentRegistry</code> і
+                    <code>ComponentsServiceProvider</code>.
+                </p>
+                <p>
+                    Див. також: <a href="directory-structure.html#variant-components">структура каталогів</a>,
+                    <a href="service-providers.html#component-providers">провайдери компонентів</a>,
+                    <a href="creating-components.html">створення компонента (AuthAdmin)</a>.
+                </p>
+
+                <h2 id="why" class="border-bottom pb-2 mb-3 mt-5">Навіщо компоненти</h2>
+                <ul>
+                    <li><strong>Package by feature</strong> — код адмінки, кабінету, каталогу лежить поруч, а не розмазаний по шарах <code>App/Controllers</code>.</li>
+                    <li><strong>Вмикання/вимикання</strong> — модуль підключається одним рядком у <code>config/components.php</code>.</li>
+                    <li><strong>Межі команди</strong> — зміни в <code>AuthAdmin/</code> рідко чіпають <code>UserCabinet/</code>.</li>
+                    <li><strong>Спільне ядро</strong> — HTTP, валідація, Twig, БД залишаються в Concept Core і <code>App/</code>.</li>
+                </ul>
+
+                <h2 id="where" class="border-bottom pb-2 mb-3 mt-5">Де що зберігати</h2>
+                <pre class="mb-4"><code class="language-text">src/
+├── App/                          # спільний код застосунку
+│   ├── Controllers/              # глобальні сторінки (головна, about)
+│   ├── Models/                   # BaseModel, спільні сутності
+│   └── Extensions/Twig/          # глобальні Twig-розширення
+└── Components/
+    └── AuthAdmin/                # приклад модуля
+        ├── AuthAdminComponent.php
+        ├── config.php            # метадані модуля
+        ├── routes.php            # HTTP-маршрути
+        ├── Controllers/
+        ├── Middlewares/
+        ├── Requests/  Dto/  Models/
+        ├── Services/
+        ├── Views/                # шаблони модуля (@auth-admin/...)
+        ├── Database/
+        │   ├── Migrations/
+        │   └── Seeders/
+        ├── Commands/             # console-команди
+        ├── Extensions/           # Twig для модуля
+        └── Assets/               # JS/CSS → public через CLI
+
+config/
+└── components.php                # які модулі активні
+
+resources/views/                # спільні layouts (@dashboard, @frontend)
+routes/web.php                  # глобальні маршрути + middleware стек</code></pre>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Що</th><th>Компонент</th><th>Застосунок (<code>App/</code>)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Маршрути фічі</td><td><code>Component/routes.php</code></td><td><code>routes/web.php</code></td></tr>
+                            <tr><td>Шаблони модуля</td><td><code>Component/Views/</code></td><td><code>resources/views/</code></td></tr>
+                            <tr><td>Міграції модуля</td><td><code>Component/Database/Migrations/</code></td><td><code>database/migrations/</code></td></tr>
+                            <tr><td>Базова модель, утиліти</td><td>—</td><td><code>App/Models/</code></td></tr>
+                            <tr><td>Спільний admin layout</td><td>extends <code>@dashboard/...</code></td><td><code>resources/views/dashboard/</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h2 id="contract" class="border-bottom pb-2 mb-3 mt-5">Контракт ComponentInterface</h2>
+                <p>Клас компонента реалізує <code>Concept\Core\Components\Component\Contracts\ComponentInterface</code> (у skeleton — через <code>BaseComponent</code>):</p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Метод</th><th>Призначення</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>name()</code>, <code>version()</code>, <code>description()</code></td><td>Метадані для <code>component:list</code></td></tr>
+                            <tr><td><code>routes()</code></td><td>Абсолютний шлях до <code>routes.php</code> або <code>null</code></td></tr>
+                            <tr><td><code>providers()</code></td><td>Додаткові service providers модуля</td></tr>
+                            <tr><td><code>viewPaths()</code></td><td>Twig namespace → шлях (<code>auth-admin</code> → <code>/src/Components/.../Views</code>)</td></tr>
+                            <tr><td><code>viewContexts()</code></td><td>Префікс URI → контекст (<code>/admin</code> → <code>dashboard</code>)</td></tr>
+                            <tr><td><code>viewExtensions()</code></td><td>Класи <code>Twig\Extension\ExtensionInterface</code></td></tr>
+                            <tr><td><code>commands()</code></td><td>Symfony Console команди</td></tr>
+                            <tr><td><code>seeders()</code></td><td>Класи сидерів</td></tr>
+                            <tr><td><code>migrations()</code></td><td>Шляхи до каталогів міграцій</td></tr>
+                            <tr><td><code>assets()</code></td><td>Мапа <code>source → public</code> для <code>component:publish-assets</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Декларація в <code>config.php</code> модуля; <code>BaseComponent</code> читає її через Noodlehaus Config.</p>
+
+                <h2 id="registration" class="border-bottom pb-2 mb-3 mt-5">Реєстрація в застосунку</h2>
+                <pre class="mb-4"><code class="language-php">// config/components.php
+return [
+    'components' => [
+        AuthAdminComponent::class => AuthAdminComponent::class,
+        UserCabinetComponent::class => UserCabinetComponent::class,
+    ],
+];</code></pre>
+                <p>
+                    Ключ і значення — FQCN класу компонента (контейнер створює екземпляр через DI).
+                    У <code>config/dev/components.php</code> можна додати лише dev-модулі (наприклад DebugBar).
+                </p>
+                <p>
+                    Список класів потрапляє в <code>ComponentRegistry</code> при реєстрації
+                    <code>ComponentsServiceProvider</code> (останній у <code>bootstrap/providers/app.php</code>).
+                </p>
+
+                <h2 id="boot" class="border-bottom pb-2 mb-3 mt-5">Що відбувається при boot</h2>
+                <p><code>ComponentsServiceProvider::boot()</code> для кожного активного компонента:</p>
+                <ol>
+                    <li>Диспатчить подію <code>ComponentRegistering</code></li>
+                    <li>Реєструє console-команди, шляхи міграцій і seeders</li>
+                    <li>Підключає nested service providers з <code>config.php</code></li>
+                    <li>Виконує <code>require</code> файлів <code>routes.php</code> (доступна змінна <code>$router</code>)</li>
+                    <li>У HTTP (не CLI) — додає Twig paths, extensions і view contexts</li>
+                </ol>
+                <p>Порядок: провайдери ядра → <code>ComponentsServiceProvider</code> → маршрути й views модулів.</p>
+
+                <h2 id="migrate-code" class="border-bottom pb-2 mb-3 mt-5">Як зібрати існуючий код у компонент</h2>
+                <p>Типовий рефакторинг з «плоского» <code>App/</code>:</p>
+                <ol>
+                    <li>Створіть <code>src/Components/MyFeature/</code> з підкаталогами за зразком AuthAdmin.</li>
+                    <li>Перенесіть контролери, моделі, FormRequest, views, middleware у каталог компонента; оновіть namespace на <code>Concept\Components\MyFeature\...</code>.</li>
+                    <li>Винесіть маршрути фічі з <code>routes/web.php</code> у <code>MyFeature/routes.php</code>.</li>
+                    <li>Додайте <code>MyFeatureComponent.php</code> (extends <code>BaseComponent</code>) і <code>config.php</code>.</li>
+                    <li>Зареєструйте клас у <code>config/components.php</code>.</li>
+                    <li>Залиште в <code>App/</code> лише спільне: BaseModel, глобальні layouts, утиліти.</li>
+                    <li>Запустіть <code>php bin/console.php db:migrate</code> і <code>component:publish-assets</code> за потреби.</li>
+                </ol>
+                <p>
+                    Якщо модуль використовує спільний layout (<code>@dashboard</code>), шаблони в <code>resources/views/dashboard/</code>
+                    не переносять — компонент лише <code>extends</code> їх у Twig.
+                </p>
+
+                <h2 id="vs-app" class="border-bottom pb-2 mb-3 mt-5">Компонент vs код у App</h2>
+                <p>Не обов’язково все виносити в компоненти. Залишайте в <code>App/</code>:</p>
+                <ul>
+                    <li>landing, статичні сторінки, спільний API gateway;</li>
+                    <li>базові класи моделей, інтерфейси, крос-модульні сервіси;</li>
+                    <li>глобальні Twig namespaces (<code>frontend</code>, <code>dashboard</code>) у <code>config/view.php</code>.</li>
+                </ul>
+                <p>Окремий компонент — коли є чітка межа: «адмінка», «особистий кабінет», «каталог проєктів».</p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Один компонент — одна відповідальність. Якщо два модулі імпортують одна одну напряму,
+                        винесіть спільне в <code>App/</code> або окремий «core» пакет застосунку.
+                    </p>
+                </div>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-uk.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

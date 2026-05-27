@@ -19,8 +19,9 @@
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
             <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="../en/csrf.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/csrf.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/csrf.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/csrf.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -41,9 +42,91 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">CSRF Protection</h1>
-                <div class="border border-secondary-subtle rounded text-center text-body-secondary p-5">
-                    <p class="mb-0">This page is a placeholder. Content will be added in a future update.</p>
+
+                <p>
+                    Concept Core protects state-changing HTTP requests from cross-site request forgery using a
+                    synchronizer token stored in the session. Verification runs in
+                    <code>VerifyCsrfTokenMiddleware</code> before the controller; <code>CsrfTokenManager</code>
+                    issues tokens for forms and AJAX.
+                </p>
+                <p>
+                    See also: <a href="middleware.html#csrf">Middleware → CSRF</a>,
+                    <a href="views.html">Views</a> (<code>csrf_token</code> in Twig).
+                </p>
+
+                <h2 id="how-it-works" class="border-bottom pb-2 mb-3 mt-5">How it works</h2>
+                <ol>
+                    <li>On first use, <code>CsrfTokenManager::getToken()</code> generates a 64-character hex token (<code>random_bytes(32)</code>) and stores it in the session under <code>SessionKey::CSRF_TOKEN</code> (<code>_csrf_token</code>).</li>
+                    <li><code>ShareViewDataMiddleware</code> exposes the token in Twig as <code>{{ csrf_token }}</code>.</li>
+                    <li>For <strong>POST</strong>, <strong>PUT</strong>, and <strong>DELETE</strong>, middleware compares the request token with the session value using <code>hash_equals()</code>.</li>
+                    <li>If the token is missing or invalid, <code>CsrfException</code> is thrown (HTTP <strong>419</strong> Page Expired).</li>
+                </ol>
+
+                <h2 id="middleware" class="border-bottom pb-2 mb-3 mt-5">Enabling middleware</h2>
+                <p>In <code>routes/web.php</code> (or on a route group), register verification after the validation handler but before state changes:</p>
+                <pre class="mb-4"><code class="language-php">$router->lazyMiddleware(HandleValidationExceptionMiddleware::class);
+$router->lazyMiddleware(VerifyCsrfTokenMiddleware::class);
+$router->lazyMiddleware(StorePreviousUrlMiddleware::class);
+$router->lazyMiddleware(ShareViewDataMiddleware::class);</code></pre>
+                <p>
+                    <code>ShareViewDataMiddleware</code> must be in the stack so templates receive a current token.
+                    Sessions are provided by <code>SessionServiceProvider</code> in
+                    <code>bootstrap/providers/app.php</code>.
+                </p>
+
+                <h2 id="forms" class="border-bottom pb-2 mb-3 mt-5">HTML forms</h2>
+                <p>Every form that mutates data should include a hidden field named <code>_csrf_token</code>:</p>
+                <pre class="mb-4"><code class="language-twig">&lt;form method="post" action="{{ url('cabinet.profile.update') }}"&gt;
+    &lt;input type="hidden" name="_csrf_token" value="{{ csrf_token }}"&gt;
+    {# ... form fields ... #}
+&lt;/form&gt;</code></pre>
+                <p>
+                    The <code>_csrf_token</code> field is excluded from validation data in
+                    <code>FormRequest</code> (global <code>$globalExcept</code>), so it never lands in your DTO.
+                </p>
+
+                <h2 id="ajax" class="border-bottom pb-2 mb-3 mt-5">AJAX and browser APIs</h2>
+                <p>Middleware also accepts the token from headers (after the parsed body):</p>
+                <ul>
+                    <li><code>X-CSRF-TOKEN</code> — raw value</li>
+                    <li><code>X-XSRF-TOKEN</code> — passed through <code>urldecode()</code></li>
+                </ul>
+                <pre class="mb-4"><code class="language-javascript">fetch('/api/profile', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+    },
+    body: JSON.stringify(payload)
+});</code></pre>
+                <p>For stateless external APIs, omit CSRF on a separate route group and use Bearer tokens, API keys, or similar.</p>
+
+                <h2 id="exceptions" class="border-bottom pb-2 mb-3 mt-5">Errors and responses</h2>
+                <p>
+                    <code>CsrfException</code> uses <code>HttpStatusCode::PAGE_EXPIRED</code> (419). The error handler
+                    returns HTML or JSON depending on the request — see <a href="responses.html">Responses</a>.
+                </p>
+                <p>Common causes of 419:</p>
+                <ul>
+                    <li>Expired or missing session cookie</li>
+                    <li>Stale form page after the session token rotated</li>
+                    <li>Cached page submit without a fresh <code>csrf_token</code></li>
+                </ul>
+
+                <h2 id="programmatic" class="border-bottom pb-2 mb-3 mt-5">Programmatic access</h2>
+                <pre class="mb-4"><code class="language-php">use Concept\Core\Components\Csrf\CsrfTokenManager;
+
+/** @var CsrfTokenManager $csrf */
+$csrf = $container->get(CsrfTokenManager::class);
+$token = $csrf->getToken();
+$valid = $csrf->validate($submittedToken);</code></pre>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        GET, HEAD, and OPTIONS are not checked. Never perform state changes via GET.
+                    </p>
                 </div>
+
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>
 

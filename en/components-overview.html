@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Component Concept — Concept Core Documentation">
+    <title>Component Concept - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="components-overview">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/components-overview.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/components-overview.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Menu</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Component Concept</h1>
+
+                <p>
+                    A <strong>component</strong> in Concept Core is an isolated application feature module
+                    (modular monolith): its own routes, templates, migrations, CLI commands, and optional DI providers.
+                    The core assembles active components via <code>ComponentRegistry</code> and
+                    <code>ComponentsServiceProvider</code>.
+                </p>
+                <p>
+                    See also: <a href="directory-structure.html#variant-components">directory structure</a>,
+                    <a href="service-providers.html#component-providers">component providers</a>,
+                    <a href="creating-components.html">creating a component (AuthAdmin)</a>.
+                </p>
+
+                <h2 id="why" class="border-bottom pb-2 mb-3 mt-5">Why components</h2>
+                <ul>
+                    <li><strong>Package by feature</strong> — admin, cabinet, and catalog code live together.</li>
+                    <li><strong>Enable/disable</strong> — one line in <code>config/components.php</code>.</li>
+                    <li><strong>Team boundaries</strong> — changes under <code>AuthAdmin/</code> rarely touch <code>UserCabinet/</code>.</li>
+                    <li><strong>Shared core</strong> — HTTP, validation, Twig, and DB stay in Concept Core and <code>App/</code>.</li>
+                </ul>
+
+                <h2 id="where" class="border-bottom pb-2 mb-3 mt-5">Where to put code</h2>
+                <pre class="mb-4"><code class="language-text">src/
+├── App/                    # shared application code
+└── Components/
+    └── AuthAdmin/          # example module
+        ├── AuthAdminComponent.php
+        ├── config.php
+        ├── routes.php
+        ├── Controllers/  Views/  Database/  ...
+
+config/components.php       # active modules
+resources/views/            # shared layouts (@dashboard, @frontend)
+routes/web.php              # global routes + middleware stack</code></pre>
+
+                <h2 id="contract" class="border-bottom pb-2 mb-3 mt-5">ComponentInterface</h2>
+                <p>Component classes implement <code>ComponentInterface</code> (via <code>BaseComponent</code> in the skeleton). Key methods: <code>routes()</code>, <code>viewPaths()</code>, <code>viewContexts()</code>, <code>commands()</code>, <code>migrations()</code>, <code>seeders()</code>, <code>assets()</code>, <code>providers()</code>.</p>
+                <p>Metadata and lists are declared in the module’s <code>config.php</code>.</p>
+
+                <h2 id="registration" class="border-bottom pb-2 mb-3 mt-5">Registration</h2>
+                <pre class="mb-4"><code class="language-php">// config/components.php
+return [
+    'components' => [
+        AuthAdminComponent::class => AuthAdminComponent::class,
+    ],
+];</code></pre>
+                <p>Dev-only modules can be added in <code>config/dev/components.php</code> (e.g. DebugBar).</p>
+
+                <h2 id="boot" class="border-bottom pb-2 mb-3 mt-5">Boot sequence</h2>
+                <p><code>ComponentsServiceProvider::boot()</code> registers commands, migrations, seeders, nested providers, requires <code>routes.php</code> files, and (in HTTP) Twig paths/extensions/contexts.</p>
+
+                <h2 id="migrate-code" class="border-bottom pb-2 mb-3 mt-5">Moving existing code into a component</h2>
+                <ol>
+                    <li>Create <code>src/Components/MyFeature/</code> following AuthAdmin layout.</li>
+                    <li>Move controllers, models, requests, views; update namespaces.</li>
+                    <li>Extract routes to <code>MyFeature/routes.php</code>.</li>
+                    <li>Add <code>MyFeatureComponent</code> + <code>config.php</code>.</li>
+                    <li>Register in <code>config/components.php</code>.</li>
+                    <li>Keep shared code in <code>App/</code> and <code>resources/views/</code>.</li>
+                </ol>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-en.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

@@ -99,7 +99,7 @@ $console-&gt;run();</code></pre>
                             <tr><td><code>db:migrate</code></td><td>Виконати міграції</td></tr>
                             <tr><td><code>db:migration:list</code></td><td>Список міграцій</td></tr>
                             <tr><td><code>db:rollback</code></td><td>Відкат останнього batch міграцій</td></tr>
-                            <tr><td><code>db:seed</code></td><td>Запуск сидерів</td></tr>
+                            <tr><td><code>db:seed</code></td><td>Усі сидери; <code>-c "Fully\Qualified\Class"</code> — один (повний FQCN)</td></tr>
                             <tr><td><code>db:seeders:list</code></td><td>Список зареєстрованих сидерів</td></tr>
                             <tr><td><code>route:list</code></td><td>Таблиця маршрутів (<code>-F</code> — повні імена middleware)</td></tr>
                             <tr><td><code>view:clear</code></td><td>Очистити кеш Twig</td></tr>
@@ -112,6 +112,7 @@ $console-&gt;run();</code></pre>
                 <h3 id="examples" class="mt-4">Приклади</h3>
                 <pre class="mb-4"><code class="language-bash">php bin/console.php db:migrate
 php bin/console.php db:seed
+php bin/console.php db:seed -c "Concept\Components\AuthAdmin\Database\Seeders\UserSeeder"
 php bin/console.php route:list
 php bin/console.php route:list -F
 php bin/console.php component:list

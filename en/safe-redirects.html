@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Safe Redirects — Concept Core Documentation">
+    <title>Safe Redirects - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="safe-redirects">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/safe-redirects.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/safe-redirects.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Menu</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Safe Redirects</h1>
+
+                <p>
+                    Open redirects (<code>?next=https://evil.com</code>) are a common vulnerability. Concept Core
+                    limits “go back” and fallback targets to in-app URLs via
+                    <code>StorePreviousUrlMiddleware</code> and <code>ResponseFactory::back()</code>.
+                </p>
+
+                <h2 id="middleware" class="border-bottom pb-2 mb-3 mt-5">StorePreviousUrlMiddleware</h2>
+                <p>The middleware tracks two session keys:</p>
+                <ul>
+                    <li><code>SessionKey::CURRENT_URL</code> — latest non-AJAX GET page</li>
+                    <li><code>SessionKey::PREVIOUS_URL</code> — page before that</li>
+                </ul>
+                <p>Each request gets <code>RequestAttribute::SAFE_BACK_URL</code>:</p>
+                <ul>
+                    <li><strong>GET</strong> → previous page URL</li>
+                    <li><strong>POST</strong> (and others) → current form page URL</li>
+                </ul>
+                <pre class="mb-4"><code class="language-php">$router->lazyMiddleware(StorePreviousUrlMiddleware::class);</code></pre>
+                <p>AJAX requests (<code>X-Requested-With: XMLHttpRequest</code>) do not update the URL chain.</p>
+
+                <h2 id="back" class="border-bottom pb-2 mb-3 mt-5">ResponseFactory::back()</h2>
+                <pre class="mb-4"><code class="language-php">return $responseFactory->back(status: 302, fallback: '/cabinet');</code></pre>
+                <p>Target resolution order:</p>
+                <ol>
+                    <li><strong>Referer</strong> header, if internal</li>
+                    <li><strong>SAFE_BACK_URL</strong> request attribute</li>
+                    <li><strong>Fallback</strong> path (default <code>/</code>)</li>
+                </ol>
+
+                <h2 id="internal-url" class="border-bottom pb-2 mb-3 mt-5">Internal URL rules</h2>
+                <ul>
+                    <li>Relative paths starting with <code>/</code> are allowed</li>
+                    <li>Absolute URLs must match the current request host</li>
+                    <li>External hosts are rejected → fallback</li>
+                </ul>
+
+                <h2 id="validation" class="border-bottom pb-2 mb-3 mt-5">After validation errors</h2>
+                <p>
+                    <code>HandleValidationExceptionMiddleware</code> flashes errors and calls <code>back()</code> for HTML —
+                    users return to the form without trusting a user-supplied return URL.
+                </p>
+
+                <h2 id="named-routes" class="border-bottom pb-2 mb-3 mt-5">Named routes</h2>
+                <pre class="mb-4"><code class="language-php">return $responseFactory->redirectByName('cabinet.dashboard');</code></pre>
+                <p>Use <code>back()</code> for form UX; use <code>redirectByName()</code> when the destination is fixed.</p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Never redirect to raw user input. Whitelist paths or route names if you need a <code>?next=</code> parameter.
+                    </p>
+                </div>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-en.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

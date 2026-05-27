@@ -31,7 +31,7 @@
             <aside class="col-lg-3 col-xl-2">
                 <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
                     <div class="offcanvas-header border-bottom d-lg-none">
-                        <h5 class="offcanvas-title" id="docsSidebarLabel">Menu</h5>
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
                     </div>
                     <div class="offcanvas-body p-0 pt-lg-4">
@@ -42,10 +42,96 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Захист CSRF</h1>
-                <div class="border border-secondary-subtle rounded text-center text-body-secondary p-5">
-                    <p class="mb-0">Ця сторінка є заглушкою. Зміст буде додано пізніше.</p>
+
+                <p>
+                    Concept Core захищає змінювальні HTTP-запити від підробки між сайтами (CSRF) через
+                    синхронізаторний токен у сесії. Перевірка виконується в
+                    <code>VerifyCsrfTokenMiddleware</code> до контролера; токен для форм і AJAX надає
+                    <code>CsrfTokenManager</code>.
+                </p>
+                <p>
+                    Див. також: <a href="middleware.html#csrf">Middleware → CSRF</a>,
+                    <a href="views.html">Представлення</a> (<code>csrf_token</code> у Twig).
+                </p>
+
+                <h2 id="how-it-works" class="border-bottom pb-2 mb-3 mt-5">Як це працює</h2>
+                <ol>
+                    <li>При першому зверненні <code>CsrfTokenManager::getToken()</code> генерує 64-символьний hex-токен (<code>random_bytes(32)</code>) і зберігає його в сесії під ключем <code>SessionKey::CSRF_TOKEN</code> (<code>_csrf_token</code>).</li>
+                    <li><code>ShareViewDataMiddleware</code> передає токен у Twig як <code>{{ csrf_token }}</code>.</li>
+                    <li>Для <strong>POST</strong>, <strong>PUT</strong> і <strong>DELETE</strong> middleware порівнює токен із запиту з сесійним через <code>hash_equals()</code>.</li>
+                    <li>Якщо токен відсутній або не збігається — кидається <code>CsrfException</code> (HTTP <strong>419</strong> Page Expired).</li>
+                </ol>
+
+                <h2 id="middleware" class="border-bottom pb-2 mb-3 mt-5">Підключення middleware</h2>
+                <p>У <code>routes/web.php</code> (або на групі маршрутів) зареєструйте перевірку після обробника валідації, але до зміни стану:</p>
+                <pre class="mb-4"><code class="language-php">$router->lazyMiddleware(HandleValidationExceptionMiddleware::class);
+$router->lazyMiddleware(VerifyCsrfTokenMiddleware::class);
+$router->lazyMiddleware(StorePreviousUrlMiddleware::class);
+$router->lazyMiddleware(ShareViewDataMiddleware::class);</code></pre>
+                <p>
+                    <code>ShareViewDataMiddleware</code> має бути в стеку, щоб шаблони отримували актуальний токен.
+                    Сесія потрібна — реєструється через <code>SessionServiceProvider</code> у
+                    <code>bootstrap/providers/app.php</code>.
+                </p>
+
+                <h2 id="forms" class="border-bottom pb-2 mb-3 mt-5">Форми (HTML)</h2>
+                <p>У кожній формі, що змінює дані, додайте приховане поле з іменем <code>_csrf_token</code>:</p>
+                <pre class="mb-4"><code class="language-twig">&lt;form method="post" action="{{ url('cabinet.profile.update') }}"&gt;
+    &lt;input type="hidden" name="_csrf_token" value="{{ csrf_token }}"&gt;
+    {# ... поля форми ... #}
+&lt;/form&gt;</code></pre>
+                <p>
+                    Поле <code>_csrf_token</code> автоматично виключається з даних валідації в
+                    <code>FormRequest</code> (глобальний <code>$globalExcept</code>), тому воно не потрапляє в DTO.
+                </p>
+
+                <h2 id="ajax" class="border-bottom pb-2 mb-3 mt-5">AJAX та API з браузера</h2>
+                <p>Middleware приймає токен також із заголовків (у порядку пріоритету після body):</p>
+                <ul>
+                    <li><code>X-CSRF-TOKEN</code> — значення як є</li>
+                    <li><code>X-XSRF-TOKEN</code> — значення з <code>urldecode()</code> (зручно для cookie-based схем)</li>
+                </ul>
+                <pre class="mb-4"><code class="language-javascript">fetch('/api/profile', {
+    method: 'POST',
+    headers: {
+        'Content-Type': 'application/json',
+        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+    },
+    body: JSON.stringify(payload)
+});</code></pre>
+                <p>Для чистих зовнішніх API без сесії CSRF зазвичай не застосовують — винесіть такі маршрути в окрему групу без <code>VerifyCsrfTokenMiddleware</code> і використовуйте іншу автентифікацію (Bearer, API key).</p>
+
+                <h2 id="exceptions" class="border-bottom pb-2 mb-3 mt-5">Помилки та відповіді</h2>
+                <p>
+                    <code>CsrfException</code> має код <code>HttpStatusCode::PAGE_EXPIRED</code> (419). Error handler
+                    (Whoops / production handler) формує HTML або JSON залежно від запиту — див.
+                    <a href="responses.html">Відповіді</a>.
+                </p>
+                <p>Типові причини 419:</p>
+                <ul>
+                    <li>Сесія прострочена або відсутня cookie</li>
+                    <li>Форма відкрита давно, токен у сесії вже змінився</li>
+                    <li>Подвійна відправка з кешованої сторінки без актуального <code>csrf_token</code></li>
+                </ul>
+
+                <h2 id="programmatic" class="border-bottom pb-2 mb-3 mt-5">Програмний доступ</h2>
+                <p>У сервісах можна отримати менеджер із контейнера:</p>
+                <pre class="mb-4"><code class="language-php">use Concept\Core\Components\Csrf\CsrfTokenManager;
+
+/** @var CsrfTokenManager $csrf */
+$csrf = $container->get(CsrfTokenManager::class);
+$token = $csrf->getToken();
+$valid = $csrf->validate($submittedToken);</code></pre>
+                <p>Для перевірки в тестах передавайте той самий токен, що в сесії тестового клієнта.</p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        GET, HEAD, OPTIONS не перевіряються — це відповідає практиці «безпечних» методів.
+                        Не виконуйте зміну стану через GET.
+                    </p>
                 </div>
-                <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
             </main>
 
             <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">

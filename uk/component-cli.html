@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="uk" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="CLI та assets компонентів — Concept Core Documentation">
+    <title>CLI та assets - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="component-cli">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Відкрити навігацію">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
+                <li class="nav-item"><a class="nav-link p-1" href="../en/component-cli.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../uk/component-cli.html">УКР</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">CLI та assets</h1>
+
+                <p>
+                    Concept Core надає консольні команди для перегляду зареєстрованих модулів і публікації
+                    статичних файлів у <code>public/</code>. Команди компонентів підключаються автоматично
+                    під час <code>ComponentsServiceProvider::boot()</code>.
+                </p>
+
+                <h2 id="component-list" class="border-bottom pb-2 mb-3 mt-5">component:list</h2>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php component:list</code></pre>
+                <p>Виводить таблицю: Name, Version, Class, Description — дані з <code>config.php</code> кожного активного модуля.</p>
+                <p>Якщо компонент не з’являється — перевірте <code>config/components.php</code> і що <code>ComponentsServiceProvider</code> зареєстрований останнім у HTTP-провайдерах.</p>
+
+                <h2 id="publish-assets" class="border-bottom pb-2 mb-3 mt-5">component:publish-assets</h2>
+                <p>Копіює файли та каталоги з мапи <code>assets</code> у <code>config.php</code> компонента:</p>
+                <pre class="mb-4"><code class="language-php">// src/Components/AuthAdmin/config.php
+'assets' => [
+    'src/Components/AuthAdmin/Assets/admin-tokens.js'
+        => 'public/components/auth-admin/js/admin-tokens.js',
+],</code></pre>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php component:publish-assets</code></pre>
+                <ul>
+                    <li>Шляхи відносні до кореня проєкту (<code>PathManager::root()</code>)</li>
+                    <li>Файл — <code>copy</code>; каталог — <code>mirror</code> з перезаписом</li>
+                    <li>Усі активні компоненти обробляються за один запуск</li>
+                </ul>
+                <p>Після зміни JS/CSS у <code>Component/Assets/</code> повторіть команду перед деплоєм.</p>
+
+                <h2 id="component-commands" class="border-bottom pb-2 mb-3 mt-5">Власні команди модуля</h2>
+                <p>Оголосіть класи в <code>config.php</code>:</p>
+                <pre class="mb-4"><code class="language-php">// AuthAdmin
+'commands' => [
+    UserListCommand::class,
+],</code></pre>
+                <p>Команда — звичайний Symfony Console class, зареєстрований у контейнері (autowiring). Приклад:</p>
+                <pre class="mb-4"><code class="language-php">// Commands/UserListCommand.php
+final class UserListCommand extends Command
+{
+    protected function configure(): void
+    {
+        $this->setName('auth:user-list');
+    }
+    // execute() ...
+}</code></pre>
+                <p>Див. <a href="console-commands.html">Створення команд</a>.</p>
+
+                <h2 id="migrations-seeders" class="border-bottom pb-2 mb-3 mt-5">Міграції та сидери</h2>
+                <p>Шляхи з <code>migrations.paths</code> і класи з <code>seeders.list</code> додаються в registries ядра:</p>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php db:migration:list
+php bin/console.php db:migrate
+php bin/console.php db:seed
+php bin/console.php db:seed -c "Concept\Components\AuthAdmin\Database\Seeders\UserSeeder"</code></pre>
+                <p>
+                    <code>db:seed</code> без опцій — усі зареєстровані сидери. Для одного сидера вкажіть
+                    <strong>повний FQCN</strong> у <code>-c</code> / <code>--class</code> (у лапках).
+                    Коротке ім’я класу не працює.
+                </p>
+                <p>Глобальні міграції з <code>config/migrations.php</code> і компонентні — в одному списку.</p>
+
+                <h2 id="env-components" class="border-bottom pb-2 mb-3 mt-5">Різні набори компонентів по середовищу</h2>
+                <pre class="mb-4"><code class="language-php">// config/dev/components.php — лише для APP_ENV=dev
+return [
+    'components' => [
+        DebugBarComponent::class => DebugBarComponent::class,
+    ],
+];</code></pre>
+                <p>ConfigServiceProvider зливає override з <code>config/{APP_ENV}/</code> — у dev додається DebugBar без зміни production-списку.</p>
+
+                <h2 id="events" class="border-bottom pb-2 mb-3 mt-5">Події</h2>
+                <p>Під час boot для кожного модуля диспатчиться <code>ComponentRegistering</code> — можна підписатися для телеметрії або перевірок:</p>
+                <pre class="mb-4"><code class="language-php">$dispatcher->addListener(
+    EventName::FRAMEWORK_COMPONENT_REGISTERING,
+    function (ComponentRegistering $event) {
+        $component = $event->component;
+        // $component->name(), routes(), ...
+    }
+);</code></pre>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-uk.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

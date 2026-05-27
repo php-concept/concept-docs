@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Creating a Component — Concept Core Documentation">
+    <title>Creating a Component - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="creating-components">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/creating-components.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/creating-components.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Menu</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Creating a Component</h1>
+
+                <p>
+                    Step-by-step walkthrough based on <strong>AuthAdmin</strong> in the skeleton: admin login,
+                    dashboard, user CRUD, migrations, seeder, and CLI command.
+                </p>
+
+                <h2 id="step-1" class="border-bottom pb-2 mb-3 mt-5">1. Component class</h2>
+                <pre class="mb-4"><code class="language-php">class AuthAdminComponent extends BaseComponent implements ComponentInterface
+{
+    protected string $componentDir = __DIR__;
+}</code></pre>
+
+                <h2 id="step-2" class="border-bottom pb-2 mb-3 mt-5">2. config.php</h2>
+                <pre class="mb-4"><code class="language-php">return [
+    'name' => 'AuthAdmin',
+    'migrations' => ['paths' => ['src/Components/AuthAdmin/Database/Migrations']],
+    'view' => [
+        'paths' => ['auth-admin' => '/src/Components/AuthAdmin/Views'],
+        'contexts' => ['/admin' => 'dashboard'],
+    ],
+    'assets' => [
+        'src/Components/AuthAdmin/Assets/admin-tokens.js'
+            => 'public/components/auth-admin/js/admin-tokens.js',
+    ],
+];</code></pre>
+
+                <h2 id="step-3" class="border-bottom pb-2 mb-3 mt-5">3. Register in config/components.php</h2>
+                <pre class="mb-4"><code class="language-php">AuthAdminComponent::class => AuthAdminComponent::class,</code></pre>
+
+                <h2 id="step-4" class="border-bottom pb-2 mb-3 mt-5">4. routes.php</h2>
+                <p>Public <code>/admin/login</code> without auth middleware; protected groups use <code>AuthMiddleware::class</code>.</p>
+
+                <h2 id="step-5" class="border-bottom pb-2 mb-3 mt-5">5–7. Middleware, controllers, views</h2>
+                <p><code>AdminController</code> uses <code>LoginRequest</code>, <code>AuthService</code>, and <code>@auth-admin/login</code> extending <code>@dashboard/layouts/auth.twig</code>.</p>
+
+                <h2 id="step-8" class="border-bottom pb-2 mb-3 mt-5">8. Database</h2>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php db:migrate
+php bin/console.php db:seed -c "Concept\Components\AuthAdmin\Database\Seeders\UserSeeder"</code></pre>
+                <p>For a single seeder, pass the <strong>full FQCN</strong> via <code>-c</code> (quoted). Short names like <code>UserSeeder</code> do not work.</p>
+
+                <h2 id="step-9" class="border-bottom pb-2 mb-3 mt-5">9. Assets & CLI</h2>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php component:publish-assets
+php bin/console.php component:list</code></pre>
+                <p>See <a href="component-cli.html">CLI & Assets</a> for details.</p>
+
+                <h2 id="checklist" class="border-bottom pb-2 mb-3 mt-5">Checklist</h2>
+                <ol>
+                    <li>Component class + <code>config.php</code></li>
+                    <li>Entry in <code>config/components.php</code></li>
+                    <li><code>routes.php</code>, controllers, services, views</li>
+                    <li>Migrations / seeders / commands / assets as needed</li>
+                    <li>Run migrate, publish assets, <code>route:list</code></li>
+                </ol>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-en.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

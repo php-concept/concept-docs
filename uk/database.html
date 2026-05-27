@@ -184,8 +184,14 @@ return [
     ],
 ];</code></pre>
                 <p>
-                    <code>db:seed</code> без опцій запускає всі зареєстровані сидери;
-                    <code>db:seed -c Concept\Components\AuthAdmin\Database\Seeders\UserSeeder</code> — один клас.
+                    <code>db:seed</code> без опцій запускає всі зареєстровані сидери.
+                    Щоб виконати <strong>один</strong> сидер, передайте <strong>повний FQCN</strong> класу через
+                    <code>-c</code> (або <code>--class</code>) — коротке ім’я класу не підтримується.
+                    Значення бажано взяти в лапки через зворотні слеші в namespace:
+                </p>
+                <pre class="mb-3"><code class="language-bash">php bin/console.php db:seed -c "Concept\Components\AuthAdmin\Database\Seeders\UserSeeder"</code></pre>
+                <p class="small text-body-secondary">
+                    Список доступних класів: <code>php bin/console.php db:seeders:list</code>.
                 </p>
 
                 <h2 id="cli" class="border-bottom pb-2 mb-3 mt-5">Консоль</h2>
@@ -198,14 +204,15 @@ return [
                             <tr><td><code>db:migrate</code></td><td>Застосувати нові міграції</td></tr>
                             <tr><td><code>db:rollback</code></td><td>Відкат останнього batch</td></tr>
                             <tr><td><code>db:migration:list</code></td><td>Список міграцій і статус</td></tr>
-                            <tr><td><code>db:seed</code></td><td>Заповнення тестовими даними</td></tr>
+                            <tr><td><code>db:seed</code></td><td>Усі сидери; <code>-c "Fully\Qualified\Class"</code> — один сидер (повний FQCN)</td></tr>
                             <tr><td><code>db:seeders:list</code></td><td>Зареєстровані сидери</td></tr>
                         </tbody>
                     </table>
                 </div>
                 <pre class="mb-4"><code class="language-bash">php bin/console.php db:migrate
 php bin/console.php db:seed
-php bin/console.php db:seed -c Database\Seeders\PageSeeder</code></pre>
+php bin/console.php db:seed -c "Database\Seeders\PageSeeder"
+php bin/console.php db:seed -c "Concept\Components\AuthAdmin\Database\Seeders\UserSeeder"</code></pre>
                 <p>
                     Перед першим <code>db:migrate</code> переконайтесь, що БД створена і
                     <code>DB_*</code> у <code>.env</code> відповідають вашому середовищу.
