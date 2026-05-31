@@ -122,7 +122,7 @@ LOG_MAX_FILES=14    → log.max_files</code></pre>
                     Якщо існує каталог <code>config/{значення APP_ENV}/</code>, усі PHP-файли з нього зливаються поверх
                     базового <code>config/</code>. Імена файлів і структура масивів — такі самі, змінюються лише потрібні ключі.
                 </p>
-                <p>У skeleton за замовчуванням:</p>
+                <p>За замовчуванням:</p>
                 <ul>
                     <li><code>config/dev/</code> — <code>app.debug = true</code></li>
                     <li><code>config/production/</code> — <code>app.debug = false</code></li>
@@ -185,8 +185,7 @@ LOG_MAX_FILES=14    → log.max_files</code></pre>
                 <h3 id="file-session">session.php</h3>
                 <p>Параметри PHP-сесії (передаються в <code>session_start()</code>).</p>
                 <p class="small text-body-secondary">
-                    Ядро читає <code>session.domain</code> та <code>session.samesite</code>; у файлі skeleton — <code>cookie_domain</code>
-                    та <code>cookie_samesite</code>. Для оверрайду через конфіг використовуйте ключі
+                    Ядро читає <code>session.domain</code> та <code>session.samesite</code> з файлу. Для оверрайду через конфіг використовуйте ключі
                     <code>session.domain</code> / <code>session.samesite</code> або змінні <code>SESSION_DOMAIN</code>,
                     <code>SESSION_SAMESITE</code> у <code>.env</code>.
                 </p>
