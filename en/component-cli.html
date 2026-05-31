@@ -18,7 +18,7 @@
             </button>
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
-            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
                 <li class="nav-item"><a class="nav-link p-1 active" href="../en/component-cli.html">EN</a></li>
                 <li class="nav-item"><a class="nav-link p-1" href="../uk/component-cli.html">UK</a></li>
                 <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
@@ -43,32 +43,81 @@
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">CLI & Assets</h1>
 
+                <p>
+                    Concept Core provides console commands to list registered modules and publish
+                    static files to <code>public/</code>. Component commands are wired automatically during
+                    <code>ComponentsServiceProvider::boot()</code>.
+                </p>
+
                 <h2 id="component-list" class="border-bottom pb-2 mb-3 mt-5">component:list</h2>
                 <pre class="mb-4"><code class="language-bash">php bin/console.php component:list</code></pre>
-                <p>Lists active modules (name, version, class, description).</p>
+                <p>Prints a table: Name, Version, Class, Description — from each active module’s <code>config.php</code>.</p>
+                <p>If a component is missing, check <code>config/components.php</code> and that <code>ComponentsServiceProvider</code> is registered last among HTTP providers.</p>
 
                 <h2 id="publish-assets" class="border-bottom pb-2 mb-3 mt-5">component:publish-assets</h2>
-                <p>Copies paths from each component’s <code>assets</code> map in <code>config.php</code> into <code>public/</code>.</p>
+                <p>Copies files and directories from the <code>assets</code> map in the component’s <code>config.php</code>:</p>
+                <pre class="mb-4"><code class="language-php">// src/Components/AuthAdmin/config.php
+'assets' => [
+    'src/Components/AuthAdmin/Assets/admin-tokens.js'
+        => 'public/components/auth-admin/js/admin-tokens.js',
+],</code></pre>
                 <pre class="mb-4"><code class="language-bash">php bin/console.php component:publish-assets</code></pre>
+                <ul>
+                    <li>Paths are relative to the project root (<code>PathManager::root()</code>)</li>
+                    <li>Files — <code>copy</code>; directories — <code>mirror</code> with overwrite</li>
+                    <li>All active components are processed in one run</li>
+                </ul>
+                <p>After changing JS/CSS under <code>Component/Assets/</code>, run the command again before deploy.</p>
 
                 <h2 id="component-commands" class="border-bottom pb-2 mb-3 mt-5">Module commands</h2>
-                <p>Declare command classes in <code>config.php</code> → <code>'commands' => [UserListCommand::class]</code>. Registered automatically on boot.</p>
+                <p>Declare classes in <code>config.php</code>:</p>
+                <pre class="mb-4"><code class="language-php">// AuthAdmin
+'commands' => [
+    UserListCommand::class,
+],</code></pre>
+                <p>The command is a regular Symfony Console class registered in the container (autowiring). Example:</p>
+                <pre class="mb-4"><code class="language-php">// Commands/UserListCommand.php
+final class UserListCommand extends Command
+{
+    protected function configure(): void
+    {
+        $this->setName('auth:user-list');
+    }
+    // execute() ...
+}</code></pre>
+                <p>See <a href="console-commands.html">Creating Commands</a>.</p>
 
-                <h2 id="migrations-seeders" class="border-bottom pb-2 mb-3 mt-5">Migrations & seeders</h2>
-                <pre class="mb-4"><code class="language-bash">php bin/console.php db:migrate
+                <h2 id="migrations-seeders" class="border-bottom pb-2 mb-3 mt-5">Migrations and seeders</h2>
+                <p>Paths from <code>migrations.paths</code> and classes from <code>seeders.list</code> are added to core registries:</p>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php db:migration:list
+php bin/console.php db:migrate
 php bin/console.php db:seed
 php bin/console.php db:seed -c "Concept\Components\AuthAdmin\Database\Seeders\UserSeeder"</code></pre>
                 <p>
-                    <code>db:seed</code> without options runs all registered seeders. For one seeder, use
-                    <code>-c</code> / <code>--class</code> with the <strong>full FQCN</strong> (quoted). Short class names are not supported.
+                    <code>db:seed</code> without options runs all registered seeders. For one seeder use
+                    <strong>full FQCN</strong> in <code>-c</code> / <code>--class</code> (quoted).
+                    Short class names do not work.
                 </p>
-                <p>Component migration paths are merged with global paths from <code>config/migrations.php</code>.</p>
+                <p>Global migrations from <code>config/migrations.php</code> and component migrations appear in one list.</p>
 
-                <h2 id="env-components" class="border-bottom pb-2 mb-3 mt-5">Per-environment components</h2>
-                <p>Use <code>config/dev/components.php</code> to add DebugBar only in development.</p>
+                <h2 id="env-components" class="border-bottom pb-2 mb-3 mt-5">Different component sets per environment</h2>
+                <pre class="mb-4"><code class="language-php">// config/dev/components.php — only when APP_ENV=dev
+return [
+    'components' => [
+        DebugBarComponent::class => DebugBarComponent::class,
+    ],
+];</code></pre>
+                <p>ConfigServiceProvider merges overrides from <code>config/{APP_ENV}/</code> — in dev, DebugBar is added without changing the production list.</p>
 
                 <h2 id="events" class="border-bottom pb-2 mb-3 mt-5">Events</h2>
-                <p><code>ComponentRegistering</code> is dispatched for each module during boot — useful for telemetry or validation hooks.</p>
+                <p>During boot each module dispatches <code>ComponentRegistering</code> — subscribe for telemetry or checks:</p>
+                <pre class="mb-4"><code class="language-php">$dispatcher->addListener(
+    EventName::FRAMEWORK_COMPONENT_REGISTERING,
+    function (ComponentRegistering $event) {
+        $component = $event->component;
+        // $component->name(), routes(), ...
+    }
+);</code></pre>
 
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>

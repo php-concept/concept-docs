@@ -18,9 +18,10 @@
             </button>
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
-            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="../en/routing.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/routing.html">UK</a></li>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/routing.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/routing.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -41,10 +42,143 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Routing</h1>
+
                 <p>
-                    Full documentation is available in
-                    <a href="../uk/routing.html">Ukrainian</a> (Маршрутизація).
+                    Concept Core uses <a href="https://github.com/thephpleague/route" rel="noopener">League Route</a>
+                    on top of PSR-7. Routes are defined in PHP files; a single shared
+                    <code>Router</code> instance serves the entire application.
                 </p>
+                <p>
+                    Context: <a href="request-lifecycle.html">request lifecycle</a>,
+                    <a href="configuration.html">config/routes.php</a>.
+                </p>
+
+                <h2 id="registration" class="border-bottom pb-2 mb-3 mt-5">Loading route files</h2>
+                <p>In <code>config/routes.php</code>, list the paths to files loaded by <code>HttpServiceProvider</code>:</p>
+                <pre class="mb-4"><code class="language-php">return [
+    'routes' => [
+        dirname(__DIR__) . '/routes/web.php',
+    ],
+];</code></pre>
+                <p>
+                    Additional files from components are loaded during
+                    <code>ComponentsServiceProvider::boot()</code> — each component can return a path to its own
+                    <code>routes.php</code> (see <a href="directory-structure.html#variant-components">structure with components</a>).
+                </p>
+                <p>Each route file has access to the <code>$router</code> variable (type <code>League\Route\Router</code>):</p>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+use League\Route\Router;
+
+/** @var Router $router */
+
+$router->get('/path', $handler);</code></pre>
+
+                <h2 id="handlers" class="border-bottom pb-2 mb-3 mt-5">Handlers</h2>
+                <p>League Route supports several callable forms:</p>
+
+                <h3 id="controller" class="mt-4">Controller [Class, method]</h3>
+                <p>The recommended approach — a controller method resolved from the DI container:</p>
+                <pre class="mb-4"><code class="language-php">use Concept\App\Controllers\IndexController;
+
+$router->get('/', [IndexController::class, 'index'])->setName('home');</code></pre>
+                <p>
+                    Method arguments are injected by <code>RouteStrategy</code> (FormRequest, <code>ServerRequestInterface</code>,
+                    URL parameters, services from the container). See <a href="controllers.html">Controllers</a> for details.
+                </p>
+
+                <h3 id="closure">Closure</h3>
+                <pre class="mb-4"><code class="language-php">$router->get('/health', fn () =&gt; new Response(/* ... */));</code></pre>
+                <p>For simple endpoints; for complex logic, prefer a controller.</p>
+
+                <h2 id="methods" class="border-bottom pb-2 mb-3 mt-5">HTTP methods</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead><tr><th>Router method</th><th>HTTP</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>get()</code></td><td>GET</td></tr>
+                            <tr><td><code>post()</code></td><td>POST</td></tr>
+                            <tr><td><code>put()</code></td><td>PUT</td></tr>
+                            <tr><td><code>patch()</code></td><td>PATCH</td></tr>
+                            <tr><td><code>delete()</code></td><td>DELETE</td></tr>
+                            <tr><td><code>map()</code></td><td>multiple methods</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h2 id="parameters" class="border-bottom pb-2 mb-3 mt-5">URL parameters</h2>
+                <p>Segments in curly braces end up in request attributes and controller arguments:</p>
+                <pre class="mb-4"><code class="language-php">$router->get('/admin/users/edit/{id:number}', [UserController::class, 'edit']);</code></pre>
+                <p>
+                    The <code>:number</code> suffix is a League Route constraint (digits only).
+                    Others: <code>:alpha</code>, <code>:alphanum</code>, <code>:segment</code>, etc.
+                    Without a suffix — any segment (<code>{token}</code>).
+                </p>
+                <p>In the controller, a parameter with the same name and type (via Caster):</p>
+                <pre class="mb-4"><code class="language-php">public function edit(int $id): ResponseInterface</code></pre>
+
+                <h2 id="groups" class="border-bottom pb-2 mb-3 mt-5">Route groups</h2>
+                <p>Shared URI prefix and middleware for a group:</p>
+                <pre class="mb-4"><code class="language-php">use League\Route\RouteGroup;
+use Concept\Components\AuthAdmin\Middlewares\AuthMiddleware;
+
+$router->group('/admin', function (RouteGroup $route) {
+    $route->get('/', [AdminController::class, 'index'])->setName('admin.home');
+    $route->get('/logout', [AdminController::class, 'logout'])->setName('admin.logout');
+})->lazyMiddleware(AuthMiddleware::class);</code></pre>
+                <p>
+                    URLs <code>/admin</code> and <code>/admin/logout</code> pass through <code>AuthMiddleware</code>.
+                    Nested groups are supported.
+                </p>
+
+                <h2 id="middleware" class="border-bottom pb-2 mb-3 mt-5">Middleware on routes</h2>
+                <p><strong>Global</strong> — for all routes in the file (usually at the top of <code>routes/web.php</code>):</p>
+                <pre class="mb-4"><code class="language-php">$router->lazyMiddleware(VerifyCsrfTokenMiddleware::class);
+$router->lazyMiddleware(ShareViewDataMiddleware::class);</code></pre>
+                <p><strong>On a group or route</strong> — the chain is extended for matches in that scope:</p>
+                <pre class="mb-4"><code class="language-php">$router->post('/projects/store', [ProjectController::class, 'store'])
+    ->setName('projects.store')
+    ->lazyMiddleware(ActiveUserMiddleware::class);</code></pre>
+                <p>
+                    <code>lazyMiddleware</code> — the class is resolved from the container at request time.
+                    See <a href="middleware.html">Middleware</a> for details.
+                </p>
+
+                <h2 id="named-routes" class="border-bottom pb-2 mb-3 mt-5">Named routes</h2>
+                <p>Each route can be given a name for URL generation:</p>
+                <pre class="mb-4"><code class="language-php">$router->get('/login', [CabinetController::class, 'showLogin'])->setName('cabinet.login');</code></pre>
+                <p>In PHP (via <code>UrlGeneratorInterface</code>):</p>
+                <pre class="mb-4"><code class="language-php">$url = $urlGenerator->route('cabinet.login');
+$path = $urlGenerator->path('admin.user.edit', ['id' =&gt; 5]);</code></pre>
+                <p>In Twig (<code>UrlExtension</code>):</p>
+                <pre class="mb-4"><code class="language-twig">{{ route('cabinet.login') }}
+{{ path('admin.user.edit', { id: user.id }) }}
+{{ base_url() }}</code></pre>
+
+                <h2 id="components-routes" class="border-bottom pb-2 mb-3 mt-5">Component routes</h2>
+                <p>
+                    A component implements <code>ComponentInterface::routes()</code> and returns an absolute path to the file.
+                    Example: <code>src/Components/AuthAdmin/routes.php</code> with prefixes <code>/admin</code>,
+                    <code>/admin/users</code>.
+                </p>
+                <p>
+                    All routes end up in one <code>Router</code> — avoid duplicate names
+                    (<code>setName</code>) across files.
+                </p>
+
+                <h2 id="cli" class="border-bottom pb-2 mb-3 mt-5">Listing routes (CLI)</h2>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php route:list
+php bin/console.php route:list -F   # full middleware class names</code></pre>
+                <p>Prints method, URI, name, handler, and middleware for each registered route.</p>
+
+                <h2 id="tips" class="border-bottom pb-2 mb-3 mt-5">Tips</h2>
+                <ul>
+                    <li>Keep public routes in <code>routes/web.php</code>, modular ones in <code>Component/routes.php</code>.</li>
+                    <li>Always name routes that appear in templates or redirects.</li>
+                    <li>POST/PUT/DELETE with forms — together with <code>VerifyCsrfTokenMiddleware</code> and a CSRF field.</li>
+                    <li>Protect areas with <code>group()</code> + auth middleware, not checks in every controller.</li>
+                </ul>
+
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>
 

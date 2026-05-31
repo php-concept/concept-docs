@@ -18,9 +18,10 @@
             </button>
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
-            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="../en/service-container.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/service-container.html">UK</a></li>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/service-container.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/service-container.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -41,10 +42,261 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Service Container</h1>
+
                 <p>
-                    Full documentation is available in
-                    <a href="../uk/service-container.html">Ukrainian</a>.
+                    Concept Core builds the application around a <strong>DI container</strong> (Dependency Injection):
+                    dependencies are declared once, and classes receive them through the constructor or factories.
+                    The implementation is <a href="https://container.thephpleague.com/" target="_blank" rel="noopener">League Container</a>
+                    with <a href="https://www.php-fig.org/psr/psr-11/" target="_blank" rel="noopener">PSR-11</a> support.
                 </p>
+                <p>
+                    See also:
+                    <a href="service-providers.html">Service providers</a>,
+                    <a href="controllers.html#autowiring">controllers → autowiring</a>,
+                    <a href="request-lifecycle.html">request lifecycle</a>.
+                </p>
+
+                <h2 id="bootstrap" class="border-bottom pb-2 mb-3 mt-5">Creating the container</h2>
+                <p>Bootstrap chain (see <a href="setup.html">setup</a>):</p>
+                <pre class="mb-4"><code class="language-php">// public/index.php
+$app = require bootstrap/app.php;
+$app-&gt;run();
+
+// bootstrap/app.php
+$app = App::create($rootPath, $paths);
+$app-&gt;registerServiceProviders([$rootPath . '/bootstrap/providers/app.php']);</code></pre>
+                <p>In <code>App::__construct()</code>, the following is registered immediately:</p>
+                <ul>
+                    <li><code>ReflectionContainer</code> — autowiring (delegate)</li>
+                    <li><code>ContainerInterface::class</code> → the container itself (shared)</li>
+                    <li><code>App::class</code> → application instance</li>
+                    <li><code>PathManager</code> — paths from <code>bootstrap/paths.php</code></li>
+                    <li><code>Whoops</code> — early error handler (before providers)</li>
+                </ul>
+                <pre class="mb-4"><code class="language-php">$this-&gt;container = new Container();
+$this-&gt;container-&gt;delegate(new ReflectionContainer(cacheResolutions: true));
+$this-&gt;container-&gt;add(ContainerInterface::class, fn () =&gt; $this-&gt;container)-&gt;setShared(true);</code></pre>
+
+                <h2 id="providers" class="border-bottom pb-2 mb-3 mt-5">Service providers</h2>
+                <p>
+                    The provider list is in <code>bootstrap/providers/app.php</code>.
+                    Each class implements <code>League\Container\ServiceProvider\ServiceProviderInterface</code>
+                    and registers services in the <code>register()</code> method.
+                </p>
+                <pre class="mb-4"><code class="language-php">return [
+    ConfigServiceProvider::class,
+    ErrorHandlerServiceProvider::class,
+    EventServiceProvider::class,
+    HttpServiceProvider::class,
+    SessionServiceProvider::class,
+    // ...
+    ComponentsServiceProvider::class,  // last — component routes and views
+];</code></pre>
+                <p><strong>Order matters:</strong> for example, <code>ConfigServiceProvider</code> before
+                    <code>HttpServiceProvider</code> (the router reads <code>config/routes</code>),
+                    <code>ViewServiceProvider</code> before components that add Twig paths.</p>
+                <p>
+                    Details — <a href="service-providers.html">Service providers</a>.
+                    Components can add providers through <code>ComponentsServiceProvider</code>.
+                </p>
+
+                <h3 id="register-vs-boot" class="mt-4"><code>register()</code> and <code>boot()</code></h3>
+                <ul>
+                    <li><code>register()</code> — binding declarations (<code>$container-&gt;add(...)</code>)</li>
+                    <li>
+                        <code>boot()</code> — eager logic right after this provider’s <code>register()</code>
+                        (see <a href="service-providers.html#register-boot">Service providers → register and boot</a>)
+                    </li>
+                </ul>
+                <p>
+                    Bootable providers in core: <code>HttpServiceProvider</code>, <code>DatabaseServiceProvider</code>,
+                    <code>ErrorHandlerServiceProvider</code>, <code>ComponentsServiceProvider</code>,
+                    <code>DebugLoggerServiceProvider</code>. The order in <code>bootstrap/providers/*.php</code> determines
+                    which services are already available in each provider’s <code>boot()</code>.
+                </p>
+
+                <h3 id="provides" class="mt-4">The <code>provides()</code> method</h3>
+                <p>
+                    If a provider declares <code>provides(string $id): bool</code>, League Container
+                    can defer loading it until one of the listed services is needed
+                    (<a href="https://container.thephpleague.com/5.x/service-providers/" target="_blank" rel="noopener">deferred providers</a>).
+                </p>
+
+                <h2 id="bindings" class="border-bottom pb-2 mb-3 mt-5">Registering services (bindings)</h2>
+
+                <h3 id="binding-closure" class="mt-4">Closure factory</h3>
+                <p>The most common approach in Concept Core:</p>
+                <pre class="mb-4"><code class="language-php">$container-&gt;add(ConfigInterface::class, function () use ($container) {
+    $pathManager = $container-&gt;get(PathManager::class);
+    // ...
+    return new Config($nhConfig);
+})-&gt;setShared(true);</code></pre>
+                <p>
+                    <code>setShared(true)</code> — one instance per request (singleton within the container).
+                    Without <code>setShared</code>, each <code>get()</code> creates a new object.
+                </p>
+
+                <h3 id="binding-instance" class="mt-4">Ready-made object</h3>
+                <pre class="mb-4"><code class="language-php">$container-&gt;add(PathManager::class, new PathManager($rootPath, $paths));</code></pre>
+
+                <h3 id="binding-alias" class="mt-4">Interface → implementation</h3>
+                <p>Depend on the contract in code; bind the implementation in the provider:</p>
+                <pre class="mb-4"><code class="language-php">$container-&gt;add(LoggerInterface::class, function () use ($container) {
+    return new Logger(/* ... */);
+})-&gt;setShared(true);
+
+// In an application class
+public function __construct(private readonly LoggerInterface $logger) {}</code></pre>
+
+                <h2 id="autowiring" class="border-bottom pb-2 mb-3 mt-5">Autowiring</h2>
+                <p>
+                    If there is no explicit <code>add()</code> for a class,
+                    <code>ReflectionContainer</code> takes over: it inspects the constructor and recursively <code>get()</code>s type-hinted dependencies.
+                </p>
+                <ul>
+                    <li>Controllers, middleware, FormRequest, application services — usually without manual registration</li>
+                    <li>Eloquent models — also resolved when the constructor allows it</li>
+                </ul>
+                <p>
+                    Method injection limits in controllers — <a href="controllers.html#method-args">FormRequest, PSR-7, and URL parameters only</a>.
+                    Everything else goes in the <strong>constructor</strong>.
+                </p>
+                <p>
+                    <a href="https://container.thephpleague.com/5.x/dependency-injection/" target="_blank" rel="noopener">League Container → Dependency Injection</a>
+                </p>
+
+                <h2 id="resolution" class="border-bottom pb-2 mb-3 mt-5">Who calls <code>get()</code></h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Location</th><th>What gets resolved</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><a href="https://route.thephpleague.com/" target="_blank" rel="noopener">League Route</a> + <code>RouteStrategy</code></td>
+                                <td>Controller <code>[Class, 'method']</code>, middleware, FormRequest</td>
+                            </tr>
+                            <tr>
+                                <td>Service provider</td>
+                                <td>Dependencies in closure <code>function () use ($container)</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>App::run()</code></td>
+                                <td><code>Router</code>, <code>ServerRequestInterface</code></td>
+                            </tr>
+                            <tr>
+                                <td>CLI <code>bin/console.php</code></td>
+                                <td><code>ConsoleApplication</code>, commands from the container</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>
+                    <code>RouteStrategy</code> passes the container to the route strategy
+                    (<code>$strategy-&gt;setContainer($container)</code> in <code>HttpServiceProvider</code>).
+                    Documentation: <a href="https://route.thephpleague.com/6.x/routing/" target="_blank" rel="noopener">Routing</a>,
+                    <a href="https://route.thephpleague.com/6.x/middleware/" target="_blank" rel="noopener">Middleware</a>.
+                </p>
+
+                <h3 id="request-rebind" class="mt-4">Updating the request in the container</h3>
+                <p>
+                    After a route match, <code>RouteStrategy</code> adds URL parameters to the request and
+                    <strong>overwrites</strong> the binding (third argument <code>true</code> — replace):
+                </p>
+                <pre class="mb-4"><code class="language-php">$container-&gt;add(ServerRequestInterface::class, $request, true);</code></pre>
+                <p>
+                    So <code>UrlGenerator</code>, <code>ViewResponseFactory</code>, and <code>ResponseFactory::back()</code>
+                    see the current request with <code>{id}</code> attributes and <code>SAFE_BACK_URL</code>.
+                </p>
+
+                <h2 id="core-services" class="border-bottom pb-2 mb-3 mt-5">Core services</h2>
+                <p>Typical bindings from Concept Core providers (by contract or class):</p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Service</th><th>Provider</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>ConfigInterface</code></td><td>ConfigServiceProvider</td></tr>
+                            <tr><td><code>EventDispatcherInterface</code></td><td>EventServiceProvider</td></tr>
+                            <tr><td><code>ServerRequestInterface</code>, <code>Router</code></td><td>HttpServiceProvider</td></tr>
+                            <tr><td><code>UrlGeneratorInterface</code>, <code>ResponseFactoryInterface</code></td><td>HttpServiceProvider</td></tr>
+                            <tr><td><code>ViewResponseFactoryInterface</code></td><td>HttpServiceProvider</td></tr>
+                            <tr><td><code>SessionInterface</code>, <code>FlashBagInterface</code></td><td>SessionServiceProvider</td></tr>
+                            <tr><td><code>ViewInterface</code></td><td>ViewServiceProvider</td></tr>
+                            <tr><td><code>ValidatorInterface</code></td><td>ValidationServiceProvider</td></tr>
+                            <tr><td><code>DatabaseInterface</code>, <code>CapsuleManager</code></td><td>DatabaseServiceProvider</td></tr>
+                            <tr><td><code>CasterInterface</code></td><td>CastingServiceProvider</td></tr>
+                            <tr><td><code>LoggerInterface</code></td><td>LogServiceProvider</td></tr>
+                            <tr><td><code>ComponentRegistry</code></td><td>ComponentsServiceProvider</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>
+                    The Twig environment is assembled inside <code>ViewInterface</code>:
+                    extensions from <code>config/view.php</code>, paths from components — see
+                    <a href="views.html">Views</a>.
+                </p>
+
+                <h2 id="custom-binding" class="border-bottom pb-2 mb-3 mt-5">Custom service</h2>
+                <ol>
+                    <li>Create a class (preferably an interface + implementation).</li>
+                    <li>
+                        Register it in an application or component <code>ServiceProvider</code>
+                        (<code>providers</code> in the component <code>config.php</code>).
+                    </li>
+                    <li>Inject the type into a controller / service constructor.</li>
+                </ol>
+                <pre class="mb-4"><code class="language-php">// App/Providers/BillingServiceProvider.php
+public function register(): void
+{
+    $this-&gt;getContainer()
+        -&gt;add(BillingGatewayInterface::class, function () {
+            return new StripeBillingGateway(/* ... */);
+        })
+        -&gt;setShared(true);
+}</code></pre>
+                <p>Add the provider to <code>bootstrap/providers/app.php</code> or the component providers array.</p>
+
+                <h2 id="anti-patterns" class="border-bottom pb-2 mb-3 mt-5">Anti-patterns</h2>
+                <h3 id="service-locator" class="mt-4">Service locator</h3>
+                <p>
+                    Do not pass <code>ContainerInterface</code> into controllers and domain services to call
+                    <code>$container-&gt;get()</code> “as needed”. This hides dependencies.
+                </p>
+                <p>Full discussion — <a href="controllers.html#service-locator">Controllers → service locator</a>.</p>
+
+                <h3 id="when-container-ok" class="mt-4">When <code>getContainer()</code> is appropriate</h3>
+                <ul>
+                    <li>Inside a <strong>service provider</strong> (<code>register()</code> / <code>boot()</code>)</li>
+                    <li>Infrastructure: <code>ResponseFactory</code> (URL generator), <code>SeederManager</code>, error handler</li>
+                    <li>Bootstrap, CLI entrypoint, tests with binding overrides</li>
+                </ul>
+
+                <h2 id="has-get" class="border-bottom pb-2 mb-3 mt-5"><code>has()</code> and <code>get()</code></h2>
+                <pre class="mb-4"><code class="language-php">if ($container-&gt;has(LoggerInterface::class)) {
+    $logger = $container-&gt;get(LoggerInterface::class);
+}</code></pre>
+                <p>
+                    PSR-11: <code>get()</code> throws <code>NotFoundExceptionInterface</code> if the service is not registered.
+                    In providers, <code>has(ConfigInterface::class)</code> is often checked first to avoid circular dependencies during early bootstrap.
+                </p>
+
+                <h2 id="events" class="border-bottom pb-2 mb-3 mt-5">Registration events</h2>
+                <p>
+                    Providers dispatch <code>ServiceAwakening</code> when key services are created
+                    (for debug/telemetry). Subscribe through <code>EventDispatcherInterface</code>
+                    (<a href="events.html">Events</a>).
+                </p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        The container is the “warehouse” of dependencies; business logic stays in services and controllers.
+                        Add new integrations (payment gateway, cache) with a binding + interface, not
+                        <code>get()</code> calls from a dozen places.
+                    </p>
+                </div>
+
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>
 

@@ -166,29 +166,160 @@ final class BillingServiceProvider extends AbstractServiceProvider implements Bo
     ComponentsServiceProvider::class,
 ];</code></pre>
 
+                <h4 id="core-providers" class="mt-4 h6 text-uppercase text-body-secondary">Провайдери ядра — призначення</h4>
+                <p>
+                    Кожен клас нижче — частина <code>php-concept/core</code>. Порядок у масиві критичний:
+                    провайдер бачить у контейнері лише те, що зареєстрували провайдери <em>вище</em> у списку.
+                </p>
                 <div class="table-responsive mb-4">
                     <table class="table table-dark table-striped table-bordered align-middle small">
                         <thead>
-                            <tr><th>Провайдер</th><th>Що робить</th></tr>
+                            <tr>
+                                <th>Провайдер</th>
+                                <th>Навіщо потрібен</th>
+                                <th>Що реєструє</th>
+                            </tr>
                         </thead>
                         <tbody>
-                            <tr><td><code>ConfigServiceProvider</code></td><td><code>ConfigInterface</code>, .env, override <code>config/{APP_ENV}</code></td></tr>
-                            <tr><td><code>ErrorHandlerServiceProvider</code></td><td>Whoops після config (HTML/JSON/CLI)</td></tr>
-                            <tr><td><code>EventServiceProvider</code></td><td><code>EventDispatcherInterface</code>, telemetry buffer</td></tr>
-                            <tr><td><code>HttpServiceProvider</code></td><td>PSR-7, Router, URL generator, responses, routes з config</td></tr>
-                            <tr><td><code>SessionServiceProvider</code></td><td>Сесія, flash bag</td></tr>
-                            <tr><td><code>MaskerServiceProvider</code></td><td>Маскування чутливих даних у логах</td></tr>
-                            <tr><td><code>LogServiceProvider</code></td><td><code>LoggerInterface</code> (Monolog)</td></tr>
-                            <tr><td><code>ViewServiceProvider</code></td><td>Twig, registries paths/extensions/contexts</td></tr>
-                            <tr><td><code>ValidationServiceProvider</code></td><td>Rakit validator, custom rules з config</td></tr>
-                            <tr><td><code>DatabaseServiceProvider</code></td><td>Eloquent Capsule, migrations/seeders registries</td></tr>
-                            <tr><td><code>CastingServiceProvider</code></td><td>Valinor <code>CasterInterface</code></td></tr>
-                            <tr><td><code>DebugLoggerServiceProvider</code></td><td>Ранній debug-лог до повного logger</td></tr>
-                            <tr><td><code>ComponentsServiceProvider</code></td><td>Компоненти: routes, views, CLI, nested providers</td></tr>
+                            <tr>
+                                <td><code>ConfigServiceProvider</code></td>
+                                <td>
+                                    Перший у списку: дає доступ до конфігурації застосунку. Завантажує PHP-файли з
+                                    <code>config/</code>, змінні з <code>.env</code> (phpdotenv), оверрайди з
+                                    <code>config/{APP_ENV}/</code> і встановлює timezone. Без нього інші провайдери
+                                    не зможуть прочитати <code>db.*</code>, <code>log.*</code>, <code>session.*</code> тощо.
+                                </td>
+                                <td><code>ConfigInterface</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>ErrorHandlerServiceProvider</code></td>
+                                <td>
+                                    Після config переналаштовує Whoops: замість «раннього» обробника з
+                                    <code>App::create()</code> підключає повноцінний стек — PrettyPage (debug),
+                                    fallback-шаблони (production), JSON для API, plain text для CLI. Додатково
+                                    пише необроблені винятки у лог через <code>ErrorLogHandler</code>.
+                                </td>
+                                <td><code>Whoops</code> (handlers у <code>boot()</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>EventServiceProvider</code></td>
+                                <td>
+                                    Централізований диспетчер подій ядра (League Event). У режимі
+                                    <code>app.debug</code> збирає телеметрію (<code>ServiceAwakening</code>,
+                                    SQL-запити тощо) у буфер для debug-панелі та діагностики bootstrap.
+                                </td>
+                                <td><code>EventDispatcherInterface</code>, <code>ApplicationTelemetryBuffer</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>HttpServiceProvider</code></td>
+                                <td>
+                                    HTTP-шар веб-застосунку: будує PSR-7 запит із superglobals, налаштовує League Route
+                                    з <code>RouteStrategy</code> (autowiring контролерів і FormRequest), підключає
+                                    файли маршрутів з <code>config/routes.php</code>, дає фабрики відповідей і
+                                    генератор URL. У <code>boot()</code> — резолвери сторінок для Illuminate Paginator.
+                                </td>
+                                <td>
+                                    <code>ServerRequestInterface</code>, <code>Router</code>,
+                                    <code>UrlGeneratorInterface</code>, <code>ResponseFactoryInterface</code>,
+                                    <code>ViewResponseFactoryInterface</code>, <code>RequestFormat</code>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><code>SessionServiceProvider</code></td>
+                                <td>
+                                    Стан між HTTP-запитами: авторизація, flash-повідомлення, дані після failed
+                                    validation (<code>errors</code>, <code>old</code> у Twig), CSRF-токен.
+                                    Опції cookie беруться з <code>config/session.php</code>.
+                                </td>
+                                <td><code>SessionInterface</code>, <code>FlashBagInterface</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>MaskerServiceProvider</code></td>
+                                <td>
+                                    Маскує паролі, токени та інші чутливі значення перед записом у лог
+                                    (regex-правила). Має бути зареєстрований <em>до</em> <code>LogServiceProvider</code>,
+                                    щоб Monolog одразу отримав masker-процесор.
+                                </td>
+                                <td><code>MaskerInterface</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>LogServiceProvider</code></td>
+                                <td>
+                                    Основне логування застосунку через Monolog: ротація
+                                    <code>storage/logs/app.log</code>, рівень з <code>log.level</code>,
+                                    ім’я каналу з <code>log.name</code>. Обгортає Monolog у
+                                    <code>Logger</code> з інтеграцією masker.
+                                </td>
+                                <td><code>LoggerInterface</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>ViewServiceProvider</code></td>
+                                <td>
+                                    Рендеринг HTML через Twig: базовий шлях <code>resources/views</code>, кеш
+                                    (вимкнено в debug), extensions і namespaces з config/registries. Компоненти
+                                    додають свої шляхи пізніше через <code>ComponentsServiceProvider</code>.
+                                </td>
+                                <td>
+                                    <code>ViewInterface</code>, <code>ViewPathRegistry</code>,
+                                    <code>ViewExtensionRegistry</code>, <code>ViewContextRegistry</code>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><code>ValidationServiceProvider</code></td>
+                                <td>
+                                    Валідація вхідних даних для <code>FormRequest</code>: адаптер над Rakit Validation
+                                    плюс власні правила з <code>config/validator.php</code> (наприклад
+                                    <code>unique</code>, <code>exists</code> для БД).
+                                </td>
+                                <td><code>ValidatorInterface</code>, <code>Rakit\Validation\Validator</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>DatabaseServiceProvider</code></td>
+                                <td>
+                                    Підключення до БД через Eloquent Capsule: query builder, моделі, міграції та
+                                    сидери. У <code>boot()</code> створює і налаштовує <code>CapsuleManager</code>
+                                    з <code>db.*</code> config; у debug або при <code>log.query</code> логує SQL.
+                                    Потребує <code>ConfigInterface</code> і (для SQL-логу) <code>LoggerInterface</code>.
+                                </td>
+                                <td>
+                                    <code>DatabaseInterface</code>, <code>CapsuleManager</code>, <code>Migrator</code>,
+                                    <code>SeederManager</code>, <code>MigrationRegistry</code>, <code>SeederRegistry</code>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><code>CastingServiceProvider</code></td>
+                                <td>
+                                    Мапінг масивів у типізовані DTO через Valinor (<code>FormRequest::toDto()</code>).
+                                    Кеш мапера — <code>storage/cache/valinor</code>. Потрібен, якщо FormRequest
+                                    оголошує <code>$dtoClass</code>.
+                                </td>
+                                <td><code>CasterInterface</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>DebugLoggerServiceProvider</code></td>
+                                <td>
+                                    Легкий debug-лог у <code>storage/logs/debug.log</code> через статичний
+                                    <code>DebugLogger::log()</code> — зручно для швидкої діагностики під час bootstrap
+                                    або в місцях, де повний Monolog ще недоступний. У <code>boot()</code> встановлює
+                                    singleton-інстанс.
+                                </td>
+                                <td><code>DebugLogger</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>ComponentsServiceProvider</code></td>
+                                <td>
+                                    <strong>Останній</strong> у списку: підключає активні модулі з
+                                    <code>config/components.php</code>. У <code>boot()</code> реєструє маршрути,
+                                    Twig paths/extensions, CLI-кomанди, шляхи migrations/seeders і nested
+                                    service providers компонентів. Потребує Router, View registries, Console тощо —
+                                    тому завжди після базових провайдерів.
+                                </td>
+                                <td><code>ComponentRegistry</code>; side effects у <code>boot()</code></td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
-                <p><strong>Порядок важливий:</strong> config → events → HTTP/view/DB → components останнім.</p>
+                <p><strong>Порядок важливий:</strong> config → events → HTTP/session/log/view/validation/DB → components останнім.</p>
 
                 <h3 id="cli-providers" class="mt-4">CLI — <code>bootstrap/providers/console.php</code></h3>
                 <p>
@@ -201,9 +332,33 @@ $app-&gt;registerServiceProviders([$rootPath . '/bootstrap/providers/console.php
 $console = $container-&gt;get(ConsoleApplication::class);
 $console-&gt;run();</code></pre>
                 <p>
-                    <code>ConsoleServiceProvider</code> читає <code>config/commands.php</code> і додає команди в
-                    Symfony Console. Команди компонентів — через <code>ComponentsServiceProvider::boot()</code>.
+                    <code>ConsoleServiceProvider</code> — єдиний додатковий провайдер ядра для CLI (деталі в
+                    <a href="#core-providers">таблиці провайдерів</a>):
                 </p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Провайдер</th>
+                                <th>Навіщо потрібен</th>
+                                <th>Що реєструє</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>ConsoleServiceProvider</code></td>
+                                <td>
+                                    Точка входу для <code>bin/console.php</code>: створює Symfony Console
+                                    Application з іменем/версією з config, підключає команди з
+                                    <code>config/commands.php</code>. Якщо команда не резолвиться з контейнера —
+                                    реєструє <code>DisabledCommand</code> з текстом помилки. Команди компонентів
+                                    додає <code>ComponentsServiceProvider::boot()</code>.
+                                </td>
+                                <td><code>ConsoleApplication</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
                 <h2 id="create-provider" class="border-bottom pb-2 mb-3 mt-5">Власний провайдер застосунку</h2>
                 <ol>
@@ -283,12 +438,6 @@ foreach ($registry-&gt;providers() as $providerClass) {
                 <p>
                     Twig: <a href="https://twig.symfony.com/doc/" target="_blank" rel="noopener">twig.symfony.com</a>,
                     views — <a href="views.html">Представлення</a>.
-                </p>
-
-                <h3 id="example-debugbar" class="mt-4">DebugBarServiceProvider (компонент)</h3>
-                <p>
-                    Реєструє <code>CustomDebugBar</code> і <code>JavascriptRenderer</code> з колекторами телеметрії.
-                    Підключається лише якщо <code>DebugBarComponent</code> у dev-config компонентів.
                 </p>
 
                 <h2 id="patterns" class="border-bottom pb-2 mb-3 mt-5">Рекомендації</h2>

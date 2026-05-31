@@ -3,10 +3,11 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Application setup — entry points, bootstrap, paths">
+    <meta name="description" content="Bootstrap setup, entry points, and directory structure">
     <title>Setup - Concept Core Documentation</title>
     <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
     <link rel="stylesheet" href="../assets/css/docs.css">
 </head>
 <body data-page="setup">
@@ -17,9 +18,10 @@
             </button>
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
-            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="setup.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/setup.html">UK</a></li>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link p-1 active" href="setup.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/setup.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -40,11 +42,218 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Setup</h1>
+
                 <p>
-                    Full documentation for this page is available in
-                    <a href="../uk/setup.html">Ukrainian</a> (Налаштування).
+                    Before working with <a href="configuration.html">configuration</a> (<code>config/</code>, <code>.env</code>),
+                    it helps to understand how the application starts: the HTTP entry point, bootstrap, and console.
+                    These are three areas: <code>public/</code>, <code>bootstrap/</code>, and <code>bin/</code>.
                 </p>
-                <p>Topics covered: <code>public/index.php</code>, <code>bootstrap/</code>, <code>bootstrap/paths.php</code>, <code>bin/console.php</code>.</p>
+
+                <h2 id="overview" class="border-bottom pb-2 mb-3 mt-5">Overview</h2>
+                <pre class="mb-4"><code class="language-text">HTTP request → public/index.php → bootstrap/app.php → providers → $app->run()
+CLI command  → bin/console.php  → bootstrap (paths + app) → console providers → Symfony Console</code></pre>
+
+                <h2 id="public-index" class="border-bottom pb-2 mb-3 mt-5">public/index.php</h2>
+                <p>The single public entry point for the web server (Apache, Nginx, PHP built-in server). The virtual host document root must point to <code>public/</code>.</p>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+use Concept\Core\App;
+
+require_once __DIR__ . '/../vendor/autoload.php';
+
+/** @var App $app */
+$app = require_once __DIR__ . '/../bootstrap/app.php';
+
+$app->run();</code></pre>
+                <ul>
+                    <li><strong>autoload</strong> — Composer PSR-4 (<code>vendor/autoload.php</code>).</li>
+                    <li><strong>bootstrap/app.php</strong> — creates <code>App</code>, registers providers for HTTP.</li>
+                    <li><strong>run()</strong> — PSR-7 request handling, routing, response.</li>
+                </ul>
+                <p>The <code>public/</code> directory also holds static files (<code>assets/</code>, <code>vendor/bootstrap</code> after publish) — they are served directly by the web server, without PHP.</p>
+
+                <h2 id="bootstrap" class="border-bottom pb-2 mb-3 mt-5">bootstrap/ directory</h2>
+                <p>Application initialization code, shared by HTTP and CLI (via <code>paths.php</code>).</p>
+                <pre class="mb-4"><code class="language-text">bootstrap/
+├── app.php              # HTTP: App + app.php providers
+├── paths.php            # map of logical paths → project directories
+└── providers/
+    ├── app.php          # providers for web requests
+    └── console.php      # providers for console</code></pre>
+
+                <h3 id="bootstrap-app" class="mt-4">bootstrap/app.php</h3>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+use Concept\Core\App;
+
+$rootPath = dirname(__DIR__);
+/** @var array&lt;string, string&gt; $paths */
+$paths = include $rootPath . '/bootstrap/paths.php';
+$app = App::create($rootPath, $paths);
+
+$providerFiles = [
+    $rootPath . '/bootstrap/providers/app.php',
+];
+$app->registerServiceProviders($providerFiles);
+
+return $app;</code></pre>
+                <ul>
+                    <li><code>$rootPath</code> — absolute path to the project root (parent directory of <code>bootstrap/</code>).</li>
+                    <li><code>paths.php</code> — returns an array for <code>PathManager</code> (see below).</li>
+                    <li><code>App::create()</code> — container, early error handler, <code>PathManager</code> registration.</li>
+                    <li><code>registerServiceProviders()</code> — each file in the list must return an array of provider classes.</li>
+                </ul>
+
+                <h3 id="bootstrap-providers-app">bootstrap/providers/app.php</h3>
+                <p>
+                    The core service provider set for HTTP: config, errors, events, HTTP, session, log, Twig,
+                    validation, database, components, and more. Order in the array matters — dependencies are registered
+                    before dependent services.
+                    <a href="service-providers.html#core-providers">Detailed description of each core provider</a>
+                    — what it is for and what it registers in the container.
+                </p>
+                <p>To add your own provider for the web — register the class in this array or include a separate file in <code>$providerFiles</code> in <code>app.php</code>.</p>
+
+                <h3 id="bootstrap-providers-console">bootstrap/providers/console.php</h3>
+                <p>A reduced set for CLI: without the View/Validation HTTP stack, with <code>ConsoleServiceProvider</code>. Used from <code>bin/console.php</code>.</p>
+
+                <h2 id="paths-php" class="border-bottom pb-2 mb-3 mt-5">bootstrap/paths.php</h2>
+                <p>
+                    The central place where you <strong>define the physical project structure</strong>.
+                    The file returns an associative array: <em>logical key</em> → <em>relative path from the project root</em>.
+                    The core accesses directories only through <code>PathManager::get($key)</code>, not hard-coded strings.
+                </p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        You can define the folder structure to your liking: rename directories, split code across a monorepo,
+                        or move logs to <code>var/log</code> — just change the values in <code>paths.php</code>,
+                        as long as the keys remain <code>PathManager</code> constants.
+                    </p>
+                </div>
+
+                <p>Example:</p>
+                <pre class="mb-4"><code class="language-php">&lt;?php
+
+use Concept\Core\Components\Path\PathManager;
+
+return [
+    PathManager::BOOTSTRAP_DIR => 'bootstrap',
+    PathManager::SRC_DIR => 'src',
+    PathManager::CONFIG_DIR => 'config',
+    PathManager::MIGRATIONS_DIR => 'database/migrations',
+    PathManager::SEEDERS_DIR => 'database/seeders',
+    PathManager::PUBLIC_DIR => 'public',
+    PathManager::STORAGE_DIR => 'storage',
+    PathManager::LOGS_DIR => 'storage/logs',
+    PathManager::CACHE_DIR => 'storage/cache',
+    PathManager::RESOURCES_DIR => 'resources',
+    PathManager::VIEWS_DIR => 'resources/views',
+    PathManager::ERRORS_FALLBACK_VIEWS_DIR => 'resources/views/errors/fallback',
+];</code></pre>
+
+                <h3 id="paths-keys" class="mt-4">PathManager keys</h3>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Constant (array key)</th>
+                                <th>Path</th>
+                                <th>Used by</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>BOOTSTRAP_DIR</code></td><td><code>bootstrap</code></td><td>Reserved for bootstrap resources</td></tr>
+                            <tr><td><code>SRC_DIR</code></td><td><code>src</code></td><td>Application code (PSR-4)</td></tr>
+                            <tr><td><code>CONFIG_DIR</code></td><td><code>config</code></td><td>PHP config, <code>config/{env}/</code> overrides</td></tr>
+                            <tr><td><code>MIGRATIONS_DIR</code></td><td><code>database/migrations</code></td><td>Database migrations</td></tr>
+                            <tr><td><code>SEEDERS_DIR</code></td><td><code>database/seeders</code></td><td>Seeders</td></tr>
+                            <tr><td><code>PUBLIC_DIR</code></td><td><code>public</code></td><td>Document root, static assets</td></tr>
+                            <tr><td><code>STORAGE_DIR</code></td><td><code>storage</code></td><td>Application writable data</td></tr>
+                            <tr><td><code>LOGS_DIR</code></td><td><code>storage/logs</code></td><td>Monolog, debug log</td></tr>
+                            <tr><td><code>CACHE_DIR</code></td><td><code>storage/cache</code></td><td>Twig cache, Valinor, etc.</td></tr>
+                            <tr><td><code>RESOURCES_DIR</code></td><td><code>resources</code></td><td>Resources, not only views</td></tr>
+                            <tr><td><code>VIEWS_DIR</code></td><td><code>resources/views</code></td><td>Twig templates (base path)</td></tr>
+                            <tr><td><code>ERRORS_FALLBACK_VIEWS_DIR</code></td><td><code>resources/views/errors/fallback</code></td><td>Error fallback templates (production)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="paths-api" class="mt-4">PathManager API</h3>
+                <pre class="mb-4"><code class="language-php">// Absolute path: /var/www/my-app/config
+$pathManager->get(PathManager::CONFIG_DIR);
+
+// With subpath: /var/www/my-app/storage/cache/views
+$pathManager->get(PathManager::CACHE_DIR, 'views');
+
+// Arbitrary path from project root
+$pathManager->root('custom/dir');</code></pre>
+                <p>
+                    The second argument to <code>get()</code> is a subdirectory within the registered path (for example <code>view.cache_dir</code> in config
+                    is appended to <code>CACHE_DIR</code>).
+                </p>
+
+                <h3 id="paths-custom" class="mt-4">Custom directory structure</h3>
+                <p>Example: logs and cache in <code>var/</code>, code in <code>app/</code>:</p>
+                <pre class="mb-4"><code class="language-php">return [
+    PathManager::SRC_DIR => 'app',
+    PathManager::CONFIG_DIR => 'etc/config',
+    PathManager::LOGS_DIR => 'var/log',
+    PathManager::CACHE_DIR => 'var/cache',
+    PathManager::VIEWS_DIR => 'app/Resources/views',
+    // ... other keys as needed
+];</code></pre>
+                <p>After changing paths:</p>
+                <ul>
+                    <li>update <code>composer.json</code> → <code>autoload.psr-4</code> if you changed <code>SRC_DIR</code>;</li>
+                    <li>ensure the web server points to the current <code>PUBLIC_DIR</code>;</li>
+                    <li>in <code>config/migrations.php</code> and <code>view.php</code>, paths align with the new structure.</li>
+                </ul>
+                <p class="small text-body-secondary">
+                    Adding new keys to <code>PathManager</code> in the core is only needed if a new path type will be used by the core itself;
+                    for your own code, <code>$pathManager->root('my/custom/path')</code> is enough.
+                </p>
+
+                <h2 id="bin" class="border-bottom pb-2 mb-3 mt-5">bin/console.php</h2>
+                <p>CLI entry point (migrations, seeders, <code>route:list</code>, <code>view:clear</code>).</p>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+use Concept\Core\App;
+use Symfony\Component\Console\Application as ConsoleApplication;
+
+require __DIR__ . '/../vendor/autoload.php';
+
+$rootPath = dirname(__DIR__);
+$paths = include $rootPath . '/bootstrap/paths.php';
+$app = App::create($rootPath, $paths);
+
+$providerFiles = [
+    $rootPath . '/bootstrap/providers/console.php',
+];
+$app->registerServiceProviders($providerFiles);
+
+$container = $app->getContainer();
+$console = $container->get(ConsoleApplication::class);
+
+$console->run();</code></pre>
+                <p>Run from the project root (as in <code>composer.json</code> → script <code>console</code>):</p>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php</code></pre>
+                <p>Differences from HTTP:</p>
+                <ul>
+                    <li>the same <code>paths.php</code> and <code>App::create()</code>;</li>
+                    <li>a different provider list — <code>bootstrap/providers/console.php</code>;</li>
+                    <li>instead of <code>$app->run()</code> — Symfony Console <code>Application</code> from the container.</li>
+                </ul>
+
+                <h2 id="checklist" class="border-bottom pb-2 mb-3 mt-5">New project checklist</h2>
+                <ol>
+                    <li>Copy the skeleton or create a structure with <code>public/index.php</code>, <code>bootstrap/</code>, <code>bin/console.php</code>.</li>
+                    <li>Configure <code>bootstrap/paths.php</code> for your directories.</li>
+                    <li>Register the providers you need in <code>bootstrap/providers/app.php</code> and <code>console.php</code>.</li>
+                    <li>Point the web server at <code>public/</code>, create <code>.env</code>.</li>
+                    <li>Continue to <a href="configuration.html">Configuration</a> — <code>config/</code> and environment variables.</li>
+                </ol>
+
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>
 
@@ -55,6 +264,9 @@
     </div>
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/bash.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
     <script src="../assets/js/nav-en.js"></script>
     <script src="../assets/js/docs.js"></script>

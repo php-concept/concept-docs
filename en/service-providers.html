@@ -18,9 +18,10 @@
             </button>
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
-            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="../en/service-providers.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/service-providers.html">UK</a></li>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/service-providers.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/service-providers.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -41,10 +42,430 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Service Providers</h1>
+
                 <p>
-                    Full documentation is available in
-                    <a href="../uk/service-providers.html">Ukrainian</a>.
+                    A <strong>service provider</strong> is a class that registers services in the DI container during bootstrap.
+                    In Concept Core, this is the primary way to wire up config, HTTP, database, Twig, validation, and component modules.
                 </p>
+                <p>
+                    The implementation follows
+                    <a href="https://container.thephpleague.com/5.x/service-providers/" target="_blank" rel="noopener">League Container Service Providers</a>
+                    (<code>League\Container\ServiceProvider\AbstractServiceProvider</code>).
+                    See also: <a href="service-container.html">Service Container</a>,
+                    <a href="configuration.html">configuration</a>.
+                </p>
+
+                <h2 id="anatomy" class="border-bottom pb-2 mb-3 mt-5">Provider anatomy</h2>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+namespace Concept\App\Providers;
+
+use Concept\Core\Providers\Concerns\PeeksEventDispatcher;
+use League\Container\ServiceProvider\AbstractServiceProvider;
+use League\Container\ServiceProvider\BootableServiceProviderInterface;
+
+final class BillingServiceProvider extends AbstractServiceProvider implements BootableServiceProviderInterface
+{
+    use PeeksEventDispatcher;
+
+    public function provides(string $id): bool
+    {
+        return $id === BillingGatewayInterface::class;
+    }
+
+    public function register(): void
+    {
+        $container = $this-&gt;getContainer();
+
+        $container-&gt;add(BillingGatewayInterface::class, function () {
+            return new StripeBillingGateway(/* ... */);
+        })-&gt;setShared(true);
+    }
+
+    public function boot(): void
+    {
+        // Eager logic immediately after register() of this provider
+    }
+}</code></pre>
+
+                <h3 id="register-boot" class="mt-4"><code>register()</code> and <code>boot()</code></h3>
+                <ul>
+                    <li><code>register()</code> — <code>$container-&gt;add()</code>, bindings, factories</li>
+                    <li>
+                        <code>boot()</code> — additional logic <strong>immediately after</strong>
+                        <code>register()</code> of <em>this same</em> provider (eager), not after all providers in the file
+                    </li>
+                </ul>
+                <p>
+                    <code>boot()</code> only makes sense in a class that implements
+                    <code>BootableServiceProviderInterface</code>. From the League Container documentation:
+                </p>
+                <blockquote class="border-start border-secondary border-4 ps-3 mb-4 small text-body-secondary">
+                    <p class="mb-2">
+                        In much the same way, this method has access to the container itself and can interact
+                        with it however you wish, the difference is that the boot method is invoked as soon
+                        as you register the service provider with the container meaning that everything in
+                        this method is eagerly loaded.
+                    </p>
+                    <p class="mb-0">
+                        If you wish to apply inflectors or register further service providers from this one,
+                        it must be from a bootable service provider like this one, otherwise they will be ignored.
+                    </p>
+                    <footer class="blockquote-footer mt-2">
+                        <a href="https://container.thephpleague.com/5.x/service-providers/" target="_blank" rel="noopener">League Container — Service Providers</a>
+                    </footer>
+                </blockquote>
+                <p>
+                    Order in <code>bootstrap/providers/app.php</code> is critical: for each provider,
+                    <code>register()</code> runs first, then <code>boot()</code> immediately, and only then the next
+                    provider in the list. In provider N's <code>boot()</code>, only services from providers
+                    <strong>above</strong> in the file are available; providers <strong>below</strong> have not yet run
+                    <code>register()</code>.
+                </p>
+                <p>
+                    That is why <code>ComponentsServiceProvider</code> is last: its <code>boot()</code> already has
+                    <code>ConfigInterface</code>, <code>Router</code>, View registries, and more — and it can
+                    <code>addServiceProvider()</code> for component providers, load <code>routes.php</code>,
+                    and Twig paths.
+                </p>
+
+                <h3 id="provides" class="mt-4"><code>provides()</code></h3>
+                <p>
+                    A list of ids this provider supplies. Enables <strong>deferred</strong> loading:
+                    the provider is loaded when one of the listed services is first needed.
+                </p>
+
+                <h3 id="peeks-event" class="mt-4"><code>ServiceAwakening</code> events</h3>
+                <p>
+                    Core providers use the <code>PeeksEventDispatcher</code> trait: if
+                    <code>EventDispatcherInterface</code> is already in the container, creating a service dispatches
+                    <code>ServiceAwakening</code> (telemetry in debug mode).
+                </p>
+
+                <h2 id="registration" class="border-bottom pb-2 mb-3 mt-5">Registering providers</h2>
+                <p><code>App::registerServiceProviders()</code> loads an array of classes from a PHP file:</p>
+                <pre class="mb-4"><code class="language-php">foreach ($providers as $providerClassName) {
+    $provider = new $providerClassName();
+    $this-&gt;container-&gt;addServiceProvider($provider);
+}</code></pre>
+                <p>Providers are not registered via autowiring — they are instantiated explicitly (<code>new $providerClassName()</code>).</p>
+
+                <h3 id="http-providers" class="mt-4">HTTP — <code>bootstrap/providers/app.php</code></h3>
+                <pre class="mb-4"><code class="language-php">return [
+    ConfigServiceProvider::class,
+    ErrorHandlerServiceProvider::class,
+    EventServiceProvider::class,
+    HttpServiceProvider::class,
+    SessionServiceProvider::class,
+    MaskerServiceProvider::class,
+    LogServiceProvider::class,
+    ViewServiceProvider::class,
+    ValidationServiceProvider::class,
+    DatabaseServiceProvider::class,
+    CastingServiceProvider::class,
+    DebugLoggerServiceProvider::class,
+    ComponentsServiceProvider::class,
+];</code></pre>
+
+                <h4 id="core-providers" class="mt-4 h6 text-uppercase text-body-secondary">Core providers — purpose</h4>
+                <p>
+                    Each class below is part of <code>php-concept/core</code>. Order in the array is critical:
+                    a provider only sees what providers <em>above</em> it in the list have registered in the container.
+                </p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Provider</th>
+                                <th>Why needed</th>
+                                <th>What it registers</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>ConfigServiceProvider</code></td>
+                                <td>
+                                    First in the list: gives access to application configuration. Loads PHP files from
+                                    <code>config/</code>, variables from <code>.env</code> (phpdotenv), overrides from
+                                    <code>config/{APP_ENV}/</code>, and sets the timezone. Without it, other providers
+                                    cannot read <code>db.*</code>, <code>log.*</code>, <code>session.*</code>, and so on.
+                                </td>
+                                <td><code>ConfigInterface</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>ErrorHandlerServiceProvider</code></td>
+                                <td>
+                                    After config, reconfigures Whoops: instead of the "early" handler from
+                                    <code>App::create()</code>, it wires the full stack — PrettyPage (debug),
+                                    fallback templates (production), JSON for API, plain text for CLI. Also
+                                    writes unhandled exceptions to the log via <code>ErrorLogHandler</code>.
+                                </td>
+                                <td><code>Whoops</code> (handlers in <code>boot()</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>EventServiceProvider</code></td>
+                                <td>
+                                    Central event dispatcher for the core (League Event). In
+                                    <code>app.debug</code> mode, collects telemetry (<code>ServiceAwakening</code>,
+                                    SQL queries, and so on) into a buffer for the debug panel and bootstrap diagnostics.
+                                </td>
+                                <td><code>EventDispatcherInterface</code>, <code>ApplicationTelemetryBuffer</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>HttpServiceProvider</code></td>
+                                <td>
+                                    HTTP layer of the web application: builds a PSR-7 request from superglobals, configures League Route
+                                    with <code>RouteStrategy</code> (controller autowiring and FormRequest), loads
+                                    route files from <code>config/routes.php</code>, and provides response factories and
+                                    URL generation. In <code>boot()</code> — page resolvers for Illuminate Paginator.
+                                </td>
+                                <td>
+                                    <code>ServerRequestInterface</code>, <code>Router</code>,
+                                    <code>UrlGeneratorInterface</code>, <code>ResponseFactoryInterface</code>,
+                                    <code>ViewResponseFactoryInterface</code>, <code>RequestFormat</code>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><code>SessionServiceProvider</code></td>
+                                <td>
+                                    State between HTTP requests: authentication, flash messages, data after failed
+                                    validation (<code>errors</code>, <code>old</code> in Twig), CSRF token.
+                                    Cookie options come from <code>config/session.php</code>.
+                                </td>
+                                <td><code>SessionInterface</code>, <code>FlashBagInterface</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>MaskerServiceProvider</code></td>
+                                <td>
+                                    Masks passwords, tokens, and other sensitive values before writing to the log
+                                    (regex rules). Must be registered <em>before</em> <code>LogServiceProvider</code>
+                                    so Monolog receives the masker processor immediately.
+                                </td>
+                                <td><code>MaskerInterface</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>LogServiceProvider</code></td>
+                                <td>
+                                    Primary application logging via Monolog: rotation of
+                                    <code>storage/logs/app.log</code>, level from <code>log.level</code>,
+                                    channel name from <code>log.name</code>. Wraps Monolog in a
+                                    <code>Logger</code> with masker integration.
+                                </td>
+                                <td><code>LoggerInterface</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>ViewServiceProvider</code></td>
+                                <td>
+                                    HTML rendering via Twig: base path <code>resources/views</code>, cache
+                                    (disabled in debug), extensions and namespaces from config/registries. Components
+                                    add their paths later via <code>ComponentsServiceProvider</code>.
+                                </td>
+                                <td>
+                                    <code>ViewInterface</code>, <code>ViewPathRegistry</code>,
+                                    <code>ViewExtensionRegistry</code>, <code>ViewContextRegistry</code>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><code>ValidationServiceProvider</code></td>
+                                <td>
+                                    Input validation for <code>FormRequest</code>: adapter over Rakit Validation
+                                    plus custom rules from <code>config/validator.php</code> (for example
+                                    <code>unique</code>, <code>exists</code> for the database).
+                                </td>
+                                <td><code>ValidatorInterface</code>, <code>Rakit\Validation\Validator</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>DatabaseServiceProvider</code></td>
+                                <td>
+                                    Database connection via Eloquent Capsule: query builder, models, migrations, and
+                                    seeders. In <code>boot()</code>, creates and configures <code>CapsuleManager</code>
+                                    from <code>db.*</code> config; in debug or when <code>log.query</code> is enabled, logs SQL.
+                                    Requires <code>ConfigInterface</code> and (for SQL logging) <code>LoggerInterface</code>.
+                                </td>
+                                <td>
+                                    <code>DatabaseInterface</code>, <code>CapsuleManager</code>, <code>Migrator</code>,
+                                    <code>SeederManager</code>, <code>MigrationRegistry</code>, <code>SeederRegistry</code>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><code>CastingServiceProvider</code></td>
+                                <td>
+                                    Maps arrays to typed DTOs via Valinor (<code>FormRequest::toDto()</code>).
+                                    Mapper cache — <code>storage/cache/valinor</code>. Required when FormRequest
+                                    declares <code>$dtoClass</code>.
+                                </td>
+                                <td><code>CasterInterface</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>DebugLoggerServiceProvider</code></td>
+                                <td>
+                                    Lightweight debug logging to <code>storage/logs/debug.log</code> via static
+                                    <code>DebugLogger::log()</code> — handy for quick diagnostics during bootstrap
+                                    or in places where full Monolog is not yet available. In <code>boot()</code>, sets
+                                    the singleton instance.
+                                </td>
+                                <td><code>DebugLogger</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>ComponentsServiceProvider</code></td>
+                                <td>
+                                    <strong>Last</strong> in the list: loads active modules from
+                                    <code>config/components.php</code>. In <code>boot()</code>, registers routes,
+                                    Twig paths/extensions, CLI commands, migration/seeder paths, and nested
+                                    service providers for components. Requires Router, View registries, Console, and so on —
+                                    so always after the base providers.
+                                </td>
+                                <td><code>ComponentRegistry</code>; side effects in <code>boot()</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p><strong>Order matters:</strong> config → events → HTTP/session/log/view/validation/DB → components last.</p>
+
+                <h3 id="cli-providers" class="mt-4">CLI — <code>bootstrap/providers/console.php</code></h3>
+                <p>
+                    <code>bin/console.php</code> calls <code>App::create()</code> and a separate provider list
+                    (without View/Validation/Casting as needed, but with <code>ConsoleServiceProvider</code>):
+                </p>
+                <pre class="mb-4"><code class="language-php">// bin/console.php
+$app-&gt;registerServiceProviders([$rootPath . '/bootstrap/providers/console.php']);
+
+$console = $container-&gt;get(ConsoleApplication::class);
+$console-&gt;run();</code></pre>
+                <p>
+                    <code>ConsoleServiceProvider</code> is the only additional core provider for CLI (details in the
+                    <a href="#core-providers">provider table</a>):
+                </p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Provider</th>
+                                <th>Why needed</th>
+                                <th>What it registers</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>ConsoleServiceProvider</code></td>
+                                <td>
+                                    Entry point for <code>bin/console.php</code>: creates a Symfony Console
+                                    Application with name/version from config, loads commands from
+                                    <code>config/commands.php</code>. If a command cannot be resolved from the container —
+                                    registers <code>DisabledCommand</code> with an error message. Component commands
+                                    are added by <code>ComponentsServiceProvider::boot()</code>.
+                                </td>
+                                <td><code>ConsoleApplication</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h2 id="create-provider" class="border-bottom pb-2 mb-3 mt-5">Application provider</h2>
+                <ol>
+                    <li>Create a class in <code>App/Providers/MyServiceProvider.php</code>.</li>
+                    <li>In <code>register()</code> — bindings for application interfaces.</li>
+                    <li>Add the class to <code>bootstrap/providers/app.php</code> <em>after</em> the providers it depends on.</li>
+                </ol>
+                <pre class="mb-4"><code class="language-php">// bootstrap/providers/app.php
+return [
+    ConfigServiceProvider::class,
+    // ...
+    BillingServiceProvider::class,  // after ConfigServiceProvider
+    ComponentsServiceProvider::class,
+];</code></pre>
+                <p>
+                    If the provider needs <code>ConfigInterface</code> — place it after
+                    <code>ConfigServiceProvider</code>. If it needs <code>Router</code> — after
+                    <code>HttpServiceProvider</code>.
+                </p>
+
+                <h2 id="component-providers" class="border-bottom pb-2 mb-3 mt-5">Component providers</h2>
+                <p>
+                    A component declares providers in <code>Component/config.php</code>.
+                    <code>ComponentsServiceProvider::boot()</code> loads them dynamically:
+                </p>
+                <pre class="mb-4"><code class="language-php">// src/Components/DebugBar/config.php
+'providers' =&gt; [
+    DebugBarServiceProvider::class,
+    MaskerServiceProvider::class,  // if not already in app.php
+],</code></pre>
+                <pre class="mb-4"><code class="language-php">// Concept\Core\Providers\ComponentsServiceProvider
+foreach ($registry-&gt;providers() as $providerClass) {
+    $this-&gt;getContainer()-&gt;addServiceProvider(new $providerClass());
+}</code></pre>
+                <p>
+                    The list of active components is in <code>config/components.php</code>
+                    (in dev, <code>config/dev/components.php</code> may include DebugBar).
+                    The component class (<code>AuthAdminComponent</code>) reads its own <code>config.php</code>.
+                </p>
+
+                <h3 id="components-boot" class="mt-4">What <code>ComponentsServiceProvider::boot()</code> does</h3>
+                <ol>
+                    <li><code>ComponentRegistering</code> events for each module</li>
+                    <li>Registration of component console commands</li>
+                    <li>Migration and seeder paths in registries</li>
+                    <li><strong>Nested service providers</strong> of components</li>
+                    <li><code>require</code> of <code>Component/routes.php</code> files (the <code>$router</code> variable)</li>
+                    <li>In HTTP (not CLI) — Twig paths, extensions, view contexts from components</li>
+                </ol>
+                <p>
+                    So component routes appear only if the component is enabled in config and
+                    <code>ComponentsServiceProvider</code> has run <code>boot()</code>.
+                </p>
+
+                <h2 id="examples" class="border-bottom pb-2 mb-3 mt-5">Examples from core</h2>
+
+                <h3 id="example-http" class="mt-4">HttpServiceProvider — register + boot</h3>
+                <p><code>register()</code>: PSR-7, Router + <code>RouteStrategy</code> + loading <code>routes/*.php</code>.</p>
+                <p><code>boot()</code>: page resolvers for Illuminate Paginator.</p>
+                <p>
+                    League Route: <a href="https://route.thephpleague.com/6.x/routing/" target="_blank" rel="noopener">routing documentation</a>.
+                </p>
+
+                <h3 id="example-database" class="mt-4">DatabaseServiceProvider — why boot</h3>
+                <p>
+                    In <code>register()</code> — <code>DatabaseInterface</code>, <code>Migrator</code>, registries.
+                    In <code>boot()</code> (immediately after this provider's <code>register()</code>) — creating
+                    <code>CapsuleManager</code>, connection from <code>ConfigInterface</code> (Config is already registered
+                    higher in the list), SQL listeners. Capsule is added to the container already configured.
+                </p>
+
+                <h3 id="example-view" class="mt-4">ViewServiceProvider — Twig</h3>
+                <p>
+                    Builds the Twig <code>Environment</code>: cache, debug, extensions from config, paths from registries.
+                    After component boot, additional namespaces appear in the registries.
+                </p>
+                <p>
+                    Twig: <a href="https://twig.symfony.com/doc/" target="_blank" rel="noopener">twig.symfony.com</a>,
+                    views — <a href="views.html">Views</a>.
+                </p>
+
+                <h2 id="patterns" class="border-bottom pb-2 mb-3 mt-5">Recommendations</h2>
+                <ul>
+                    <li><strong>One provider — one area</strong> (Billing, Notifications), not a "GodProvider"</li>
+                    <li><strong>register — bindings only</strong>; heavy wiring — in <code>boot()</code></li>
+                    <li><strong>Dependencies via <code>$container-&gt;get()</code></strong> only inside the provider, not in controllers</li>
+                    <li><strong><code>setShared(true)</code></strong> for services that should be singleton per request</li>
+                    <li><strong>Do not change core provider order</strong> without understanding dependencies</li>
+                </ul>
+
+                <h2 id="checklist" class="border-bottom pb-2 mb-3 mt-5">New module checklist</h2>
+                <ol>
+                    <li>Component in <code>config/components.php</code></li>
+                    <li>If needed — <code>providers</code> in <code>Component/config.php</code></li>
+                    <li><code>routes.php</code>, <code>view.paths</code>, migrations — in the component config</li>
+                    <li>Service classes resolve via autowiring or binding in the module provider</li>
+                </ol>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        If a service is "not found" in the container — check whether the provider is in the correct file
+                        (<code>app.php</code> vs <code>console.php</code>), whether the component's <code>boot()</code> ran,
+                        and whether an explicit <code>add()</code> is needed instead of autowiring.
+                    </p>
+                </div>
+
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>
 

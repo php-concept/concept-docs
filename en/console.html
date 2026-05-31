@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Console — Concept Core Documentation">
-    <title>Console - Concept Core Documentation</title>
+    <meta name="description" content="Working with the console — Concept Core Documentation">
+    <title>Working with the Console - Concept Core Documentation</title>
     <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
     <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
@@ -18,9 +18,10 @@
             </button>
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
-            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="../en/console.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/console.html">UK</a></li>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link p-1 active" href="console.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/console.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -40,11 +41,114 @@
             </aside>
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
-                <h1 class="display-6 fw-bold mb-4">Console</h1>
+                <h1 class="display-6 fw-bold mb-4">Working with the Console</h1>
+
                 <p>
-                    Full documentation is available in
-                    <a href="../uk/console.html">Ukrainian</a>.
+                    The application CLI is built on
+                    <a href="https://symfony.com/doc/current/console.html" target="_blank" rel="noopener">Symfony Console</a>.
+                    The entry point is <code>bin/console.php</code>; commands are registered via the DI container and
+                    <code>ConsoleServiceProvider</code>.
                 </p>
+                <p>
+                    See also:
+                    <a href="setup.html#bin">setup → bin/console.php</a>,
+                    <a href="service-providers.html#cli-providers">CLI providers</a>,
+                    <a href="console-commands.html">creating custom commands</a>.
+                </p>
+
+                <h2 id="run" class="border-bottom pb-2 mb-3 mt-5">Running</h2>
+                <p>From the project root:</p>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php
+
+# or via Composer (script in composer.json)
+composer console
+
+# help
+php bin/console.php list
+
+# help for a single command
+php bin/console.php help db:migrate</code></pre>
+                <p>
+                    CLI bootstrap differs from HTTP: it loads
+                    <code>bootstrap/providers/console.php</code> (without View/Validation for the web stack, with
+                    <code>ConsoleServiceProvider</code>). For details, see <a href="setup.html#bootstrap-providers-console">Setup</a>.
+                </p>
+
+                <h2 id="how-it-works" class="border-bottom pb-2 mb-3 mt-5">How it works</h2>
+                <pre class="mb-4"><code class="language-php">// bin/console.php
+$app = App::create($rootPath, $paths);
+$app-&gt;registerServiceProviders([$rootPath . '/bootstrap/providers/console.php']);
+
+$console = $app-&gt;getContainer()-&gt;get(ConsoleApplication::class);
+$console-&gt;run();</code></pre>
+                <ol>
+                    <li><code>ConsoleServiceProvider</code> creates <code>Symfony\Component\Console\Application</code></li>
+                    <li>Commands from <code>config/commands.php</code> are resolved from the container and added to the application</li>
+                    <li><code>ComponentsServiceProvider::boot()</code> adds commands from each component's <code>config.php</code></li>
+                </ol>
+
+                <h2 id="built-in" class="border-bottom pb-2 mb-3 mt-5">Core commands</h2>
+                <p>Registered in <code>config/commands.php</code>:</p>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Command</th><th>Purpose</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>db:migrate</code></td><td>Run migrations</td></tr>
+                            <tr><td><code>db:migration:list</code></td><td>List migrations</td></tr>
+                            <tr><td><code>db:rollback</code></td><td>Roll back the last migration batch</td></tr>
+                            <tr><td><code>db:seed</code></td><td>All seeders; <code>-c "Fully\Qualified\Class"</code> — one seeder (full FQCN)</td></tr>
+                            <tr><td><code>db:seeders:list</code></td><td>List registered seeders</td></tr>
+                            <tr><td><code>route:list</code></td><td>Route table (<code>-F</code> — full middleware names)</td></tr>
+                            <tr><td><code>view:clear</code></td><td>Clear Twig cache</td></tr>
+                            <tr><td><code>component:list</code></td><td>List enabled components</td></tr>
+                            <tr><td><code>component:publish-assets</code></td><td>Publish component assets to <code>public/</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="examples" class="mt-4">Examples</h3>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php db:migrate
+php bin/console.php db:seed
+php bin/console.php db:seed -c "Concept\Components\AuthAdmin\Database\Seeders\UserSeeder"
+php bin/console.php route:list
+php bin/console.php route:list -F
+php bin/console.php component:list
+php bin/console.php view:clear</code></pre>
+
+                <h2 id="component-commands" class="border-bottom pb-2 mb-3 mt-5">Component commands</h2>
+                <p>
+                    A component adds commands in the <code>commands</code> section of its <code>config.php</code>.
+                    During <code>ComponentsServiceProvider::boot()</code> they are registered in the same
+                    <code>ConsoleApplication</code>.
+                </p>
+
+                <h2 id="exit-codes" class="border-bottom pb-2 mb-3 mt-5">Exit codes</h2>
+                <p>
+                    Commands return <code>Command::SUCCESS</code> (0) or <code>Command::FAILURE</code> (1).
+                    In CI scripts, check the exit code after <code>php bin/console.php ...</code>.
+                </p>
+
+                <h2 id="env" class="border-bottom pb-2 mb-3 mt-5">Environment and config</h2>
+                <p>
+                    CLI uses the same <code>.env</code> and <code>ConfigServiceProvider</code> as HTTP.
+                    <code>APP_ENV</code> determines <code>config/{env}/</code> overrides and the component list
+                    (for example, DebugBar only in <code>config/dev/components.php</code>).
+                </p>
+                <p>
+                    Migrations and seeders require a valid DB connection in
+                    <a href="database.html#configuration"><code>config/db.php</code></a> (or via <code>.env</code>).
+                </p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Use the console for maintenance (migrations, cache, diagnostics) and local development.
+                        Keep long-running business logic in services; leave a thin call in the command.
+                    </p>
+                </div>
+
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>
 

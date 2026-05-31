@@ -18,7 +18,7 @@
             </button>
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
-            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
                 <li class="nav-item"><a class="nav-link p-1 active" href="../en/components-overview.html">EN</a></li>
                 <li class="nav-item"><a class="nav-link p-1" href="../uk/components-overview.html">UK</a></li>
                 <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
@@ -65,43 +65,130 @@
 
                 <h2 id="where" class="border-bottom pb-2 mb-3 mt-5">Where to put code</h2>
                 <pre class="mb-4"><code class="language-text">src/
-├── App/                    # shared application code
+├── App/                          # shared application code
+│   ├── Controllers/              # global pages (home, about)
+│   ├── Models/                   # BaseModel, shared entities
+│   └── Extensions/Twig/          # global Twig extensions
 └── Components/
-    └── AuthAdmin/          # example module
+    └── AuthAdmin/                # example module
         ├── AuthAdminComponent.php
-        ├── config.php
-        ├── routes.php
-        ├── Controllers/  Views/  Database/  ...
+        ├── config.php            # module metadata
+        ├── routes.php            # HTTP routes
+        ├── Controllers/
+        ├── Middlewares/
+        ├── Requests/  Dto/  Models/
+        ├── Services/
+        ├── Views/                # module templates (@auth-admin/...)
+        ├── Database/
+        │   ├── Migrations/
+        │   └── Seeders/
+        ├── Commands/             # console commands
+        ├── Extensions/           # Twig for the module
+        └── Assets/               # JS/CSS → public via CLI
 
-config/components.php       # active modules
-resources/views/            # shared layouts (@dashboard, @frontend)
-routes/web.php              # global routes + middleware stack</code></pre>
+config/
+└── components.php                # active modules
 
-                <h2 id="contract" class="border-bottom pb-2 mb-3 mt-5">ComponentInterface</h2>
-                <p>Component classes implement <code>ComponentInterface</code> (via <code>BaseComponent</code> in the skeleton). Key methods: <code>routes()</code>, <code>viewPaths()</code>, <code>viewContexts()</code>, <code>commands()</code>, <code>migrations()</code>, <code>seeders()</code>, <code>assets()</code>, <code>providers()</code>.</p>
-                <p>Metadata and lists are declared in the module’s <code>config.php</code>.</p>
+resources/views/                # shared layouts (@dashboard, @frontend)
+routes/web.php                  # global routes + middleware stack</code></pre>
 
-                <h2 id="registration" class="border-bottom pb-2 mb-3 mt-5">Registration</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>What</th><th>Component</th><th>Application (<code>App/</code>)</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td>Feature routes</td><td><code>Component/routes.php</code></td><td><code>routes/web.php</code></td></tr>
+                            <tr><td>Module templates</td><td><code>Component/Views/</code></td><td><code>resources/views/</code></td></tr>
+                            <tr><td>Module migrations</td><td><code>Component/Database/Migrations/</code></td><td><code>database/migrations/</code></td></tr>
+                            <tr><td>Base model, utilities</td><td>—</td><td><code>App/Models/</code></td></tr>
+                            <tr><td>Shared admin layout</td><td>extends <code>@dashboard/...</code></td><td><code>resources/views/dashboard/</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h2 id="contract" class="border-bottom pb-2 mb-3 mt-5">ComponentInterface contract</h2>
+                <p>The component class implements <code>Concept\Core\Components\Component\Contracts\ComponentInterface</code> (for example via <code>BaseComponent</code>):</p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Method</th><th>Purpose</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>name()</code>, <code>version()</code>, <code>description()</code></td><td>Metadata for <code>component:list</code></td></tr>
+                            <tr><td><code>routes()</code></td><td>Absolute path to <code>routes.php</code> or <code>null</code></td></tr>
+                            <tr><td><code>providers()</code></td><td>Additional module service providers</td></tr>
+                            <tr><td><code>viewPaths()</code></td><td>Twig namespace → path (<code>auth-admin</code> → <code>/src/Components/.../Views</code>)</td></tr>
+                            <tr><td><code>viewContexts()</code></td><td>URI prefix → context (<code>/admin</code> → <code>dashboard</code>)</td></tr>
+                            <tr><td><code>viewExtensions()</code></td><td><code>Twig\Extension\ExtensionInterface</code> classes</td></tr>
+                            <tr><td><code>commands()</code></td><td>Symfony Console commands</td></tr>
+                            <tr><td><code>seeders()</code></td><td>Seeder classes</td></tr>
+                            <tr><td><code>migrations()</code></td><td>Migration directory paths</td></tr>
+                            <tr><td><code>assets()</code></td><td><code>source → public</code> map for <code>component:publish-assets</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Declare values in the module’s <code>config.php</code>; <code>BaseComponent</code> reads it via Noodlehaus Config.</p>
+
+                <h2 id="registration" class="border-bottom pb-2 mb-3 mt-5">Application registration</h2>
                 <pre class="mb-4"><code class="language-php">// config/components.php
 return [
     'components' => [
         AuthAdminComponent::class => AuthAdminComponent::class,
+        UserCabinetComponent::class => UserCabinetComponent::class,
     ],
 ];</code></pre>
-                <p>Dev-only modules can be added in <code>config/dev/components.php</code> (e.g. DebugBar).</p>
+                <p>
+                    Both key and value are the component class FQCN (the container creates the instance via DI).
+                    In <code>config/dev/components.php</code> you can add dev-only modules (for example DebugBar).
+                </p>
+                <p>
+                    Class names are stored in <code>ComponentRegistry</code> when
+                    <code>ComponentsServiceProvider</code> is registered (last in <code>bootstrap/providers/app.php</code>).
+                </p>
 
-                <h2 id="boot" class="border-bottom pb-2 mb-3 mt-5">Boot sequence</h2>
-                <p><code>ComponentsServiceProvider::boot()</code> registers commands, migrations, seeders, nested providers, requires <code>routes.php</code> files, and (in HTTP) Twig paths/extensions/contexts.</p>
+                <h2 id="boot" class="border-bottom pb-2 mb-3 mt-5">What happens on boot</h2>
+                <p><code>ComponentsServiceProvider::boot()</code> for each active component:</p>
+                <ol>
+                    <li>Dispatches the <code>ComponentRegistering</code> event</li>
+                    <li>Registers console commands, migration paths, and seeders</li>
+                    <li>Boots nested service providers from <code>config.php</code></li>
+                    <li><code>require</code>s <code>routes.php</code> files (<code>$router</code> is available)</li>
+                    <li>In HTTP (not CLI) — adds Twig paths, extensions, and view contexts</li>
+                </ol>
+                <p>Order: core providers → <code>ComponentsServiceProvider</code> → module routes and views.</p>
 
                 <h2 id="migrate-code" class="border-bottom pb-2 mb-3 mt-5">Moving existing code into a component</h2>
+                <p>Typical refactor from a flat <code>App/</code> layout:</p>
                 <ol>
-                    <li>Create <code>src/Components/MyFeature/</code> following AuthAdmin layout.</li>
-                    <li>Move controllers, models, requests, views; update namespaces.</li>
-                    <li>Extract routes to <code>MyFeature/routes.php</code>.</li>
-                    <li>Add <code>MyFeatureComponent</code> + <code>config.php</code>.</li>
-                    <li>Register in <code>config/components.php</code>.</li>
-                    <li>Keep shared code in <code>App/</code> and <code>resources/views/</code>.</li>
+                    <li>Create <code>src/Components/MyFeature/</code> with subdirectories following AuthAdmin.</li>
+                    <li>Move controllers, models, FormRequest, views, and middleware into the component; update namespaces to <code>Concept\Components\MyFeature\...</code>.</li>
+                    <li>Move feature routes from <code>routes/web.php</code> to <code>MyFeature/routes.php</code>.</li>
+                    <li>Add <code>MyFeatureComponent.php</code> (extends <code>BaseComponent</code>) and <code>config.php</code>.</li>
+                    <li>Register the class in <code>config/components.php</code>.</li>
+                    <li>Keep only shared code in <code>App/</code>: BaseModel, global layouts, utilities.</li>
+                    <li>Run <code>php bin/console.php db:migrate</code> and <code>component:publish-assets</code> when needed.</li>
                 </ol>
+                <p>
+                    If the module uses a shared layout (<code>@dashboard</code>), leave templates in
+                    <code>resources/views/dashboard/</code> — the component only <code>extends</code> them in Twig.
+                </p>
+
+                <h2 id="vs-app" class="border-bottom pb-2 mb-3 mt-5">Component vs App code</h2>
+                <p>You do not have to move everything into components. Keep in <code>App/</code>:</p>
+                <ul>
+                    <li>landing pages, static pages, shared API gateway;</li>
+                    <li>base model classes, interfaces, cross-module services;</li>
+                    <li>global Twig namespaces (<code>frontend</code>, <code>dashboard</code>) in <code>config/view.php</code>.</li>
+                </ul>
+                <p>Use a separate component when there is a clear boundary: “admin panel”, “user cabinet”, “project catalog”.</p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        One component — one responsibility. If two modules import each other directly,
+                        move shared code to <code>App/</code> or a separate application “core” package.
+                    </p>
+                </div>
 
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>

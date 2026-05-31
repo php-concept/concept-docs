@@ -18,7 +18,7 @@
             </button>
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
-            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
                 <li class="nav-item"><a class="nav-link p-1 active" href="../en/creating-components.html">EN</a></li>
                 <li class="nav-item"><a class="nav-link p-1" href="../uk/creating-components.html">UK</a></li>
                 <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
@@ -44,57 +44,167 @@
                 <h1 class="display-6 fw-bold mb-4">Creating a Component</h1>
 
                 <p>
-                    Step-by-step walkthrough based on <strong>AuthAdmin</strong> in the skeleton: admin login,
-                    dashboard, user CRUD, migrations, seeder, and CLI command.
+                    Step-by-step example based on <strong>AuthAdmin</strong>: admin login,
+                    dashboard, user CRUD, migrations, seeder, and a CLI command.
                 </p>
+                <p>Prerequisites: <a href="components-overview.html">component concept</a>, global middleware in <code>routes/web.php</code>.</p>
 
-                <h2 id="step-1" class="border-bottom pb-2 mb-3 mt-5">1. Component class</h2>
-                <pre class="mb-4"><code class="language-php">class AuthAdminComponent extends BaseComponent implements ComponentInterface
+                <h2 id="step-1" class="border-bottom pb-2 mb-3 mt-5">1. Directory and component class</h2>
+                <pre class="mb-4"><code class="language-php">// src/Components/AuthAdmin/AuthAdminComponent.php
+namespace Concept\Components\AuthAdmin;
+
+use Concept\Components\BaseComponent;
+use Concept\Core\Components\Component\Contracts\ComponentInterface;
+
+class AuthAdminComponent extends BaseComponent implements ComponentInterface
 {
     protected string $componentDir = __DIR__;
 }</code></pre>
+                <p><code>$componentDir</code> points at the module root — <code>config.php</code> is read from here and the path to <code>routes.php</code> is built.</p>
 
-                <h2 id="step-2" class="border-bottom pb-2 mb-3 mt-5">2. config.php</h2>
-                <pre class="mb-4"><code class="language-php">return [
+                <h2 id="step-2" class="border-bottom pb-2 mb-3 mt-5">2. Module config.php</h2>
+                <pre class="mb-4"><code class="language-php">// src/Components/AuthAdmin/config.php
+return [
     'name' => 'AuthAdmin',
-    'migrations' => ['paths' => ['src/Components/AuthAdmin/Database/Migrations']],
+    'description' => 'Admin authentication, dashboard and user management.',
+    'version' => '1.0.0',
+    'seeders' => [
+        'list' => [UserSeeder::class],
+    ],
+    'migrations' => [
+        'paths' => ['src/Components/AuthAdmin/Database/Migrations'],
+    ],
+    'commands' => [UserListCommand::class],
     'view' => [
-        'paths' => ['auth-admin' => '/src/Components/AuthAdmin/Views'],
-        'contexts' => ['/admin' => 'dashboard'],
+        'extensions' => [TwigExtension::class],
+        'paths' => [
+            'auth-admin' => '/src/Components/AuthAdmin/Views',
+        ],
+        'contexts' => [
+            '/admin' => 'dashboard',
+        ],
     ],
     'assets' => [
         'src/Components/AuthAdmin/Assets/admin-tokens.js'
             => 'public/components/auth-admin/js/admin-tokens.js',
     ],
 ];</code></pre>
+                <ul class="small">
+                    <li><code>view.paths</code> — template <code>@auth-admin/login</code> → <code>Views/login.twig</code></li>
+                    <li><code>view.contexts</code> — URLs under <code>/admin</code> get <code>route_namespace = dashboard</code> (see <a href="views.html#route-namespace">Views</a>)</li>
+                    <li><code>providers</code> — optional, as in DebugBar</li>
+                </ul>
 
-                <h2 id="step-3" class="border-bottom pb-2 mb-3 mt-5">3. Register in config/components.php</h2>
-                <pre class="mb-4"><code class="language-php">AuthAdminComponent::class => AuthAdminComponent::class,</code></pre>
+                <h2 id="step-3" class="border-bottom pb-2 mb-3 mt-5">3. Register in the application</h2>
+                <pre class="mb-4"><code class="language-php">// config/components.php
+use Concept\Components\AuthAdmin\AuthAdminComponent;
 
-                <h2 id="step-4" class="border-bottom pb-2 mb-3 mt-5">4. routes.php</h2>
-                <p>Public <code>/admin/login</code> without auth middleware; protected groups use <code>AuthMiddleware::class</code>.</p>
+return [
+    'components' => [
+        AuthAdminComponent::class => AuthAdminComponent::class,
+    ],
+];</code></pre>
 
-                <h2 id="step-5" class="border-bottom pb-2 mb-3 mt-5">5–7. Middleware, controllers, views</h2>
-                <p><code>AdminController</code> uses <code>LoginRequest</code>, <code>AuthService</code>, and <code>@auth-admin/login</code> extending <code>@dashboard/layouts/auth.twig</code>.</p>
+                <h2 id="step-4" class="border-bottom pb-2 mb-3 mt-5">4. Routes</h2>
+                <pre class="mb-4"><code class="language-php">// src/Components/AuthAdmin/routes.php
+/** @var Router $router */
+
+$router->get('/admin/login', [AdminController::class, 'showLogin'])->setName('admin.login');
+$router->post('/admin/login', [AdminController::class, 'login'])->setName('admin.login.submit');
+
+$router->group('/admin', function (RouteGroup $route) {
+    $route->get('/dashboard', [AdminController::class, 'index'])->setName('admin.dashboard');
+    $route->get('/logout', [AdminController::class, 'logout'])->setName('admin.logout');
+})->lazyMiddleware(AuthMiddleware::class);
+
+$router->group('/admin/users', function (RouteGroup $route) {
+    $route->get('/', [UserController::class, 'index'])->setName('admin.users');
+    $route->post('/store', [UserController::class, 'store'])->setName('admin.user.store');
+    // ...
+})->lazyMiddleware(AuthMiddleware::class);</code></pre>
+                <p>
+                    Public login has no <code>AuthMiddleware</code>; protected groups use the module middleware.
+                    Route names (<code>admin.*</code>) are used in <code>redirectByName()</code> and Twig <code>path()</code>.
+                </p>
+
+                <h2 id="step-5" class="border-bottom pb-2 mb-3 mt-5">5. Auth middleware</h2>
+                <pre class="mb-4"><code class="language-php">// Middlewares/AuthMiddleware.php — session check, admin role, ACTIVE status
+public function process(...): ResponseInterface
+{
+    if (!$this->auth->check()) {
+        return new RedirectResponse('/admin/login', HttpStatusCode::FOUND);
+    }
+    // ...
+    return $handler->handle($request);
+}</code></pre>
+                <p>The class is registered in DI automatically; League Route creates instances via the container.</p>
+
+                <h2 id="step-6" class="border-bottom pb-2 mb-3 mt-5">6. Controller and FormRequest</h2>
+                <pre class="mb-4"><code class="language-php">// Controllers/AdminController.php
+public function login(LoginRequest $request): ResponseInterface
+{
+    $loginDto = $request->toDto();
+    if ($loginDto && $this->auth->attempt($loginDto->email, $loginDto->password, $loginDto->remember)) {
+        return $this->response->redirectByName('admin.dashboard');
+    }
+    return $this->response->redirectByName('admin.login');
+}
+
+public function showLogin(): ResponseInterface
+{
+    return $this->viewResponse->create('@auth-admin/login');
+}</code></pre>
+                <p>
+                    <code>LoginRequest</code> holds validation rules and a DTO; CSRF and
+                    <code>HandleValidationExceptionMiddleware</code> work like for any controller.
+                </p>
+
+                <h2 id="step-7" class="border-bottom pb-2 mb-3 mt-5">7. Views</h2>
+                <pre class="mb-4"><code class="language-twig">{# Views/login.twig — auth-admin namespace, App layout #}
+{% extends '@dashboard/layouts/auth.twig' %}
+
+&lt;form method="post" action="{{ path('admin.login.submit') }}"&gt;
+    &lt;input type="hidden" name="_csrf_token" value="{{ csrf_token }}"&gt;
+    ...
+&lt;/form&gt;</code></pre>
+                <p>
+                    Module templates use <code>@auth-admin/...</code>; shared admin chrome uses
+                    <code>@dashboard/...</code> from <code>resources/views/dashboard/</code>.
+                </p>
 
                 <h2 id="step-8" class="border-bottom pb-2 mb-3 mt-5">8. Database</h2>
+                <p>Migration in <code>Database/Migrations/V2026_03_24_120000_CreateUsersTable.php</code>, model <code>UserModel</code>, seeder <code>UserSeeder</code>.</p>
                 <pre class="mb-4"><code class="language-bash">php bin/console.php db:migrate
 php bin/console.php db:seed -c "Concept\Components\AuthAdmin\Database\Seeders\UserSeeder"</code></pre>
-                <p>For a single seeder, pass the <strong>full FQCN</strong> via <code>-c</code> (quoted). Short names like <code>UserSeeder</code> do not work.</p>
+                <p>
+                    For a single seeder pass the <strong>full FQCN</strong> in quotes (<code>-c</code> or
+                    <code>--class</code>). Short names like <code>UserSeeder</code> do not work.
+                    Without options, <code>db:seed</code> runs all registered seeders.
+                </p>
+                <p>Migration paths from <code>config.php</code> are added to <code>MigrationRegistry</code> when the component boots.</p>
 
-                <h2 id="step-9" class="border-bottom pb-2 mb-3 mt-5">9. Assets & CLI</h2>
+                <h2 id="step-9" class="border-bottom pb-2 mb-3 mt-5">9. Assets and CLI</h2>
                 <pre class="mb-4"><code class="language-bash">php bin/console.php component:publish-assets
 php bin/console.php component:list</code></pre>
                 <p>See <a href="component-cli.html">CLI & Assets</a> for details.</p>
 
-                <h2 id="checklist" class="border-bottom pb-2 mb-3 mt-5">Checklist</h2>
+                <h2 id="checklist" class="border-bottom pb-2 mb-3 mt-5">New component checklist</h2>
                 <ol>
-                    <li>Component class + <code>config.php</code></li>
+                    <li><code>{Name}Component.php</code> + <code>config.php</code></li>
                     <li>Entry in <code>config/components.php</code></li>
-                    <li><code>routes.php</code>, controllers, services, views</li>
+                    <li><code>routes.php</code> (if needed)</li>
+                    <li>Controllers, Services, Models, Requests/Dto</li>
+                    <li>Views + <code>view.paths</code> / <code>view.contexts</code></li>
                     <li>Migrations / seeders / commands / assets as needed</li>
-                    <li>Run migrate, publish assets, <code>route:list</code></li>
+                    <li><code>db:migrate</code>, <code>component:publish-assets</code>, <code>route:list</code></li>
                 </ol>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Copy the <code>DemoComponent</code> structure for a minimal scaffold without business logic,
+                        then fill it in following AuthAdmin.
+                    </p>
+                </div>
 
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>

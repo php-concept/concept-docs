@@ -18,9 +18,10 @@
             </button>
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
-            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="../en/views.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/views.html">UK</a></li>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link p-1 active" href="views.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/views.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -41,10 +42,325 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Views</h1>
+
                 <p>
-                    Full documentation is available in
-                    <a href="../uk/views.html">Ukrainian</a>.
+                    HTML in Concept Core is rendered through <strong>Twig</strong>.
+                    Templates are <code>.twig</code> files in the views directory; in the controller the response is built via
+                    <code>ViewResponseFactoryInterface::create()</code> (see <a href="responses.html#html">Responses → HTML</a>).
                 </p>
+                <p>
+                    Low-level rendering — <code>ViewInterface::render()</code> (services, error handler).
+                    View paths are configured in <code>config/view.php</code> and in component <code>config.php</code> files.
+                </p>
+
+                <h2 id="namespaces" class="border-bottom pb-2 mb-3 mt-5">Twig namespaces</h2>
+                <p>
+                    A template from the controller is specified as <code>@namespace/path/without_extension</code>.
+                    The namespace is registered in configuration:
+                </p>
+                <pre class="mb-4"><code class="language-php">// config/view.php
+'paths' =&gt; [
+    'frontend'  =&gt; '/resources/views/frontend',
+    'dashboard' =&gt; '/resources/views/dashboard',
+],
+
+// src/Components/UserCabinet/config.php
+'paths' =&gt; [
+    'cabinet' =&gt; '/src/Components/UserCabinet/Views',
+],</code></pre>
+                <p>File <code>src/Components/UserCabinet/Views/index.twig</code> → <code>@cabinet/index</code>.</p>
+                <p>
+                    The <code>resources/views</code> directory (<code>PathManager::VIEWS_DIR</code> key) is also added
+                    as a fallback without a namespace — rarely needed if all templates are in namespaced paths.
+                </p>
+
+                <h2 id="from-controller" class="border-bottom pb-2 mb-3 mt-5">Rendering from the controller</h2>
+                <pre class="mb-4"><code class="language-php">return $this-&gt;viewResponse-&gt;create('@frontend/index');
+
+return $this-&gt;viewResponse-&gt;create('@cabinet/index', [
+    'user' =&gt; $user,
+    'latestProject' =&gt; $latestProject,
+]);</code></pre>
+                <p>
+                    The second argument — variables for this request only. They are merged with the global context
+                    (<code>errors</code>, <code>old</code>, <code>flashes</code>, <code>csrf_token</code>) from
+                    <a href="middleware.html#core-middleware">ShareViewDataMiddleware</a>.
+                </p>
+
+                <h2 id="layouts" class="border-bottom pb-2 mb-3 mt-5">Layouts and partials</h2>
+                <p>Typical structure:</p>
+                <pre class="mb-4"><code class="language-text">resources/views/frontend/
+├── layouts/base.twig
+├── partials/_navbar.twig
+├── partials/_flash.twig
+└── index.twig
+
+src/Components/UserCabinet/Views/
+├── layouts/cabinet.twig
+├── layouts/auth.twig
+└── index.twig</code></pre>
+                <pre class="mb-4"><code class="language-twig">{# index.twig #}
+{% extends '@frontend/layouts/base.twig' %}
+
+{% block title %}Головна{% endblock %}
+
+{% block body %}
+    &lt;h1&gt;Контент&lt;/h1&gt;
+{% endblock %}</code></pre>
+                <pre class="mb-4"><code class="language-twig">{# Підключення фрагмента #}
+{% include '@frontend/partials/_flash.twig' %}</code></pre>
+                <p>
+                    Component pages often extend a shared layout from another namespace
+                    (for example admin: <code>@auth-admin/users/list.twig</code> → <code>@dashboard/layouts/base.twig</code>).
+                </p>
+
+                <h2 id="twig-urls" class="border-bottom pb-2 mb-3 mt-5">URLs in templates</h2>
+                <p><code>UrlExtension</code> extension (<code>config/view.php</code>):</p>
+                <pre class="mb-4"><code class="language-twig">&lt;a href="{{ path('architecture') }}"&gt;Architecture&lt;/a&gt;
+&lt;a href="{{ route('cabinet.login') }}"&gt;Login&lt;/a&gt;
+&lt;a href="{{ path('admin.user.edit', { id: user.id }) }}"&gt;Edit&lt;/a&gt;
+&lt;link rel="canonical" href="{{ base_url() }}"&gt;</code></pre>
+                <ul class="small">
+                    <li><code>path()</code> — relative path by route name</li>
+                    <li><code>route()</code> — full URL</li>
+                    <li><code>base_url()</code> — application base</li>
+                </ul>
+                <p>More on route names — <a href="routing.html#named-routes">routing</a>.</p>
+
+                <h2 id="globals" class="border-bottom pb-2 mb-3 mt-5">Global variables and flash</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Variable</th><th>Source</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>errors</code></td><td>Validation errors (flash)</td></tr>
+                            <tr><td><code>old</code></td><td>Previous input after failed validation</td></tr>
+                            <tr><td><code>flashes</code></td><td>All flash messages (<code>success</code>, <code>error</code>…)</td></tr>
+                            <tr><td><code>csrf_token</code></td><td>Token for forms</td></tr>
+                            <tr><td><code>route_namespace</code></td><td>UI context by URI prefix — <a href="#route-namespace">details</a></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <pre class="mb-4"><code class="language-twig">&lt;input name="email" value="{{ old.email|default('') }}"
+       class="input {{ errors.email is defined and errors.email ? 'is-invalid' : '' }}"&gt;
+{% if errors.email is defined and errors.email is not empty %}
+    &lt;div class="field-error" role="alert"&gt;
+        {{ errors.email is iterable ? errors.email|join(', ') : errors.email }}
+    &lt;/div&gt;
+{% endif %}</code></pre>
+                <p>Flash messages:</p>
+                <pre class="mb-4"><code class="language-twig">{% if flashes is defined and flashes|length &gt; 0 %}
+    {% for type, messages in flashes %}
+        {% for message in messages %}
+            &lt;div class="alert alert-{{ type == 'error' ? 'danger' : type }}"&gt;{{ message }}&lt;/div&gt;
+        {% endfor %}
+    {% endfor %}
+{% endif %}</code></pre>
+                <p>More on validation — <a href="requests.html#validation-errors">Requests & Validation</a>.</p>
+
+                <h2 id="route-namespace" class="border-bottom pb-2 mb-3 mt-5"><code>route_namespace</code></h2>
+                <p>
+                    <code>route_namespace</code> is <strong>not</strong> the same as a Twig template namespace
+                    (<code>@cabinet/index</code>). It is the <strong>logical UI context</strong>: based on the current URL,
+                    it determines which «skin» the page uses (public site, admin panel, user cabinet).
+                </p>
+                <p>
+                    The variable is available in all templates as a global: it is added by
+                    <code>ContextExtension</code> via <code>ViewContextResolver</code>.
+                </p>
+
+                <h3 id="route-namespace-why" class="mt-4">Why</h3>
+                <p>
+                    A single application has multiple zones with different layouts and styles. On 404/500 or in shared partials,
+                    you need to know <em>which set of views to include</em>, without checking the path in every Twig file.
+                </p>
+                <p><code>route_namespace</code> answers: URI prefix → context name from configuration.</p>
+
+                <h3 id="route-namespace-how" class="mt-4">How it is determined</h3>
+                <ol>
+                    <li>In <code>view.contexts</code> (application + components) a map of <strong>URI prefix → context</strong> is defined.</li>
+                    <li>
+                        <code>ViewContextResolver</code> takes the request path, iterates prefixes from longest
+                        (so <code>/admin/users</code> matches <code>/admin</code>, not <code>/</code>).
+                    </li>
+                    <li><code>ContextExtension::getGlobals()</code> returns <code>route_namespace</code> to Twig.</li>
+                </ol>
+                <pre class="mb-4"><code class="language-php">// config/view.php
+'contexts' =&gt; [
+    '/' =&gt; 'frontend',
+],
+
+// src/Components/AuthAdmin/config.php
+'contexts' =&gt; [
+    '/admin' =&gt; 'dashboard',
+],
+
+// src/Components/UserCabinet/config.php
+'contexts' =&gt; [
+    '/cabinet' =&gt; 'cabinet',
+    '/login' =&gt; 'cabinet',
+],</code></pre>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>URL</th><th><code>route_namespace</code></th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>/</code>, <code>/architecture</code></td><td><code>frontend</code></td></tr>
+                            <tr><td><code>/admin/users</code></td><td><code>dashboard</code></td></tr>
+                            <tr><td><code>/cabinet/profile</code></td><td><code>cabinet</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="route-namespace-errors" class="mt-4">Example: error pages</h3>
+                <p>
+                    You can use a single dispatcher in <code>resources/views/errors/</code> that includes 404/500
+                    for the appropriate context:
+                </p>
+                <pre class="mb-4"><code class="language-twig">{# resources/views/errors/404.twig #}
+{% include '@' ~ (route_namespace|default('frontend')) ~ '/errors/404.twig' %}</code></pre>
+                <ul>
+                    <li><code>/unknown-page</code> → <code>frontend</code> → <code>@frontend/errors/404.twig</code> (public layout)</li>
+                    <li><code>/admin/missing</code> → <code>dashboard</code> → <code>@dashboard/errors/404.twig</code> (admin layout)</li>
+                </ul>
+                <p>
+                    Public 404 extends <code>@frontend/layouts/base.twig</code>;
+                    admin — <code>@dashboard/layouts/error.twig</code>.
+                    Without <code>route_namespace</code> you would have to duplicate conditions «if /admin — one template, else another».
+                </p>
+
+                <h3 id="route-namespace-usage" class="mt-4">Other usage in Twig</h3>
+                <pre class="mb-4"><code class="language-twig">{# Різний partial залежно від зони #}
+{% if route_namespace == 'dashboard' %}
+    {% include '@dashboard/partials/_sidebar.twig' %}
+{% else %}
+    {% include '@frontend/partials/_navbar.twig' %}
+{% endif %}
+
+{# Динамічний include (ignore missing — якщо partial відсутній) #}
+{% include '@' ~ route_namespace ~ '/partials/_breadcrumbs.twig' ignore missing %}</code></pre>
+
+                <h3 id="route-namespace-nuance" class="mt-4">Important nuance</h3>
+                <p>
+                    Values in <code>contexts</code> (<code>dashboard</code>, <code>frontend</code>, <code>cabinet</code>)
+                    must match the <strong>Twig namespace</strong> where the required templates actually live.
+                </p>
+                <p>
+                    In AuthAdmin the context is named <code>dashboard</code>, not <code>auth-admin</code>: error pages
+                    and the shared admin layout are in <code>@dashboard/</code>, while CRUD content is in <code>@auth-admin/</code>.
+                </p>
+                <p>
+                    For <code>/cabinet</code> the context is <code>cabinet</code>, but there are no separate
+                    <code>Views/errors/</code> in the UserCabinet component. If you need a custom 404 in the cabinet —
+                    add <code>@cabinet/errors/404.twig</code> or change the dispatcher with a fallback to
+                    <code>frontend</code>.
+                </p>
+
+                <h2 id="config" class="border-bottom pb-2 mb-3 mt-5"><code>config/view.php</code> configuration</h2>
+                <pre class="mb-4"><code class="language-php">return [
+    'view' =&gt; [
+        'extensions' =&gt; [
+            AppExtension::class,      // has_component()
+            ContextExtension::class,  // route_namespace
+            UrlExtension::class,      // path(), route(), base_url()
+        ],
+        'paths' =&gt; [ /* namespace =&gt; шлях від кореня проєкту */ ],
+        'contexts' =&gt; [
+            '/' =&gt; 'frontend',       // URI prefix =&gt; ім'я контексту для route_namespace
+        ],
+        'cache_dir' =&gt; 'views',      // storage/cache/views у production
+    ],
+];</code></pre>
+                <ul>
+                    <li><strong>extensions</strong> — <code>Twig\Extension\AbstractExtension</code> classes, resolved from the DI container</li>
+                    <li><strong>paths</strong> — Twig namespaces for the application</li>
+                    <li><strong>contexts</strong> — URI prefix → <code>route_namespace</code> (<a href="#route-namespace">details</a>)</li>
+                    <li><strong>cache_dir</strong> — subdirectory in <code>storage/cache</code>; when <code>app.debug</code> Twig cache is disabled</li>
+                </ul>
+
+                <h2 id="components" class="border-bottom pb-2 mb-3 mt-5">Views in components</h2>
+                <p>
+                    In <code>Component/config.php</code> the <code>view</code> section: <code>paths</code>, <code>contexts</code>,
+                    optionally <code>extensions</code>. During <code>ComponentsServiceProvider::boot()</code> the data
+                    is added to registries and picked up by Twig on HTTP requests (not in CLI).
+                </p>
+                <pre class="mb-4"><code class="language-php">// AuthAdmin — власне розширення + шаблони
+'view' =&gt; [
+    'extensions' =&gt; [ TwigExtension::class ],  // auth()
+    'paths' =&gt; [
+        'auth-admin' =&gt; '/src/Components/AuthAdmin/Views',
+    ],
+    'contexts' =&gt; [
+        '/admin' =&gt; 'dashboard',
+    ],
+],</code></pre>
+                <p>
+                    In Twig: <code>{{ auth().check() }}</code> (if the component extension is enabled),
+                    <code>{{ has_component('UserCabinet') }}</code> — from <code>AppExtension</code>.
+                </p>
+
+                <h2 id="extensions" class="border-bottom pb-2 mb-3 mt-5">Custom Twig extension</h2>
+                <pre class="mb-4"><code class="language-php">class MyExtension extends AbstractExtension
+{
+    public function getFunctions(): array
+    {
+        return [
+            new TwigFunction('format_money', [$this, 'formatMoney']),
+        ];
+    }
+
+    public function getFilters(): array
+    {
+        return [
+            new TwigFilter('excerpt', [$this, 'excerpt']),
+        ];
+    }
+}</code></pre>
+                <p>
+                    Register the class in <code>view.extensions</code> (application) or component <code>view.extensions</code>.
+                    In templates: <code>{{ price|format_money }}</code>, <code>{{ format_money(price) }}</code>.
+                </p>
+
+                <h2 id="direct-render" class="border-bottom pb-2 mb-3 mt-5">Direct <code>ViewInterface</code> call</h2>
+                <pre class="mb-4"><code class="language-php">/** @var ViewInterface $view */
+$view = $container-&gt;get(ViewInterface::class);
+$html = $view-&gt;render('@frontend/errors/404', ['exception' =&gt; $e]);</code></pre>
+                <p>
+                    The <code>.twig</code> extension is added automatically if not specified.
+                    Events: <code>TemplateRendering</code>, <code>TemplateRendered</code> (telemetry).
+                    In debug — <code>DebugExtension</code> and Twig Profiler.
+                </p>
+
+                <h2 id="errors" class="border-bottom pb-2 mb-3 mt-5">Error pages</h2>
+                <p>
+                    The dispatcher <code>resources/views/errors/{code}.twig</code> via
+                    <a href="#route-namespace-errors"><code>route_namespace</code></a> includes
+                    <code>@frontend/errors/...</code> or <code>@dashboard/errors/...</code>.
+                    In production the error handler renders the same path; if the file is missing — fallback to <code>500</code>.
+                </p>
+                <p>
+                    Additional PHP fallback files — <code>resources/views/errors/fallback/</code>
+                    (<code>PathManager::ERRORS_FALLBACK_VIEWS_DIR</code>).
+                </p>
+
+                <h2 id="assets" class="border-bottom pb-2 mb-3 mt-5">Static assets in templates</h2>
+                <p>
+                    CSS/JS usually live in <code>public/</code> and are linked with absolute paths
+                    (<code>/assets/css/frontend.css</code>, <code>/vendor/bootstrap/...</code>).
+                    Components can publish assets via <code>assets</code> in <code>config.php</code>
+                    (copied to <code>public/components/...</code>).
+                </p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Keep logic (DB queries, access control) in controllers and services.
+                        In Twig — display, conditions, loops, and helper filters.
+                    </p>
+                </div>
+
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>
 

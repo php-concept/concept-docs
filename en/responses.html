@@ -18,9 +18,10 @@
             </button>
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
-            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="../en/responses.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/responses.html">UK</a></li>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/responses.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/responses.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -41,10 +42,214 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Responses</h1>
+
                 <p>
-                    Full documentation is available in
-                    <a href="../uk/responses.html">Ukrainian</a>.
+                    Every controller action returns <code>Psr\Http\Message\ResponseInterface</code> (PSR-7).
+                    After <code>Router::dispatch()</code>, the core calls <code>SapiEmitter</code> (Laminas) —
+                    headers and body are sent to the PHP SAPI (FPM, Apache, built-in server).
                 </p>
+                <p>
+                    See also:
+                    <a href="controllers.html">controllers</a>,
+                    <a href="request-lifecycle.html#response">request lifecycle → response</a>,
+                    <a href="views.html">Views</a> (Twig).
+                </p>
+
+                <h2 id="factories" class="border-bottom pb-2 mb-3 mt-5">Two factories</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Interface</th>
+                                <th>Class</th>
+                                <th>Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>ResponseFactoryInterface</code></td>
+                                <td><code>Concept\Core\Http\ResponseFactory</code></td>
+                                <td>JSON, redirect, empty response, <code>back()</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>ViewResponseFactoryInterface</code></td>
+                                <td><code>Concept\Core\Components\View\ViewResponseFactory</code></td>
+                                <td>HTML via Twig</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Both are registered in <code>HttpServiceProvider</code>. In the controller — via constructor (autowiring):</p>
+                <pre class="mb-4"><code class="language-php">public function __construct(
+    private readonly ResponseFactoryInterface $response,
+    private readonly ViewResponseFactoryInterface $viewResponse,
+) {}</code></pre>
+
+                <h2 id="html" class="border-bottom pb-2 mb-3 mt-5">HTML (Twig)</h2>
+                <pre class="mb-4"><code class="language-php">return $this-&gt;viewResponse-&gt;create('@cabinet/index', [
+    'user' =&gt; $user,
+    'projects' =&gt; $projects,
+]);</code></pre>
+                <ul>
+                    <li><code>@cabinet/index</code> — logical template name (component prefix)</li>
+                    <li>Second argument — local variables for this action</li>
+                    <li>Third argument — HTTP status code (default <code>200</code>)</li>
+                </ul>
+                <p>
+                    <code>ViewResponseFactory</code> merges data from the request attribute
+                    <code>RequestAttribute::VIEW_PAYLOAD</code> (flash, <code>errors</code>, <code>old</code>, CSRF
+                    from <a href="middleware.html#core-middleware">ShareViewDataMiddleware</a>), then renders Twig
+                    and sets <code>Content-Type: text/html</code>.
+                    See <a href="views.html">Views</a> for template details.
+                </p>
+
+                <h2 id="json" class="border-bottom pb-2 mb-3 mt-5">JSON</h2>
+                <h3 id="json-raw" class="mt-4">Arbitrary JSON — <code>json()</code></h3>
+                <pre class="mb-4"><code class="language-php">return $this-&gt;response-&gt;json([
+    'token' =&gt; bin2hex(random_bytes(32)),
+]);</code></pre>
+                <p>Body — your array as-is; default status <code>200</code>.</p>
+
+                <h3 id="json-success" class="mt-4">Consistent success — <code>jsonSuccess()</code></h3>
+                <pre class="mb-4"><code class="language-php">return $this-&gt;response-&gt;jsonSuccess(['id' =&gt; $user-&gt;getId()]);
+
+// Response (example)
+// { "status": "success", "code": 200, "data": { "id": 42 } }</code></pre>
+
+                <h3 id="json-error" class="mt-4">Consistent error — <code>jsonError()</code></h3>
+                <pre class="mb-4"><code class="language-php">return $this-&gt;response-&gt;jsonError(
+    'Resource not found',
+    HttpStatusCode::NOT_FOUND
+);
+
+// With an errors array (e.g. validation)
+return $this-&gt;response-&gt;jsonError(
+    'Validation failed',
+    HttpStatusCode::UNPROCESSABLE_ENTITY,
+    ['email' =&gt; ['The email field is required.']]
+);
+
+// { "status": "error", "code": 422, "message": "...", "errors": { ... } }</code></pre>
+                <p>The <code>errors</code> key is added only if the array is not empty.</p>
+
+                <h3 id="json-api" class="mt-4">API routes</h3>
+                <p>
+                    For JSON requests, attach to the route group (as needed):
+                    <code>ParseJsonBodyMiddleware</code> (body → <code>getParsedBody()</code>),
+                    <code>ForceJsonResponseMiddleware</code> (Accept/Content-Type JSON).
+                    See <a href="middleware.html#core-middleware">core middleware</a>.
+                </p>
+                <p>
+                    <code>RequestFormat::expectsJson()</code> determines whether the client expects JSON
+                    (<code>Accept: application/json</code> or <code>X-Requested-With: XMLHttpRequest</code>).
+                    <a href="requests.html#validation-errors">Validation errors</a> are handled the same way in middleware.
+                </p>
+
+                <h2 id="redirects" class="border-bottom pb-2 mb-3 mt-5">Redirects</h2>
+
+                <h3 id="redirect-url" class="mt-4"><code>redirect($url)</code></h3>
+                <pre class="mb-4"><code class="language-php">return $this-&gt;response-&gt;redirect('/cabinet/profile', HttpStatusCode::FOUND);</code></pre>
+                <p>Hard-coded path or full URL. Default status — <code>302 Found</code>.</p>
+
+                <h3 id="redirect-named" class="mt-4"><code>redirectByName()</code></h3>
+                <pre class="mb-4"><code class="language-php">return $this-&gt;response-&gt;redirectByName('admin.users');
+return $this-&gt;response-&gt;redirectByName('admin.user.edit', ['id' =&gt; $user-&gt;getId()]);</code></pre>
+                <p>
+                    URL is built via <code>UrlGeneratorInterface::path()</code> — relative path from a
+                    <a href="routing.html#named-routes">named route</a>. Convenient after POST (PRG).
+                </p>
+
+                <h3 id="redirect-back" class="mt-4"><code>back()</code></h3>
+                <p>Safe "go back" (not an open redirect):</p>
+                <ol class="small">
+                    <li><strong>Referer</strong> — if internal (same host or relative <code>/...</code>)</li>
+                    <li><strong><code>SAFE_BACK_URL</code></strong> — request attribute from <code>StorePreviousUrlMiddleware</code></li>
+                    <li><strong>Fallback</strong> — method argument (default <code>/</code>)</li>
+                </ol>
+                <pre class="mb-4"><code class="language-php">return $this-&gt;response-&gt;back();
+return $this-&gt;response-&gt;back(HttpStatusCode::FOUND, '/cabinet');</code></pre>
+                <p>
+                    After failed validation, <code>HandleValidationExceptionMiddleware</code> calls
+                    <code>back()</code> for HTML forms (flash + old input).
+                </p>
+
+                <h2 id="empty" class="border-bottom pb-2 mb-3 mt-5">Empty and custom responses</h2>
+                <pre class="mb-4"><code class="language-php">use Concept\Core\Http\Protocol\HttpStatusCode;
+
+$response = $this-&gt;response-&gt;createResponse(HttpStatusCode::NO_CONTENT);
+// or CREATED, NOT_FOUND, etc. — no body</code></pre>
+                <p>
+                    <code>createResponse()</code> — from PSR-17; for a custom body, write to
+                    <code>$response-&gt;getBody()</code> and add headers via <code>withHeader()</code>.
+                    In normal code, the factory methods above are sufficient.
+                </p>
+
+                <h2 id="status-codes" class="border-bottom pb-2 mb-3 mt-5">Status codes</h2>
+                <p>Constants in <code>Concept\Core\Http\Protocol\HttpStatusCode</code>:</p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Constant</th><th>Code</th><th>Typical use</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>OK</code></td><td>200</td><td>Successful response</td></tr>
+                            <tr><td><code>CREATED</code></td><td>201</td><td>Resource created</td></tr>
+                            <tr><td><code>NO_CONTENT</code></td><td>204</td><td>Success without body</td></tr>
+                            <tr><td><code>FOUND</code></td><td>302</td><td>Redirect (default)</td></tr>
+                            <tr><td><code>NOT_FOUND</code></td><td>404</td><td>Resource not found</td></tr>
+                            <tr><td><code>UNPROCESSABLE_ENTITY</code></td><td>422</td><td>FormRequest validation</td></tr>
+                            <tr><td><code>PAGE_EXPIRED</code></td><td>419</td><td>CSRF (<code>CsrfException</code>)</td></tr>
+                            <tr><td><code>INTERNAL_SERVER_ERROR</code></td><td>500</td><td>Unhandled error</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p><code>getReasonPhrase($code)</code> — text for the PSR-7 reason phrase.</p>
+
+                <h2 id="patterns" class="border-bottom pb-2 mb-3 mt-5">Common patterns</h2>
+
+                <h3 id="pattern-prg" class="mt-4">POST → redirect (PRG)</h3>
+                <pre class="mb-4"><code class="language-php">public function store(StoreUserRequest $request): ResponseInterface
+{
+    $this-&gt;userModel-&gt;newQuery()-&gt;create(
+        $this-&gt;normalizeUserPayload($request-&gt;validated())
+    );
+    $this-&gt;flashBag-&gt;add('success', 'User successfully created');
+
+    return $this-&gt;response-&gt;redirectByName('admin.users');
+}</code></pre>
+
+                <h3 id="pattern-not-found" class="mt-4">Not found → flash + redirect</h3>
+                <pre class="mb-4"><code class="language-php">if (!($user instanceof UserModel)) {
+    $this-&gt;flashBag-&gt;add('error', 'User not found');
+    return $this-&gt;response-&gt;redirectByName('admin.users');
+}
+
+return $this-&gt;viewResponse-&gt;create('@auth-admin/users/show', ['user' =&gt; $user]);</code></pre>
+
+                <h3 id="pattern-api" class="mt-4">JSON endpoint</h3>
+                <pre class="mb-4"><code class="language-php">public function generateTokenApi(): ResponseInterface
+{
+    return $this-&gt;response-&gt;json([
+        'token' =&gt; bin2hex(random_bytes(32)),
+    ]);
+}</code></pre>
+
+                <h2 id="framework-responses" class="border-bottom pb-2 mb-3 mt-5">Responses without a controller</h2>
+                <p>Some responses are produced in middleware or the error handler:</p>
+                <ul>
+                    <li><strong>Validation</strong> — <code>HandleValidationExceptionMiddleware</code>: JSON 422 or <code>back()</code></li>
+                    <li><strong>CSRF</strong> — <code>CsrfException</code> (code 419), handled by the error handler</li>
+                    <li><strong>Production / API errors</strong> — Whoops + <code>jsonError()</code> per <code>RequestFormat</code></li>
+                </ul>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Do not use <code>echo</code> or <code>header()</code> in a controller — only
+                        <code>ResponseInterface</code>. Otherwise the emitter and middleware (for example DebugBar) cannot
+                        process the response correctly.
+                    </p>
+                </div>
+
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>
 

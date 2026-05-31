@@ -18,9 +18,10 @@
             </button>
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
-            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="../en/middleware.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/middleware.html">UK</a></li>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/middleware.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/middleware.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -41,10 +42,157 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Middleware</h1>
+
                 <p>
-                    Full documentation is available in
-                    <a href="../uk/middleware.html">Ukrainian</a>.
+                    Middleware is a layer between routing and the controller: it filters the request, adds context,
+                    catches exceptions, or modifies the response. Concept Core uses
+                    <code>Psr\Http\Server\MiddlewareInterface</code> (PSR-15) and League Route
+                    <code>lazyMiddleware()</code>.
                 </p>
+                <p>
+                    See also: <a href="request-lifecycle.html#middleware">request lifecycle → middleware</a>,
+                    <a href="routing.html#middleware">registration on routes</a>.
+                </p>
+
+                <h2 id="contract" class="border-bottom pb-2 mb-3 mt-5">PSR-15 contract</h2>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+namespace App\Http\Middlewares;
+
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\MiddlewareInterface;
+use Psr\Http\Server\RequestHandlerInterface;
+
+final class ExampleMiddleware implements MiddlewareInterface
+{
+    public function process(
+        ServerRequestInterface $request,
+        RequestHandlerInterface $handler
+    ): ResponseInterface {
+        // Before controller: checks, modifying $request
+
+        $response = $handler->handle($request);
+
+        // After controller: headers, logging
+
+        return $response;
+    }
+}</code></pre>
+                <p>
+                    The class is registered in the container; League Route creates an instance via DI when calling
+                    <code>lazyMiddleware(MyMiddleware::class)</code>.
+                </p>
+
+                <h2 id="registration" class="border-bottom pb-2 mb-3 mt-5">Where to attach</h2>
+                <ul>
+                    <li><strong>Global</strong> — at the top of <code>routes/web.php</code> (all routes in the file).</li>
+                    <li><strong>Group</strong> — <code>$router->group(...)->lazyMiddleware(...)</code>.</li>
+                    <li><strong>Single route</strong> — chain after <code>get()</code> / <code>post()</code>.</li>
+                    <li><strong>Component</strong> — in <code>Component/routes.php</code> (for example DebugBar in dev).</li>
+                </ul>
+                <p>Registration order determines wrapping order: the first middleware added is the outer layer (runs first on the way in).</p>
+
+                <h2 id="core-middleware" class="border-bottom pb-2 mb-3 mt-5">Core middleware</h2>
+                <p>Classes in <code>Concept\Core\Http\Middlewares</code>:</p>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Class</th>
+                                <th>Purpose</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>HandleValidationExceptionMiddleware</code></td>
+                                <td>Catches <code>ValidationException</code>: JSON 422 or flash + redirect back</td>
+                            </tr>
+                            <tr>
+                                <td><code>VerifyCsrfTokenMiddleware</code></td>
+                                <td>CSRF for POST, PUT, DELETE</td>
+                            </tr>
+                            <tr>
+                                <td><code>StorePreviousUrlMiddleware</code></td>
+                                <td>Stores URL in session for <code>back()</code> / safe redirect</td>
+                            </tr>
+                            <tr>
+                                <td><code>ShareViewDataMiddleware</code></td>
+                                <td>Flash, validation errors, <code>csrf_token</code> in Twig</td>
+                            </tr>
+                            <tr>
+                                <td><code>ParseJsonBodyMiddleware</code></td>
+                                <td>Parses JSON body into <code>getParsedBody()</code> (API)</td>
+                            </tr>
+                            <tr>
+                                <td><code>ForceJsonResponseMiddleware</code></td>
+                                <td>Forces Accept/Content-Type JSON</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="global-stack" class="mt-4">Typical global stack</h3>
+                <p>In <code>routes/web.php</code>, middleware is often attached in this order:</p>
+                <pre class="mb-4"><code class="language-php">$router->lazyMiddleware(HandleValidationExceptionMiddleware::class);
+$router->lazyMiddleware(VerifyCsrfTokenMiddleware::class);
+$router->lazyMiddleware(StorePreviousUrlMiddleware::class);
+$router->lazyMiddleware(ShareViewDataMiddleware::class);</code></pre>
+                <ol class="small">
+                    <li>Outer validation try/catch</li>
+                    <li>CSRF check before state changes</li>
+                    <li>URL capture before rendering</li>
+                    <li>Template data preparation</li>
+                </ol>
+
+                <h2 id="csrf" class="border-bottom pb-2 mb-3 mt-5">CSRF</h2>
+                <p>
+                    The token is stored in the session (<code>CsrfTokenManager</code>). In forms — the
+                    <code>_csrf_token</code> field; for AJAX — headers <code>X-CSRF-TOKEN</code> or
+                    <code>X-XSRF-TOKEN</code>.
+                </p>
+                <pre class="mb-4"><code class="language-twig">&lt;input type="hidden" name="_csrf_token" value="{{ csrf_token }}"&gt;</code></pre>
+                <p>The <code>csrf_token</code> Twig variable is provided by <code>ShareViewDataMiddleware</code>.</p>
+
+                <h2 id="auth-middleware" class="border-bottom pb-2 mb-3 mt-5">Authorization middleware (example)</h2>
+                <p>In the application — custom classes on route groups:</p>
+                <ul>
+                    <li><code>AuthMiddleware</code> — admin area: session, admin role, ACTIVE status</li>
+                    <li><code>ActiveUserMiddleware</code> — user cabinet: authentication, pending/blocked statuses</li>
+                </ul>
+                <p>On failure — redirect to login (often <code>redirectByName('cabinet.login')</code>), without running the controller.</p>
+                <pre class="mb-4"><code class="language-php">$router->group('/cabinet', function (RouteGroup $route) {
+  // ...
+})->lazyMiddleware(ActiveUserMiddleware::class);</code></pre>
+
+                <h2 id="request-attributes" class="border-bottom pb-2 mb-3 mt-5">Request attributes</h2>
+                <p>Middleware can pass data downstream via <code>$request->withAttribute()</code>:</p>
+                <ul>
+                    <li><code>RequestAttribute::VIEW_PAYLOAD</code> — context for Twig</li>
+                    <li><code>RequestAttribute::SAFE_BACK_URL</code> — safe URL for <code>ResponseFactory::back()</code></li>
+                </ul>
+                <p>The controller or <code>ViewResponseFactory</code> reads attributes from the PSR-7 request.</p>
+
+                <h2 id="custom" class="border-bottom pb-2 mb-3 mt-5">Custom middleware</h2>
+                <ol>
+                    <li>Create a class implementing <code>MiddlewareInterface</code>.</li>
+                    <li>Dependencies — via constructor (the container injects them automatically).</li>
+                    <li>Attach with <code>lazyMiddleware</code> globally, on a group, or on a route.</li>
+                    <li>Check order relative to CSRF, auth, and the validation handler.</li>
+                </ol>
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Middleware should be "narrow": one responsibility. Complex business logic belongs in a service
+                        or controller.
+                    </p>
+                </div>
+
+                <h2 id="cli" class="border-bottom pb-2 mb-3 mt-5">Listing middleware</h2>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php route:list
+php bin/console.php route:list -F</code></pre>
+                <p>The middleware column shows global and local classes for each route.</p>
+
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>
 

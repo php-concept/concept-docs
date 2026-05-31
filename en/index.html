@@ -18,9 +18,10 @@
             </button>
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
-            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="index.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/index.html">UK</a></li>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link p-1 active" href="index.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/index.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -45,19 +46,17 @@
                 <ul>
                     <li><a href="#introduction">Introduction</a></li>
                     <li><a href="#why-concept">Why Concept?</a></li>
+                    <li><a href="#official-docs">Official Library Documentation</a></li>
                     <li><a href="#learning-concept">Learning Concept</a></li>
                 </ul>
 
                 <h2 id="introduction" class="border-bottom pb-2 mb-3 mt-5">Introduction</h2>
                 <p>
-                    Concept Core is the kernel of the PHP Concept framework. It provides the application bootstrap,
-                    service container, HTTP layer, routing, views, validation, and pluggable components that applications
-                    build upon.
+                    Concept Core is the kernel of the PHP Concept framework. It provides application bootstrap,
+                    service container, HTTP layer, routing, views, validation, and pluggable components.
                 </p>
                 <p>
-                    This documentation covers the <code>php-concept/core</code> package — the foundation used by
-                    skeleton applications and custom projects. For application-level topics (components, modules, deployment),
-                    refer to your project documentation.
+                    This documentation describes the <code>php-concept/core</code> package — the foundation for your own solutions.
                 </p>
 
                 <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
@@ -71,21 +70,94 @@
 
                 <h2 id="why-concept" class="border-bottom pb-2 mb-3 mt-5">Why Concept?</h2>
                 <p>
-                    Concept is designed for developers who want a modern PHP stack without the weight of a full monolith.
-                    The core is explicit, composable, and PSR-friendly:
+                    Concept is built for developers who need a modern PHP stack without the weight of a monolith:
                 </p>
                 <ul>
-                    <li><strong>League Container</strong> for dependency injection</li>
-                    <li><strong>League Route</strong> for HTTP routing</li>
-                    <li><strong>Twig</strong> for templating</li>
-                    <li><strong>Illuminate Database</strong> when you need Eloquent-style models</li>
-                    <li><strong>Valinor</strong> for mapping request data to DTOs</li>
+                    <li><strong>League Container</strong> — dependency injection</li>
+                    <li><strong>League Route</strong> — HTTP routing</li>
+                    <li><strong>Twig</strong> — templating</li>
+                    <li><strong>Illuminate Database</strong> — Eloquent-style models</li>
+                    <li><strong>Valinor</strong> — mapping request data to DTOs</li>
                 </ul>
+
+                <h2 id="official-docs" class="border-bottom pb-2 mb-3 mt-5">Official Library Documentation</h2>
+                <p>Concept Core integrates these packages; API details are in their docs:</p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                        <tr><th>Library</th><th>Role in Concept Core</th><th>Documentation</th></tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td>League Container</td>
+                            <td>DI, bindings, service providers</td>
+                            <td><a href="https://container.thephpleague.com/" target="_blank" rel="noopener">container.thephpleague.com</a></td>
+                        </tr>
+                        <tr>
+                            <td>League Route</td>
+                            <td>Routes, middleware, resolving controllers from the container</td>
+                            <td><a href="https://route.thephpleague.com/" target="_blank" rel="noopener">route.thephpleague.com</a></td>
+                        </tr>
+                        <tr>
+                            <td>Laminas Diactoros</td>
+                            <td>PSR-7 requests/responses</td>
+                            <td><a href="https://docs.laminas.dev/laminas-diactoros/" target="_blank" rel="noopener">laminas-diactoros</a></td>
+                        </tr>
+                        <tr>
+                            <td>PSR-7 / PSR-15</td>
+                            <td>HTTP message, middleware</td>
+                            <td>
+                                <a href="https://www.php-fig.org/psr/psr-7/" target="_blank" rel="noopener">PSR-7</a>,
+                                <a href="https://www.php-fig.org/psr/psr-15/" target="_blank" rel="noopener">PSR-15</a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Twig</td>
+                            <td>HTML templates</td>
+                            <td><a href="https://twig.symfony.com/doc/" target="_blank" rel="noopener">twig.symfony.com</a></td>
+                        </tr>
+                        <tr>
+                            <td>League Event</td>
+                            <td>Core events, telemetry</td>
+                            <td><a href="https://event.thephpleague.com/" target="_blank" rel="noopener">event.thephpleague.com</a></td>
+                        </tr>
+                        <tr>
+                            <td>Symfony HttpFoundation</td>
+                            <td>Session, flash</td>
+                            <td><a href="https://symfony.com/doc/current/components/http_foundation.html" target="_blank" rel="noopener">HttpFoundation</a></td>
+                        </tr>
+                        <tr>
+                            <td>Monolog</td>
+                            <td>Logging, <code>LoggerInterface</code></td>
+                            <td><a href="https://github.com/Seldaek/monolog" target="_blank" rel="noopener">github.com/Seldaek/monolog</a></td>
+                        </tr>
+                        <tr>
+                            <td>phpdotenv</td>
+                            <td><code>.env</code> → config</td>
+                            <td><a href="https://github.com/vlucas/phpdotenv" target="_blank" rel="noopener">vlucas/phpdotenv</a></td>
+                        </tr>
+                        <tr>
+                            <td>Illuminate Database</td>
+                            <td>Eloquent / Capsule, migrations</td>
+                            <td><a href="https://laravel.com/docs/eloquent" target="_blank" rel="noopener">Eloquent</a></td>
+                        </tr>
+                        <tr>
+                            <td>Rakit Validation</td>
+                            <td>FormRequest validation, field rules</td>
+                            <td><a href="https://github.com/rakit/validation" target="_blank" rel="noopener">github.com/rakit/validation</a></td>
+                        </tr>
+                        <tr>
+                            <td>Valinor</td>
+                            <td>Mapping <code>validated()</code> to DTOs</td>
+                            <td><a href="https://valinor.cuyz.io/latest/" target="_blank" rel="noopener">valinor.cuyz.io</a></td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
 
                 <h2 id="learning-concept" class="border-bottom pb-2 mb-3 mt-5">Learning Concept</h2>
                 <p>
-                    In addition to this documentation, read the source in
-                    <code>vendor/php-concept/core</code> and explore a skeleton application.
+                    Review the code in <code>vendor/php-concept/core</code> and the skeleton application.
                 </p>
 
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
