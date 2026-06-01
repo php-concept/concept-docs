@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Встановлення Concept Core через Composer">
+    <meta name="description" content="Встановлення Concept Core через Concept Skeleton — швидкий старт, Docker, вимоги">
     <title>Встановлення - Concept Core Documentation</title>
     <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
@@ -43,49 +43,93 @@
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Встановлення</h1>
 
-                <h2 id="meet-php" class="border-bottom pb-2 mb-3 mt-5">Знайомство з Concept</h2>
                 <p>
-                    Найкращий спосіб почати — skeleton-застосунок, який уже містить
-                    <code>php-concept/core</code> та робочий bootstrap.
+                    Рекомендований спосіб почати новий проєкт — офіційний
+                    <a href="https://github.com/php-concept/concept-skeleton" rel="noopener">Concept Skeleton</a>:
+                    мінімальний застосунок з уже підключеним <code>php-concept/core</code>, bootstrap,
+                    робочим маршрутом <code>/</code> і landing-сторінкою на Twig.
+                </p>
+
+                <h2 id="skeleton" class="border-bottom pb-2 mb-3 mt-5">Concept Skeleton</h2>
+                <p>Skeleton постачає:</p>
+                <ul>
+                    <li>HTTP + Twig landing page і компонентно-орієнтовану структуру <code>src/App/</code></li>
+                    <li>Усі дванадцять провайдерів ядра, увімкнених за замовчуванням (<code>bootstrap/providers/app.php</code>)</li>
+                    <li>Каталоги <code>config/</code>, <code>routes/</code>, <code>database/</code>, <code>resources/views/</code></li>
+                    <li>Docker-оточення (Apache + MySQL) та скрипт публікації Bootstrap у <code>public/vendor/</code></li>
+                </ul>
+                <p>
+                    Альтернативні підходи до організації коду в <code>src/</code> — у розділі
+                    <a href="directory-structure.html">Структура каталогів</a>.
                 </p>
 
                 <h2 id="requirements" class="border-bottom pb-2 mb-3 mt-5">Вимоги до сервера</h2>
-                <p>Concept Core потребує:</p>
+                <p>Concept Skeleton (і Concept Core) потребують:</p>
                 <ul>
-                    <li>PHP 8.4 або новіший</li>
+                    <li>PHP <strong>8.4+</strong></li>
                     <li>Composer 2.x</li>
-                    <li>Розширення: <code>mbstring</code>, <code>json</code>, <code>pdo</code></li>
+                    <li>Розширення PHP: <code>dom</code>, <code>pdo</code>, <code>pdo_mysql</code>, <code>mysqli</code>, <code>zip</code></li>
                 </ul>
+                <p class="small text-body-secondary">
+                    Повний набір для Docker — у <code>Dockerfile</code> репозиторію skeleton.
+                    Без БД можна тимчасово вимкнути <code>DatabaseServiceProvider</code> у провайдерах.
+                </p>
 
-                <h2 id="composer" class="border-bottom pb-2 mb-3 mt-5">Встановлення через Composer</h2>
+                <h2 id="quick-start" class="border-bottom pb-2 mb-3 mt-5">Швидкий старт</h2>
+                <pre class="mb-4"><code class="language-bash">git clone https://github.com/php-concept/concept-skeleton.git my-app
+cd my-app
+
+composer install
+
+cp .env.example .env
+# Відредагуйте .env — APP_ENV, облікові дані БД тощо</code></pre>
+                <p>
+                    Document root веб-сервера має вказувати на каталог <code>public/</code>.
+                    Для локальної перевірки:
+                </p>
+                <pre class="mb-4"><code class="language-bash">php -S localhost:8080 -t public</code></pre>
+                <p>
+                    Відкрийте застосунок у браузері — маршрут <code>/</code> відобразить landing Concept Core.
+                </p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Після <code>composer install</code> скрипт <code>publish-assets</code> копіює Bootstrap
+                        і Bootstrap Icons у <code>public/vendor/</code>. Highlight.js для прикладів коду
+                        уже лежить у <code>public/libs/highlight/</code>.
+                    </p>
+                </div>
+
+                <h2 id="docker" class="border-bottom pb-2 mb-3 mt-5">Docker</h2>
+                <pre class="mb-4"><code class="language-bash">cp docker-compose.yml.example docker-compose.yml
+# Відредагуйте docker-compose.yml (container_name, volumes)
+docker compose up -d</code></pre>
+                <p>У контейнері застосунку встановіть залежності:</p>
+                <pre class="mb-4"><code class="language-bash">docker exec -it concept_skeleton bash
+composer install</code></pre>
+                <p>
+                    Apache vhost — у <code>docker/apache/vhost.conf</code> (<code>DocumentRoot</code> → <code>public/</code>).
+                    За замовчуванням застосунок доступний на порту <code>8080</code>.
+                </p>
+
+                <h2 id="existing-project" class="border-bottom pb-2 mb-3 mt-5">Ядро в існуючому проєкті</h2>
+                <p>
+                    Якщо інтегруєте Concept Core у власний репозиторій, додайте пакет через Composer
+                    і вручну створіть bootstrap, точки входу та каталоги конфігурації:
+                </p>
                 <pre class="mb-4"><code class="language-bash">composer require php-concept/core:^1.0</code></pre>
-
-                <h2 id="bootstrap" class="border-bottom pb-2 mb-3 mt-5">Bootstrap застосунку</h2>
-                <p>Створіть екземпляр застосунку у front controller (наприклад, <code>public/index.php</code>):</p>
-                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
-
-use Concept\Core\App;
-
-$app = App::create(
-    rootPath: dirname(__DIR__),
-    paths: [
-        'config' =&gt; 'config',
-        'storage' =&gt; 'storage',
-        'routes' =&gt; 'routes',
-    ],
-);
-
-$app-&gt;registerServiceProviders([
-    $app-&gt;getRootPath() . '/bootstrap/providers/app.php',
-]);
-
-$app-&gt;run();</code></pre>
+                <p>
+                    Еталонна структура та код ініціалізації — у skeleton і в розділі
+                    <a href="setup.html">Налаштування</a> (<code>public/index.php</code>, <code>bootstrap/app.php</code>,
+                    <code>bootstrap/paths.php</code>, провайдери).
+                </p>
 
                 <h2 id="next-steps" class="border-bottom pb-2 mb-3 mt-5">Наступні кроки</h2>
-                <p>
-                    Після встановлення налаштуйте середовище в
-                    <a href="configuration.html">Конфігурація</a> та зареєструйте маршрути.
-                </p>
+                <ul>
+                    <li><a href="setup.html">Налаштування</a> — bootstrap, <code>paths.php</code>, консоль</li>
+                    <li><a href="configuration.html">Конфігурація</a> — <code>.env</code>, файли <code>config/</code></li>
+                    <li><a href="directory-structure.html">Структура каталогів</a> — варіанти організації <code>src/</code></li>
+                </ul>
 
                 <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
             </main>
