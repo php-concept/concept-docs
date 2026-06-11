@@ -3,10 +3,11 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Application setup — entry points, bootstrap, paths">
+    <meta name="description" content="Bootstrap, entry points, and directory structure setup">
     <title>Setup - Concept Core Documentation</title>
     <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
     <link rel="stylesheet" href="../assets/css/docs.css">
 </head>
 <body data-page="setup">
@@ -18,8 +19,9 @@
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
             <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="setup.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/setup.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/setup.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/setup.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -40,11 +42,378 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Setup</h1>
+
                 <p>
-                    Full documentation for this page is available in
-                    <a href="../uk/setup.html">Ukrainian</a> (Налаштування).
+                    This page describes application bootstrap: HTTP and CLI entry points, <code>paths.php</code>, and service providers.
+                    If you have not installed the package yet — start with
+                    <a href="installation.html">Installation</a> (Concept Skeleton or <code>composer require php-concept/core</code>).
+                    Next — <a href="configuration.html">Configuration</a> (<code>config/</code>, <code>.env</code>).
                 </p>
-                <p>Topics covered: <code>public/index.php</code>, <code>bootstrap/</code>, <code>bootstrap/paths.php</code>, <code>bin/console.php</code>.</p>
+
+                <h2 id="core-only" class="border-bottom pb-2 mb-3 mt-5">Core only: minimal structure</h2>
+                <p>
+                    After <code>composer require php-concept/core</code> you assemble this root structure
+                    (paths can be changed in <a href="#paths-php"><code>paths.php</code></a>):
+                </p>
+                <pre class="mb-4"><code class="language-text">project/
+├── public/index.php          # HTTP front controller
+├── bin/console.php           # CLI (optional)
+├── bootstrap/
+│   ├── app.php
+│   ├── paths.php
+│   └── providers/
+│       ├── app.php           # providers for web requests
+│       └── console.php       # providers for CLI
+├── config/                   # PHP config (required for ConfigServiceProvider)
+├── routes/                   # if routes are extracted from config
+├── storage/                  # logs, cache
+└── composer.json</code></pre>
+                <p>
+                    Alternative directory layouts — in
+                    <a href="directory-structure.html">Directory structure</a>.
+                    In skeleton these files are ready; below is a breakdown of each element for your own project.
+                </p>
+
+                <h2 id="overview" class="border-bottom pb-2 mb-3 mt-5">Overview</h2>
+                <p>
+                    HTTP and CLI share <code>paths.php</code> and <code>App::create()</code>, but use
+                    <strong>different entry points and different provider lists</strong>. In skeleton, HTTP goes through
+                    <code>bootstrap/app.php</code>, while CLI builds bootstrap directly in <code>bin/console.php</code>
+                    (without <code>app.php</code>).
+                </p>
+                <p>
+                    <code>registerServiceProviders()</code> only attaches provider classes to the container.
+                    Full loading of config, routes, and services happens <em>lazy</em> — on the first
+                    container access in <code>$app-&gt;run()</code> (HTTP) or <code>$container-&gt;get(ConsoleApplication)</code> (CLI).
+                </p>
+
+                <h3 id="overview-http" class="h5 border-bottom pb-2 mb-3 mt-4">HTTP</h3>
+                <div class="docs-mermaid mb-4">
+                    <pre class="mermaid">flowchart TB
+    WS["Web server"]
+    IDX["public/index.php"]
+    AUTO["vendor/autoload.php"]
+    APP_PHP["bootstrap/app.php"]
+    PATHS["paths.php"]
+    CREATE["App::create()"]
+    EARLY["Early Whoops + PathManager"]
+    REG["registerServiceProviders()"]
+    PROV_HTTP["providers/app.php"]
+    RUN["App::run()"]
+    LAZY["Lazy provider boot"]
+    CFG["Config: .env + config/"]
+    HTTP_P["Http: PSR-7 Request, Router, routes/web.php"]
+    COMP["Components: module routes, views"]
+    DISP["Router::dispatch()"]
+    MW["Middleware"]
+    STRAT["RouteStrategy: interceptors, autowire"]
+    CTRL["Controller → PSR-7 Response"]
+    EMIT["SapiEmitter → client"]
+
+    WS --> IDX --> AUTO --> APP_PHP
+    APP_PHP --> PATHS --> CREATE --> EARLY
+    APP_PHP --> REG --> PROV_HTTP
+    IDX --> RUN
+    RUN --> LAZY --> CFG --> HTTP_P --> COMP
+    RUN --> DISP --> MW --> STRAT --> CTRL --> EMIT</pre>
+                </div>
+                <ol class="mb-4">
+                    <li><strong>public/index.php</strong> — autoload and <code>bootstrap/app.php</code>.</li>
+                    <li><strong>App::create()</strong> — League Container, <code>ReflectionContainer</code>, early Whoops, <code>PathManager</code>.</li>
+                    <li><strong>registerServiceProviders</strong> — array of classes from <code>bootstrap/providers/app.php</code>.</li>
+                    <li><strong>App::run()</strong> — resolves <code>Router</code> and <code>ServerRequest</code> from the container; providers load config, routes, Twig, session, etc.</li>
+                    <li><strong>Router::dispatch()</strong> — middleware, <code>RouteStrategy</code>, controller; response is sent by <code>SapiEmitter</code>.</li>
+                </ol>
+                <p class="small text-body-secondary mb-4">
+                    Detailed breakdown of middleware, <a href="route-interceptors.html">route interceptors</a>, and autowiring —
+                    <a href="request-lifecycle.html">Request lifecycle</a>.
+                </p>
+
+                <h3 id="overview-cli" class="h5 border-bottom pb-2 mb-3 mt-4">CLI</h3>
+                <div class="docs-mermaid mb-4">
+                    <pre class="mermaid">flowchart TB
+    BIN["bin/console.php"]
+    AUTO["vendor/autoload.php"]
+    PATHS["paths.php"]
+    CREATE["App::create()"]
+    EARLY["Early Whoops + PathManager"]
+    REG["registerServiceProviders()"]
+    PROV_CLI["providers/console.php"]
+    GET["container->get(ConsoleApplication)"]
+    LAZY["Lazy provider boot"]
+    CFG["Config: .env + config/"]
+    CON["ConsoleServiceProvider: commands from config"]
+    COMP["Components: module CLI commands"]
+    RUN["ConsoleApplication::run()"]
+    CMD["Symfony Command"]
+
+    BIN --> AUTO --> PATHS --> CREATE --> EARLY
+    BIN --> REG --> PROV_CLI
+    BIN --> GET --> LAZY --> CFG --> CON --> COMP --> RUN --> CMD</pre>
+                </div>
+                <ol class="mb-4">
+                    <li><strong>bin/console.php</strong> — autoload, <code>paths.php</code>, <code>App::create()</code> (like HTTP, but without <code>bootstrap/app.php</code>).</li>
+                    <li><strong>providers/console.php</strong> — different provider set: no Twig/Validation HTTP stack, with <code>ConsoleServiceProvider</code>.</li>
+                    <li><strong>get(ConsoleApplication)</strong> — lazy boot: config, core and component command registration.</li>
+                    <li><strong>ConsoleApplication::run()</strong> — Symfony Console runs the command (<code>db:migrate</code>, <code>route:list</code>, etc.).</li>
+                </ol>
+                <div class="alert alert-secondary border-start border-secondary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        <code>ComponentsServiceProvider</code> in CLI does not register view paths/contexts — only commands,
+                        migrations, seeders, and additional module providers.
+                    </p>
+                </div>
+
+                <h2 id="public-index" class="border-bottom pb-2 mb-3 mt-5">public/index.php</h2>
+                <p>The single public entry point for the web server (Apache, Nginx, PHP built-in server). The virtual host document root must point to <code>public/</code>.</p>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+use Concept\Core\App;
+
+require_once __DIR__ . '/../vendor/autoload.php';
+
+/** @var App $app */
+$app = require_once __DIR__ . '/../bootstrap/app.php';
+
+$app->run();</code></pre>
+                <ul>
+                    <li><strong>autoload</strong> — Composer PSR-4 (<code>vendor/autoload.php</code>).</li>
+                    <li><strong>bootstrap/app.php</strong> — creates <code>App</code>, registers providers for HTTP.</li>
+                    <li><strong>run()</strong> — handles PSR-7 request, routing, response.</li>
+                </ul>
+                <p>Static files also live in <code>public/</code> (<code>assets/</code>, <code>vendor/bootstrap</code> after publish) — they are served directly by the web server, without PHP.</p>
+
+                <h2 id="bootstrap" class="border-bottom pb-2 mb-3 mt-5">bootstrap/ directory</h2>
+                <p>
+                    Application initialization code. <code>paths.php</code> is shared for HTTP and CLI;
+                    <code>app.php</code> is used only by the web entry point. CLI duplicates
+                    <code>App::create()</code> + providers directly in <code>bin/console.php</code>.
+                </p>
+                <pre class="mb-4"><code class="language-text">bootstrap/
+├── app.php              # HTTP: App + app.php providers
+├── paths.php            # map of logical paths → project directories
+└── providers/
+    ├── app.php          # providers for web requests
+    └── console.php      # providers for console</code></pre>
+
+                <h3 id="bootstrap-app" class="mt-4">bootstrap/app.php</h3>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+use Concept\Core\App;
+
+$rootPath = dirname(__DIR__);
+/** @var array&lt;string, string&gt; $paths */
+$paths = include $rootPath . '/bootstrap/paths.php';
+$app = App::create($rootPath, $paths);
+
+$providerFiles = [
+    $rootPath . '/bootstrap/providers/app.php',
+];
+$app->registerServiceProviders($providerFiles);
+
+return $app;</code></pre>
+                <ul>
+                    <li><code>$rootPath</code> — absolute path to project root (parent of <code>bootstrap/</code>).</li>
+                    <li><code>paths.php</code> — returns array for <code>PathManager</code> (see below).</li>
+                    <li><code>App::create()</code> — container, early error handler, <code>PathManager</code> registration.</li>
+                    <li><code>registerServiceProviders()</code> — each file in the list must return an array of provider classes.</li>
+                </ul>
+
+                <h3 id="bootstrap-providers-app">bootstrap/providers/app.php</h3>
+                <p>
+                    The file returns an array of core service provider classes. Each provider registers services in the container
+                    (router, config, Twig, DB, etc.). Order in the array matters — dependencies must come before dependent services.
+                </p>
+                <p><strong>Minimum for HTTP</strong> — config and routing (requires <code>config/app.php</code>, <code>config/routes.php</code>, and a routes file):</p>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+use Concept\Core\Providers\ConfigServiceProvider;
+use Concept\Core\Providers\HttpServiceProvider;
+
+return [
+    ConfigServiceProvider::class,
+    HttpServiceProvider::class,
+];</code></pre>
+                <p>
+                    For a real application, add error, session, log, view, validation, DB, and component providers —
+                    as in
+                    <a href="https://github.com/php-concept/concept-skeleton/blob/main/bootstrap/providers/app.php" target="_blank" rel="noopener">Concept Skeleton</a>.
+                    To add your own provider — add the class to the array or a separate file in <code>$providerFiles</code> in <code>app.php</code>.
+                </p>
+
+                <h3 id="bootstrap-providers-console">bootstrap/providers/console.php</h3>
+                <p>
+                    Reduced set for CLI: no Twig/Validation HTTP stack, with <code>ConsoleServiceProvider</code>.
+                    Used with <code>bin/console.php</code>. Example from skeleton:
+                </p>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+use Concept\Core\Providers\ComponentsServiceProvider;
+use Concept\Core\Providers\ConfigServiceProvider;
+use Concept\Core\Providers\ConsoleServiceProvider;
+use Concept\Core\Providers\DatabaseServiceProvider;
+use Concept\Core\Providers\ErrorHandlerServiceProvider;
+use Concept\Core\Providers\HttpServiceProvider;
+use Concept\Core\Providers\LogServiceProvider;
+use Concept\Core\Providers\SessionServiceProvider;
+
+return [
+    ConfigServiceProvider::class,
+    ErrorHandlerServiceProvider::class,
+    HttpServiceProvider::class,
+    SessionServiceProvider::class,
+    LogServiceProvider::class,
+    DatabaseServiceProvider::class,
+    ConsoleServiceProvider::class,
+    ComponentsServiceProvider::class,
+];</code></pre>
+
+                <h2 id="paths-php" class="border-bottom pb-2 mb-3 mt-5">bootstrap/paths.php</h2>
+                <p>
+                    The central place where you <strong>define the physical project structure</strong>.
+                    The file returns an associative array: <em>logical key</em> → <em>relative path from project root</em>.
+                    The core accesses directories only through <code>PathManager::get($key)</code>, not hard-coded strings.
+                </p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        You can define folder structure as you prefer: rename directories, split code in a monorepo,
+                        or move logs to <code>var/log</code> — just change values in <code>paths.php</code>,
+                        as long as keys remain <code>PathName</code> constants.
+                    </p>
+                </div>
+
+                <p>Example from skeleton (full set of keys):</p>
+                <pre class="mb-4"><code class="language-php">&lt;?php
+
+use Concept\Core\Foundation\PathName;
+
+return [
+    PathName::BOOTSTRAP =&gt; 'bootstrap',
+    PathName::SRC =&gt; 'src',
+    PathName::CONFIG =&gt; 'config',
+    PathName::MIGRATIONS =&gt; 'database/migrations',
+    PathName::SEEDERS =&gt; 'database/seeders',
+    PathName::PUBLIC =&gt; 'public',
+    PathName::STORAGE =&gt; 'storage',
+    PathName::LOGS =&gt; 'storage/logs',
+    PathName::CACHE =&gt; 'storage/cache',
+    PathName::RESOURCES =&gt; 'resources',
+    PathName::LANG =&gt; 'resources/lang',
+    PathName::VALIDATOR_TRANSLATIONS =&gt; 'resources/lang/validator',
+    PathName::VIEWS =&gt; 'resources/views',
+    PathName::ERRORS_FALLBACK_VIEWS =&gt; 'resources/views/errors/fallback',
+];</code></pre>
+
+                <h3 id="paths-keys" class="mt-4">PathName keys</h3>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Constant (array key)</th>
+                                <th>Path in skeleton</th>
+                                <th>Used by</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>BOOTSTRAP</code></td><td><code>bootstrap</code></td><td>Reserved for bootstrap resources</td></tr>
+                            <tr><td><code>SRC</code></td><td><code>src</code></td><td>Application code (PSR-4)</td></tr>
+                            <tr><td><code>CONFIG</code></td><td><code>config</code></td><td>PHP config, <code>config/{env}/</code> overrides</td></tr>
+                            <tr><td><code>MIGRATIONS</code></td><td><code>database/migrations</code></td><td>DB migrations</td></tr>
+                            <tr><td><code>SEEDERS</code></td><td><code>database/seeders</code></td><td>Seeders</td></tr>
+                            <tr><td><code>PUBLIC</code></td><td><code>public</code></td><td>Document root, static files</td></tr>
+                            <tr><td><code>STORAGE</code></td><td><code>storage</code></td><td>Writable application data</td></tr>
+                            <tr><td><code>LOGS</code></td><td><code>storage/logs</code></td><td>Monolog, debug log</td></tr>
+                            <tr><td><code>CACHE</code></td><td><code>storage/cache</code></td><td>Twig, Valinor cache, etc.</td></tr>
+                            <tr><td><code>RESOURCES</code></td><td><code>resources</code></td><td>Resources, not only views</td></tr>
+                            <tr><td><code>LANG</code></td><td><code>resources/lang</code></td><td>Language files</td></tr>
+                            <tr><td><code>VALIDATOR_TRANSLATIONS</code></td><td><code>resources/lang/validator</code></td><td>Validation rule translations</td></tr>
+                            <tr><td><code>VIEWS</code></td><td><code>resources/views</code></td><td>Twig / Plates templates</td></tr>
+                            <tr><td><code>ERRORS_FALLBACK_VIEWS</code></td><td><code>resources/views/errors/fallback</code></td><td>Fallback error templates (production)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="paths-api" class="mt-4">PathManager API</h3>
+                <pre class="mb-4"><code class="language-php">use Concept\Core\Foundation\PathName;
+
+// Absolute path: /var/www/my-app/config
+$pathManager->get(PathName::CONFIG);
+
+// With subpath: /var/www/my-app/storage/cache/views
+$pathManager->get(PathName::CACHE, 'views');
+
+// Arbitrary path from project root
+$pathManager->root('custom/dir');</code></pre>
+                <p>
+                    The second argument to <code>get()</code> is a subdirectory inside the registered path (for example <code>view.cache_dir</code> in config
+                    is appended to <code>PathName::CACHE</code>).
+                </p>
+
+                <h3 id="paths-custom" class="mt-4">Custom directory structure</h3>
+                <p>Example: logs and cache in <code>var/</code>, code in <code>app/</code>:</p>
+                <pre class="mb-4"><code class="language-php">use Concept\Core\Foundation\PathName;
+
+return [
+    PathName::SRC =&gt; 'app',
+    PathName::CONFIG =&gt; 'etc/config',
+    PathName::LOGS =&gt; 'var/log',
+    PathName::CACHE =&gt; 'var/cache',
+    PathName::VIEWS =&gt; 'app/Resources/views',
+    // ... other keys as needed
+];</code></pre>
+                <p>After changing paths:</p>
+                <ul>
+                    <li>update <code>composer.json</code> → <code>autoload.psr-4</code> if you changed <code>PathName::SRC</code>;</li>
+                    <li>ensure the web server points to the current <code>PathName::PUBLIC</code>;</li>
+                    <li>align paths in <code>config/migrations.php</code> and <code>view.php</code> with the new structure.</li>
+                </ul>
+                <p class="small text-body-secondary">
+                    Adding new keys to <code>PathName</code> in core is needed only if a new path type will be used by core itself;
+                    for your own code, <code>$pathManager->root('my/custom/path')</code> is enough.
+                </p>
+
+                <h2 id="bin" class="border-bottom pb-2 mb-3 mt-5">bin/console.php</h2>
+                <p>CLI entry point (migrations, seeders, <code>route:list</code>, <code>view:clear</code>).</p>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+use Concept\Core\App;
+use Symfony\Component\Console\Application as ConsoleApplication;
+
+require __DIR__ . '/../vendor/autoload.php';
+
+$rootPath = dirname(__DIR__);
+$paths = include $rootPath . '/bootstrap/paths.php';
+$app = App::create($rootPath, $paths);
+
+$providerFiles = [
+    $rootPath . '/bootstrap/providers/console.php',
+];
+$app->registerServiceProviders($providerFiles);
+
+$container = $app->getContainer();
+$console = $container->get(ConsoleApplication::class);
+
+$console->run();</code></pre>
+                <p>Run from project root (as in <code>composer.json</code> → script <code>console</code>):</p>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php</code></pre>
+                <p>Differences from HTTP:</p>
+                <ul>
+                    <li>same <code>paths.php</code> and <code>App::create()</code>;</li>
+                    <li>different provider list — <code>bootstrap/providers/console.php</code>;</li>
+                    <li>instead of <code>$app->run()</code> — Symfony Console <code>Application</code> from the container.</li>
+                </ul>
+
+                <h2 id="checklist" class="border-bottom pb-2 mb-3 mt-5">New project checklist</h2>
+                <ol>
+                    <li>Install the package — <a href="installation.html#skeleton">Concept Skeleton</a> or <a href="installation.html#core-only">core only</a>.</li>
+                    <li>Create structure with <code>public/index.php</code>, <code>bootstrap/</code>, and optionally <code>bin/console.php</code>.</li>
+                    <li>Configure <a href="#paths-php"><code>bootstrap/paths.php</code></a> for your directories.</li>
+                    <li>Register providers in <a href="#bootstrap-providers-app"><code>bootstrap/providers/app.php</code></a> and <a href="#bootstrap-providers-console"><code>console.php</code></a>.</li>
+                    <li>Point the web server at <code>public/</code>, create <code>.env</code>.</li>
+                    <li>Proceed to <a href="configuration.html">Configuration</a> — <code>config/</code> and environment variables.</li>
+                </ol>
+
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>
 
@@ -55,7 +424,14 @@
     </div>
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/bash.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'dark', securityLevel: 'loose' });
+    </script>
     <script src="../assets/js/nav-en.js"></script>
     <script src="../assets/js/docs.js"></script>
 </body>

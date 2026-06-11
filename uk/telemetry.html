@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="uk" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Телеметрія — Concept Core Documentation">
+    <title>Телеметрія - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="telemetry">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Відкрити навігацію">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
+                <li class="nav-item"><a class="nav-link p-1" href="../en/telemetry.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../uk/telemetry.html">УКР</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Телеметрія</h1>
+
+                <p>
+                    Телеметрія Concept Core — збір метрик і відміток <strong>життєвого циклу</strong>
+                    (bootstrap, HTTP, шаблони, SQL) для debug і профілювання. Це не шина доменних подій:
+                    ядро не надає <code>EventDispatcherInterface</code> для бізнес-подій на кшталт
+                    <code>UserRegistered</code> — таку логіку додають у власному service provider (PSR-14, Symfony тощо).
+                </p>
+                <p>
+                    Див. також:
+                    <a href="service-providers.html#telemetry-trait">Service providers → TelemetryTrait</a>,
+                    <a href="request-lifecycle.html">життєвий цикл запиту</a>,
+                    <a href="configuration.html">конфігурація</a>.
+                </p>
+
+                <h2 id="enable" class="border-bottom pb-2 mb-3 mt-5">Увімкнення</h2>
+                <p>Ключ <code>telemetry.enabled</code> (<code>ConfigKey::TELEMETRY_ENABLED</code>):</p>
+                <pre class="mb-4"><code class="language-php">// config/telemetry.php
+return [
+    'telemetry' => [
+        'enabled' => false,
+    ],
+];
+
+// config/dev/telemetry.php — override для APP_ENV=dev
+return [
+    'telemetry' => [
+        'enabled' => true,
+    ],
+];</code></pre>
+                <p>
+                    За замовчуванням у skeleton — <code>false</code>; у dev-override — <code>true</code>.
+                    Поки прапорець вимкнено, <code>TelemetryTrait::telemetry()</code> повертає <code>null</code>
+                    і ядро не записує події (окрім місць, де колектор передають явно — див. нижче).
+                </p>
+
+                <h2 id="components" class="border-bottom pb-2 mb-3 mt-5">Компоненти телеметрії</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Клас</th><th>Роль</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>TelemetryServiceProvider</code></td>
+                                <td>Реєструє shared <code>TelemetryCollector</code> у контейнері</td>
+                            </tr>
+                            <tr>
+                                <td><code>TelemetryCollector</code></td>
+                                <td>Зберігання подій: <code>start()</code>, <code>finish()</code>, <code>mark()</code>, <code>items()</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>TelemetryTrait</code></td>
+                                <td>Доступ до колектора з урахуванням <code>telemetry.enabled</code> (у провайдерах, <code>RouteStrategy</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>TelemetryEvent</code></td>
+                                <td>Константи імен подій (рядкові ідентифікатори)</td>
+                            </tr>
+                            <tr>
+                                <td><code>TelemetryItem</code></td>
+                                <td>Один запис: контекст, <code>started_at</code>, <code>finished_at</code>, <code>duration</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>
+                    <code>TelemetryServiceProvider</code> стоїть рано в <code>bootstrap/providers/app.php</code>
+                    (після <code>ConfigServiceProvider</code> і <code>LocaleServiceProvider</code>), щоб інші
+                    провайдери могли писати телеметрію під час <code>register()</code>.
+                </p>
+
+                <h2 id="builtin-records" class="border-bottom pb-2 mb-3 mt-5">Вбудовані записи</h2>
+                <p>Ідентифікатори в <code>Concept\Core\Telemetry\TelemetryEvent</code>:</p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Константа</th><th>Значення</th><th>Коли записується</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>FRAMEWORK_SERVICE_AWAKENING</code></td>
+                                <td><code>framework.service_awakening</code></td>
+                                <td>Перше створення сервісу в провайдері (<code>mark</code> з ім’ям класу)</td>
+                            </tr>
+                            <tr>
+                                <td><code>FRAMEWORK_COMPONENT_REGISTERED</code></td>
+                                <td><code>framework.component_registered</code></td>
+                                <td><code>ComponentsServiceProvider::boot()</code> — кожен активний компонент</td>
+                            </tr>
+                            <tr>
+                                <td><code>HTTP_ROUTE_CALLABLE_INVOKE</code></td>
+                                <td><code>http.route_callable_invoke</code></td>
+                                <td>Виклик handler у <code>RouteStrategy</code> (<code>start</code>/<code>finish</code>, контекст: route, handler)</td>
+                            </tr>
+                            <tr>
+                                <td><code>TPL_RENDERED</code></td>
+                                <td><code>tpl.rendered</code></td>
+                                <td>Рендер Twig у <code>TwigView::render()</code> (ім’я шаблону, тривалість)</td>
+                            </tr>
+                            <tr>
+                                <td><code>DB_QUERY_EXECUTED</code></td>
+                                <td><code>db.query_executed</code></td>
+                                <td>SQL listener у <code>DatabaseServiceProvider</code> (якщо <code>log.query</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>HTTP_FORM_REQUEST_VALIDATED</code></td>
+                                <td><code>http.form_request_validated</code></td>
+                                <td>Зарезервовано в API; наразі ядро не емітує цей запис</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h2 id="api" class="border-bottom pb-2 mb-3 mt-5">API колектора</h2>
+                <h3 id="mark" class="mt-4"><code>mark()</code> — миттєва відмітка</h3>
+                <p>Для точкових відміток без вимірювання тривалості (пробудження сервісу):</p>
+                <pre class="mb-4"><code class="language-php">$this->telemetry()?->mark(
+    TelemetryEvent::FRAMEWORK_SERVICE_AWAKENING,
+    SessionInterface::class
+);</code></pre>
+
+                <h3 id="start-finish" class="mt-4"><code>start()</code> / <code>finish()</code> — span</h3>
+                <pre class="mb-4"><code class="language-php">$id = $this->telemetry()?->start(TelemetryEvent::HTTP_ROUTE_CALLABLE_INVOKE, [
+    'route' => $route,
+    'handler' => 'UserController::index',
+]);
+try {
+    // ...
+} finally {
+    $this->telemetry()?->finish(TelemetryEvent::HTTP_ROUTE_CALLABLE_INVOKE, (string) $id);
+}</code></pre>
+
+                <h3 id="read" class="mt-4">Читання даних</h3>
+                <pre class="mb-4"><code class="language-php">/** @var TelemetryCollector $telemetry */
+$telemetry = $container->get(TelemetryCollector::class);
+
+$services = $telemetry->items(TelemetryEvent::FRAMEWORK_SERVICE_AWAKENING);
+$all = $telemetry->toArray();</code></pre>
+                <p>
+                    Колектор — singleton на запит. Після завершення HTTP-запиту дані не зберігаються між запитами
+                    (якщо застосунок не експортує їх сам, наприклад у DebugBar).
+                </p>
+
+                <h2 id="trait" class="border-bottom pb-2 mb-3 mt-5">TelemetryTrait у провайдерах</h2>
+                <p>
+                    Провайдери ядра (<code>HttpServiceProvider</code>, <code>SessionServiceProvider</code>,
+                    <code>DatabaseServiceProvider</code> тощо) використовують <code>TelemetryTrait</code>:
+                </p>
+                <pre class="mb-4"><code class="language-php">private function telemetry(): ?TelemetryCollector
+{
+    // 1. Є TelemetryCollector у контейнері?
+    // 2. telemetry.enabled === true?
+    // 3. Інакше — null (запис пропускається)
+}</code></pre>
+                <p>
+                    У власному bootable-провайдері можна підключити той самий trait, якщо клас має
+                    <code>getContainer()</code> (як у <code>AbstractServiceProvider</code>).
+                </p>
+
+                <h2 id="debugbar" class="border-bottom pb-2 mb-3 mt-5">Приклад: DebugBar</h2>
+                <p>
+                    Компонент DebugBar читає <code>TelemetryCollector</code> і показує віджети
+                    «Services», handler маршруту, останній відрендерений шаблон:
+                </p>
+                <pre class="mb-4"><code class="language-php">// ServicesDataCollector
+$items = $this->telemetryCollector->items(TelemetryEvent::FRAMEWORK_SERVICE_AWAKENING);
+foreach ($items as $item) {
+    $className = $item->getContext()['name'] ?? 'Unknown';
+    // ...
+}</code></pre>
+                <p>
+                    Увімкніть <code>telemetry.enabled</code> і компонент <code>DebugBarComponent</code>
+                    у <code>config/dev/components.php</code>.
+                </p>
+
+                <h2 id="custom" class="border-bottom pb-2 mb-3 mt-5">Власні записи</h2>
+                <p>У сервісі або middleware застосунку:</p>
+                <pre class="mb-4"><code class="language-php">public function __construct(
+    private readonly TelemetryCollector $telemetry,
+    private readonly ConfigInterface $config,
+) {}
+
+public function heavyOperation(): void
+{
+    if (!$this->config->getBool('telemetry.enabled')) {
+        return;
+    }
+
+    $id = $this->telemetry->start('app.heavy_operation', ['step' => 'import']);
+    try {
+        // ...
+    } finally {
+        $this->telemetry->finish('app.heavy_operation', $id);
+    }
+}</code></pre>
+                <p>
+                    Префікс імені (<code>app.</code>) — домовленість застосунку; ядро не валідує довільні рядки.
+                    Для констант у своєму коді створіть клас на кшталт <code>AppTelemetryEvent</code>.
+                </p>
+
+                <h2 id="not-included" class="border-bottom pb-2 mb-3 mt-5">Чого немає в ядрі</h2>
+                <ul>
+                    <li>
+                        <strong>Доменні події</strong> — реєстрація listener/subscriber для бізнес-подій;
+                        підключайте PSR-14 або Symfony EventDispatcher у власному провайдері
+                    </li>
+                    <li>
+                        <strong><code>EventServiceProvider</code></strong> — такого класу в concept-core немає
+                        (див. <a href="request-lifecycle.html">життєвий цикл</a>)
+                    </li>
+                    <li>
+                        <strong>Illuminate <code>QueryExecuted</code></strong> — внутрішній dispatcher Eloquent
+                        для listener SQL; Concept-телеметрія SQL — окремий шар у <code>DatabaseServiceProvider</code>
+                        і залежить від <code>log.query</code>
+                    </li>
+                </ul>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Телеметрія призначена для debug і профілювання, не для бізнес-логіки.
+                        Не покладайтеся на неї в production-коді як на механізм інтеграції між модулями.
+                    </p>
+                </div>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-uk.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

@@ -19,8 +19,9 @@
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
             <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1" href="../en/console-commands.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1 active" href="../uk/console-commands.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../en/console-commands.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../uk/console-commands.html">УКР</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -47,6 +48,13 @@
                     <code>Symfony\Component\Console\Command\Command</code>.
                     Залежності передаються через <strong>конструктор</strong> (автовайринг контейнера);
                     логіка — у методі <code>execute()</code>.
+                </p>
+                <p>
+                    Див. також:
+                    <a href="console.html">Робота з консоллю</a>
+                    (<a href="console.html#providers">провайдери та залежності</a>,
+                    <a href="console.html#disabled-commands"><code>DisabledCommand</code></a>),
+                    <a href="service-container.html#autowiring">автовайринг</a>.
                 </p>
                 <p>
                     Документація Symfony:
@@ -93,41 +101,84 @@ final class GreetCommand extends Command
                 <p>
                     <code>ConsoleServiceProvider</code> робить <code>$container-&gt;get(GreetCommand::class)</code>
                     і <code>addCommand()</code>. Якщо в конструкторі потрібні сервіси — вони резолвляться автоматично
-                    (<a href="service-container.html#autowiring">автовайринг</a>).
+                    через <code>ReflectionContainer</code>.
+                </p>
+                <p>
+                    Якщо залежність не зареєстрована (немає потрібного провайдера в
+                    <code>bootstrap/providers/console.php</code>), замість вашої команди з’явиться
+                    <code>DisabledCommand</code> — див. <a href="console.html#disabled-commands">консоль → disabled</a>.
                 </p>
                 <pre class="mb-4"><code class="language-bash">php bin/console.php app:greet</code></pre>
 
+                <h2 id="providers" class="border-bottom pb-2 mb-3 mt-5">Провайдери для вашої команди</h2>
+                <p>Типові залежності власних команд і що підключити в CLI:</p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Залежність у конструкторі</th><th>Провайдер у <code>console.php</code></th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>UserModel</code>, <code>DatabaseInterface</code></td><td><code>DatabaseServiceProvider</code></td></tr>
+                            <tr><td><code>ConfigInterface</code></td><td><code>ConfigServiceProvider</code></td></tr>
+                            <tr><td><code>RouterInterface</code></td><td><code>HttpServiceProvider</code></td></tr>
+                            <tr><td><code>LoggerInterface</code></td><td><code>LogServiceProvider</code></td></tr>
+                            <tr><td>сервіс компонента</td><td>провайдер компонента + <code>ComponentsServiceProvider</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>
+                    Команда без конструктора (як <code>GreetCommand</code>) залежить лише від
+                    <code>ConsoleServiceProvider</code>. Після зміни <code>console.php</code> перезапустіть
+                    <code>php bin/console.php list</code> і переконайтеся, що немає червоного «disabled».
+                </p>
+
                 <h2 id="options" class="border-bottom pb-2 mb-3 mt-5">Аргументи та опції</h2>
-                <p>Приклад з опцією (як <code>user:list</code> у skeleton):</p>
-                <pre class="mb-4"><code class="language-php">use Symfony\Component\Console\Input\InputOption;
+                <p>Приклад — <code>UserListCommand</code> (<code>user:list</code>):</p>
+                <pre class="mb-4"><code class="language-php">use Concept\Components\AuthAdmin\Models\UserModel;
+use Symfony\Component\Console\Input\InputOption;
 
-protected function configure(): void
+class UserListCommand extends Command
 {
-    $this-&gt;setName('user:list')
-        -&gt;setDescription('Display registered users')
-        -&gt;addOption('limit', 'l', InputOption::VALUE_OPTIONAL, 'Max rows', 10);
-}
+    private const string COMMAND_NAME = 'user:list';
 
-protected function execute(InputInterface $input, OutputInterface $output): int
-{
-    $io = new SymfonyStyle($input, $output);
-    $limit = (int) $input-&gt;getOption('limit');
+    protected function configure(): void
+    {
+        $this-&gt;setName(self::COMMAND_NAME)
+            -&gt;setDescription('Display a list of registered users')
+            -&gt;addOption('limit', 'l', InputOption::VALUE_OPTIONAL, 'How many users?', 10);
+    }
 
-    $users = $this-&gt;userModel-&gt;newQuery()-&gt;limit($limit)-&gt;get();
-    $io-&gt;table(['id', 'email', 'name'], /* ... */);
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $io = new SymfonyStyle($input, $output);
+        $limit = is_numeric($input-&gt;getOption('limit'))
+            ? (int) $input-&gt;getOption('limit')
+            : 10;
 
-    return Command::SUCCESS;
+        $users = UserModel::query()-&gt;limit($limit)-&gt;get()-&gt;toArray();
+        $io-&gt;table(array_keys($users[0] ?? []), $users);
+
+        return Command::SUCCESS;
+    }
 }</code></pre>
-                <p>Залежності в конструкторі:</p>
+                <p>
+                    Для узгодженості з <a href="database.html#queries">моделями через DI</a> краще інжектувати
+                    <code>UserModel</code> і викликати <code>$this-&gt;userModel-&gt;newQuery()</code>:
+                </p>
                 <pre class="mb-4"><code class="language-php">public function __construct(
     private readonly UserModel $userModel,
 ) {
     parent::__construct();
 }</code></pre>
+                <p class="small text-body-secondary">
+                    Потрібен <code>DatabaseServiceProvider</code> у CLI — інакше команда стане disabled.
+                </p>
 
                 <h2 id="core-example" class="border-bottom pb-2 mb-3 mt-5">Приклад з ядра: DI в команді</h2>
-                <p><code>RouteListCommand</code> отримує <code>Router</code> з контейнера:</p>
-                <pre class="mb-4"><code class="language-php">public function __construct(private readonly Router $router)
+                <p><code>RouteListCommand</code> отримує <code>RouterInterface</code> — потрібен <code>HttpServiceProvider</code>:</p>
+                <pre class="mb-4"><code class="language-php">use Concept\Core\Http\Routing\Contracts\RouterInterface;
+
+public function __construct(private readonly RouterInterface $router)
 {
     parent::__construct();
 }</code></pre>
@@ -147,9 +198,14 @@ protected function execute(InputInterface $input, OutputInterface $output): int
     UserListCommand::class,
 ],</code></pre>
                 <p>
-                    Реєстрація відбувається в <code>ComponentsServiceProvider::registerConsoleCommands()</code>
-                    під час <code>boot()</code> — після того, як <code>ConsoleApplication</code> уже створений
-                    провайдером консолі.
+                    Під час <code>ComponentsServiceProvider::boot()</code> команди резолвяться з контейнера і
+                    додаються в <code>ConsoleApplication</code> через <code>addCommand()</code>.
+                    <code>ConsoleServiceProvider</code> має бути зареєстрований <em>раніше</em> у
+                    <code>bootstrap/providers/console.php</code>.
+                </p>
+                <p>
+                    Якщо команда компонента потребує БД або HTTP-сервісів — у CLI все одно потрібні відповідні
+                    провайдери ядра (див. <a href="#providers">таблицю вище</a>).
                 </p>
 
                 <h2 id="output" class="border-bottom pb-2 mb-3 mt-5">Вивід і помилки</h2>
@@ -179,16 +235,18 @@ $io-&gt;progressFinish();</code></pre>
                 <h2 id="checklist" class="border-bottom pb-2 mb-3 mt-5">Чеклист</h2>
                 <ol>
                     <li>Унікальне ім’я команди (<code>module:action</code>, наприклад <code>billing:sync</code>)</li>
-                    <li><code>configure()</code> — name, description, arguments/options</li>
-                    <li><code>execute()</code> — коротка orchestration, важке в сервісі</li>
-                    <li>Реєстрація в <code>config/commands.php</code> або <code>Component/config.php</code></li>
-                    <li>Перевірка: <code>php bin/console.php list</code> і <code>help your:command</code></li>
+                    <li><code>configure()</code> — name, description, arguments/options; константа <code>COMMAND_NAME</code> як у ядрі</li>
+                    <li><code>execute()</code> — коротка orchestration, важке в сервісі; <code>Command::SUCCESS</code> / <code>FAILURE</code></li>
+                    <li>Реєстрація в <code>config/commands.php</code> або <code>commands</code> у <code>config.php</code> компонента</li>
+                    <li>Провайдери CLI покривають усі залежності конструктора</li>
+                    <li>Перевірка: <code>php bin/console.php list</code> (без «disabled») і <code>help your:command</code></li>
                 </ol>
 
                 <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
                     <p class="mb-0">
                         Не дублюйте HTTP-контролери в CLI: винесіть спільну логіку в <code>Services/</code>
                         і викличте її і з web, і з command.
+                        Команда «disabled» — це майже завжди відсутній провайдер у <code>console.php</code>, а не помилка в <code>execute()</code>.
                     </p>
                 </div>
 
@@ -203,6 +261,8 @@ $io-&gt;progressFinish();</code></pre>
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/bash.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
     <script src="../assets/js/nav-uk.js"></script>
     <script src="../assets/js/docs.js"></script>

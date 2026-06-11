@@ -18,7 +18,7 @@
             </button>
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
-            <ul class="navbar-nav flex-row gap-1 ms-auto">
+            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
                 <li class="nav-item"><a class="nav-link p-1" href="../en/console.html">EN</a></li>
                 <li class="nav-item"><a class="nav-link p-1 active" href="../uk/console.html">УКР</a></li>
                 <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
@@ -53,15 +53,36 @@
                     Див. також:
                     <a href="setup.html#bin">налаштування → bin/console.php</a>,
                     <a href="service-providers.html#cli-providers">провайдери для CLI</a>,
-                    <a href="console-commands.html">створення власних команд</a>.
+                    <a href="console-commands.html">створення власних команд</a>,
+                    <a href="database.html#cli">БД → консольні команди</a>.
                 </p>
+
+                <h2 id="architecture" class="border-bottom pb-2 mb-3 mt-5">Класи ядра</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Клас</th><th>Роль</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>ConsoleServiceProvider</code></td>
+                                <td><code>Symfony\Component\Console\Application</code>, реєстрація з <code>config/commands.php</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>ComponentsServiceProvider</code></td>
+                                <td>Додає команди компонентів у <code>boot()</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>DisabledCommand</code></td>
+                                <td>Заглушка, якщо команду не вдалося створити з DI</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
                 <h2 id="run" class="border-bottom pb-2 mb-3 mt-5">Запуск</h2>
                 <p>З кореня проєкту:</p>
                 <pre class="mb-4"><code class="language-bash">php bin/console.php
-
-# або через Composer (script у composer.json)
-composer console
 
 # довідка
 php bin/console.php list
@@ -70,22 +91,172 @@ php bin/console.php list
 php bin/console.php help db:migrate</code></pre>
                 <p>
                     Bootstrap CLI відрізняється від HTTP: підключається
-                    <code>bootstrap/providers/console.php</code> (без View/Validation для веб-стеку, з
-                    <code>ConsoleServiceProvider</code>). Детальніше — <a href="setup.html#bootstrap-providers-console">Setup</a>.
+                    <code>bootstrap/providers/console.php</code>. Детальніше —
+                    <a href="setup.html#bootstrap-providers-console">Setup</a> і розділ
+                    <a href="#providers">провайдери та команди</a> нижче.
                 </p>
 
                 <h2 id="how-it-works" class="border-bottom pb-2 mb-3 mt-5">Як це влаштовано</h2>
-                <pre class="mb-4"><code class="language-php">// bin/console.php
+                <pre class="mb-4"><code class="language-php">require __DIR__ . '/../vendor/autoload.php';
+
+$rootPath = dirname(__DIR__);
+$paths = include $rootPath . '/bootstrap/paths.php';
 $app = App::create($rootPath, $paths);
 $app-&gt;registerServiceProviders([$rootPath . '/bootstrap/providers/console.php']);
 
 $console = $app-&gt;getContainer()-&gt;get(ConsoleApplication::class);
 $console-&gt;run();</code></pre>
                 <ol>
-                    <li><code>ConsoleServiceProvider</code> створює <code>Symfony\Component\Console\Application</code></li>
-                    <li>Команди з <code>config/commands.php</code> резолвяться з контейнера і додаються в application</li>
-                    <li><code>ComponentsServiceProvider::boot()</code> додає команди з <code>config.php</code> кожного компонента</li>
+                    <li><code>ConsoleServiceProvider</code> створює <code>Application</code> з іменем/версією з <code>app.name</code> / <code>app.version</code></li>
+                    <li>Класи з <code>config/commands.php</code> (<code>ConfigKey::COMMANDS</code>) резолвяться з DI і додаються в application</li>
+                    <li>Якщо залежність команди недоступна — реєструється <code>DisabledCommand</code> з поясненням помилки</li>
+                    <li><code>ComponentsServiceProvider::boot()</code> додає команди з <code>commands</code> у <code>config.php</code> кожного компонента</li>
                 </ol>
+                <pre class="mb-4"><code class="language-php">// config/commands.php (фрагмент)
+return [
+    'commands' =&gt; [
+        DbMigrateCommand::class,
+        RouteListCommand::class,
+        // ...
+    ],
+];</code></pre>
+
+                <h2 id="providers" class="border-bottom pb-2 mb-3 mt-5">Провайдери та залежності команд</h2>
+                <p>
+                    Кожна команда — звичайний сервіс Symfony Console: залежності передаються через конструктор і
+                    резолвяться з DI-контейнера. Якщо провайдер, який реєструє сервіс, відсутній у
+                    <code>bootstrap/providers/console.php</code>, команда не створюється — замість неї з’являється
+                    <a href="#disabled-commands"><code>DisabledCommand</code></a>.
+                </p>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Команда</th>
+                                <th>Залежності (DI)</th>
+                                <th>Потрібні провайдери</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>db:migrate</code>, <code>db:rollback</code></td>
+                                <td><code>Migrator</code>, <code>MigrationRegistry</code></td>
+                                <td><code>DatabaseServiceProvider</code> (<code>boot()</code> — Capsule)</td>
+                            </tr>
+                            <tr>
+                                <td><code>migration:list</code></td>
+                                <td><code>CapsuleManager</code>, <code>ConfigInterface</code></td>
+                                <td><code>ConfigServiceProvider</code>, <code>DatabaseServiceProvider</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>db:seed</code></td>
+                                <td><code>SeederManager</code></td>
+                                <td><code>DatabaseServiceProvider</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>seeders:list</code></td>
+                                <td><code>SeederRegistry</code></td>
+                                <td><code>DatabaseServiceProvider</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>route:list</code></td>
+                                <td><code>RouterInterface</code></td>
+                                <td><code>HttpServiceProvider</code>, <code>ConfigServiceProvider</code> (шляхи до <code>routes/*.php</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>view:clear</code></td>
+                                <td><code>PathManager</code>, <code>ConfigInterface</code></td>
+                                <td><code>ConfigServiceProvider</code> (Twig у CLI не потрібен)</td>
+                            </tr>
+                            <tr>
+                                <td><code>component:list</code>, <code>component:publish-assets</code></td>
+                                <td><code>ComponentRegistry</code></td>
+                                <td><code>ComponentsServiceProvider</code> (останнім після <code>ConsoleServiceProvider</code>)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p>Рекомендований мінімум (<code>bootstrap/providers/console.php</code>):</p>
+                <pre class="mb-4"><code class="language-php">return [
+    ConfigServiceProvider::class,        // конфіг, PathManager
+    HttpServiceProvider::class,          // RouterInterface → route:list
+    SessionServiceProvider::class,       // якщо команди/сидери торкаються сесії
+    ErrorHandlerServiceProvider::class,
+    LogServiceProvider::class,
+    DatabaseServiceProvider::class,      // db:*, migration:list, seeders:list
+    ConsoleServiceProvider::class,       // Application + команди з config/commands.php
+    DebugLoggerServiceProvider::class,
+    ComponentsServiceProvider::class,    // component:* + команди компонентів
+];</code></pre>
+                <p class="small text-body-secondary">
+                    <code>ConsoleServiceProvider</code> має бути <em>перед</em> <code>ComponentsServiceProvider</code>:
+                    останній у <code>boot()</code> додає команди компонентів у вже створений <code>ConsoleApplication</code>.
+                </p>
+
+                <h3 id="http-in-cli" class="mt-4">Навіщо CLI потребує <code>HttpServiceProvider</code></h3>
+                <p>
+                    На перший погляд HTTP-стек у консолі зайвий — CLI не обробляє запити браузера. Але
+                    <code>route:list</code> інжектує <code>RouterInterface</code>, а роутер реєструє
+                    <code>HttpServiceProvider</code>: він створює <code>League\Route\Router</code>, підключає
+                    <code>RouteStrategy</code> і завантажує файли з <code>config/routes.php</code> (і маршрути
+                    компонентів — через <code>ComponentsServiceProvider</code>).
+                </p>
+                <p>
+                    Без <code>HttpServiceProvider</code> контейнер не знає <code>RouterInterface</code> →
+                    <code>RouteListCommand</code> не збирається → у <code>php bin/console.php list</code> ви бачите
+                    <code>route:list</code> із червоним попередженням про disabled (як на скріншоті нижче).
+                    Повний список маршрутів компонентів додатково потребує
+                    <code>ComponentsServiceProvider</code>, який підключає <code>routes.php</code> кожного компонента.
+                </p>
+                <p>
+                    У CLI <strong>не викликається</strong> <code>App::run()</code> і не відбувається dispatch запиту.
+                    Провайдер лише будує той самий граф маршрутів, що й у веб-застосунку, щоб діагностика
+                    (<code>route:list</code>, <code>-F</code> для middleware) показувала реальну картину.
+                    <code>ServerRequestInterface</code> у CLI — «порожній» PSR-7 з <code>fromGlobals()</code>;
+                    для переліку маршрутів цього достатньо.
+                </p>
+                <p>
+                    Twig, Validation, ViewRegistry у консольний bootstrap навмисно не входять — вони не потрібні
+                    жодній вбудованій команді. <code>HttpServiceProvider</code> реєструє також
+                    <code>ResponseFactory</code> і <code>ViewResponseFactory</code>, але CLI-команди їх не резолвять.
+                </p>
+
+                <h3 id="disabled-commands" class="mt-4">Якщо провайдер не підключено — <code>DisabledCommand</code></h3>
+                <p>
+                    У <code>ConsoleServiceProvider::addConsoleCommands()</code> кожен клас з
+                    <code>config/commands.php</code> створюється через <code>$container-&gt;get($className)</code>.
+                    Будь-який <code>Throwable</code> (немає binding, не вдалося autowire, провайдер не
+                    зареєстрований) перехоплюється — замість справжньої команди додається
+                    <code>DisabledCommand</code> з тим самим ім’ям (<code>COMMAND_NAME</code> з оригінального класу).
+                </p>
+                <p>У виводі <code>php bin/console.php list</code> такі команди мають опис:</p>
+                <pre class="mb-3"><code class="language-text text-danger">!!! WARNING: This command is disabled (possible missing dependencies).
+Run command to see details. !!!</code></pre>
+                <p>Типова картина при «урізаному» <code>console.php</code> (без HTTP і компонентів):</p>
+                <ul class="small">
+                    <li><code>route:list</code> — disabled (немає <code>HttpServiceProvider</code>)</li>
+                    <li><code>component:list</code>, <code>component:publish-assets</code> — disabled (немає <code>ComponentsServiceProvider</code>)</li>
+                    <li><code>db:migrate</code>, <code>db:rollback</code> — disabled (немає або не завершив <code>boot()</code> <code>DatabaseServiceProvider</code>)</li>
+                    <li><code>db:seed</code>, <code>seeders:list</code>, <code>migration:list</code>, <code>view:clear</code> — часто лишаються активними, бо їхні залежності простіші або не потребують повного HTTP-стеку</li>
+                </ul>
+                <p>Щоб побачити точну причину, запустіть disabled-команду:</p>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php route:list</code></pre>
+                <p>Приклад виводу:</p>
+                <pre class="mb-4"><code class="language-text text-warning">Command Disabled: route:list
+
+ [WARNING] This command cannot be executed because its dependencies are not met.
+           Likely a required ServiceProvider is not registered in bootstrap/providers/.
+
+ Original Class   Concept\Core\Console\Commands\RouteListCommand
+ Error Detail     ... (текст винятку контейнера, напр. class not found)</code></pre>
+                <p>
+                    Виправлення: додайте відповідний провайдер у <code>bootstrap/providers/console.php</code>
+                    (див. таблицю вище) і перезапустіть консоль. Для власних команд — те саме: якщо command
+                    потребує <code>DatabaseInterface</code>, без <code>DatabaseServiceProvider</code> вона теж стане
+                    disabled.
+                </p>
 
                 <h2 id="built-in" class="border-bottom pb-2 mb-3 mt-5">Команди ядра</h2>
                 <p>Реєстрація в <code>config/commands.php</code>:</p>
@@ -97,22 +268,24 @@ $console-&gt;run();</code></pre>
                         </thead>
                         <tbody>
                             <tr><td><code>db:migrate</code></td><td>Виконати міграції</td></tr>
-                            <tr><td><code>db:migration:list</code></td><td>Список міграцій</td></tr>
+                            <tr><td><code>migration:list</code></td><td>Список записів у таблиці <code>migrations</code> (<code>-l</code> — ліміт)</td></tr>
                             <tr><td><code>db:rollback</code></td><td>Відкат останнього batch міграцій</td></tr>
                             <tr><td><code>db:seed</code></td><td>Усі сидери; <code>-c "Fully\Qualified\Class"</code> — один (повний FQCN)</td></tr>
-                            <tr><td><code>db:seeders:list</code></td><td>Список зареєстрованих сидерів</td></tr>
-                            <tr><td><code>route:list</code></td><td>Таблиця маршрутів (<code>-F</code> — повні імена middleware)</td></tr>
-                            <tr><td><code>view:clear</code></td><td>Очистити кеш Twig</td></tr>
-                            <tr><td><code>component:list</code></td><td>Список увімкнених компонентів</td></tr>
-                            <tr><td><code>component:publish-assets</code></td><td>Публікація assets компонентів у <code>public/</code></td></tr>
+                            <tr><td><code>seeders:list</code></td><td>Список зареєстрованих сидерів</td></tr>
+                            <tr><td><code>route:list</code></td><td>Таблиця маршрутів; <code>-F</code> / <code>--full-middleware</code> — FQCN middleware</td></tr>
+                            <tr><td><code>view:clear</code></td><td>Очистити каталог кешу Twig (<code>storage/cache/{view.cache_dir}</code>)</td></tr>
+                            <tr><td><code>component:list</code></td><td>Список увімкнених компонентів (<code>ComponentRegistry</code>)</td></tr>
+                            <tr><td><code>component:publish-assets</code></td><td>Копіює <code>assets</code> з <code>config.php</code> компонентів у <code>public/</code></td></tr>
                         </tbody>
                     </table>
                 </div>
 
                 <h3 id="examples" class="mt-4">Приклади</h3>
                 <pre class="mb-4"><code class="language-bash">php bin/console.php db:migrate
+php bin/console.php migration:list
 php bin/console.php db:seed
 php bin/console.php db:seed -c "Concept\Components\AuthAdmin\Database\Seeders\UserSeeder"
+php bin/console.php seeders:list
 php bin/console.php route:list
 php bin/console.php route:list -F
 php bin/console.php component:list
@@ -121,8 +294,20 @@ php bin/console.php view:clear</code></pre>
                 <h2 id="component-commands" class="border-bottom pb-2 mb-3 mt-5">Команди компонентів</h2>
                 <p>
                     Компонент додає команди в секції <code>commands</code> свого <code>config.php</code>.
-                    Під час <code>ComponentsServiceProvider::boot()</code> вони реєструються в тому ж
-                    <code>ConsoleApplication</code>.
+                    Під час <code>ComponentsServiceProvider::boot()</code> вони резолвяться з контейнера
+                    і додаються в той самий <code>ConsoleApplication</code>.
+                    У CLI не реєструються view extensions/paths компонентів (лише команди, міграції, сидери, провайдери).
+                </p>
+                <pre class="mb-4"><code class="language-php">// src/Components/AuthAdmin/config.php
+'commands' =&gt; [
+    UserListCommand::class,
+],
+
+// php bin/console.php user:list
+// php bin/console.php user:list --limit=5</code></pre>
+                <p>
+                    Власні команди додатку — у <code>config/commands.php</code> у секції
+                    <code>// Custom Business Commands</code>. Детальніше — <a href="console-commands.html">Створення команд</a>.
                 </p>
 
                 <h2 id="exit-codes" class="border-bottom pb-2 mb-3 mt-5">Коди завершення</h2>
@@ -145,7 +330,8 @@ php bin/console.php view:clear</code></pre>
                 <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
                     <p class="mb-0">
                         Консоль — для обслуговування (міграції, кеш, діагностика) і локальної розробки.
-                        Довготривалу бізнес-логіку краше виносити в сервіси, а в command лишати тонкий виклик.
+                        Довготривалу бізнес-логіку краще виносити в сервіси, а в command лишати тонкий виклик.
+                        Якщо команда «disabled» — спочатку перевірте <a href="#providers">провайдери CLI</a>, а не саму команду.
                     </p>
                 </div>
 
@@ -160,6 +346,8 @@ php bin/console.php view:clear</code></pre>
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/bash.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
     <script src="../assets/js/nav-uk.js"></script>
     <script src="../assets/js/docs.js"></script>

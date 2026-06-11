@@ -155,7 +155,7 @@ return $this-&gt;response-&gt;jsonError(
                 <pre class="mb-4"><code class="language-php">return $this-&gt;response-&gt;redirectByName('admin.users');
 return $this-&gt;response-&gt;redirectByName('admin.user.edit', ['id' =&gt; $user-&gt;getId()]);</code></pre>
                 <p>
-                    URL будується через <code>UrlGeneratorInterface::path()</code> — відносний шлях за
+                    URL будується через <code>UrlGeneratorInterface::uri()</code> — відносний шлях за
                     <a href="routing.html#named-routes">іменованим маршрутом</a>. Зручно після POST (PRG).
                 </p>
 

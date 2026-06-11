@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Telemetry — Concept Core Documentation">
+    <title>Telemetry - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="telemetry">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/telemetry.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/telemetry.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Menu</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Telemetry</h1>
+
+                <p>
+                    Concept Core telemetry collects metrics and marks for the <strong>request lifecycle</strong>
+                    (bootstrap, HTTP, templates, SQL) for debugging and profiling. It is not a domain event bus:
+                    the core does not provide <code>EventDispatcherInterface</code> for business events like
+                    <code>UserRegistered</code> — add that logic in your own service provider (PSR-14, Symfony, etc.).
+                </p>
+                <p>
+                    See also:
+                    <a href="service-providers.html#telemetry-trait">Service providers → TelemetryTrait</a>,
+                    <a href="request-lifecycle.html">request lifecycle</a>,
+                    <a href="configuration.html">configuration</a>.
+                </p>
+
+                <h2 id="enable" class="border-bottom pb-2 mb-3 mt-5">Enabling</h2>
+                <p>Key <code>telemetry.enabled</code> (<code>ConfigKey::TELEMETRY_ENABLED</code>):</p>
+                <pre class="mb-4"><code class="language-php">// config/telemetry.php
+return [
+    'telemetry' => [
+        'enabled' => false,
+    ],
+];
+
+// config/dev/telemetry.php — override for APP_ENV=dev
+return [
+    'telemetry' => [
+        'enabled' => true,
+    ],
+];</code></pre>
+                <p>
+                    Default in skeleton — <code>false</code>; in dev override — <code>true</code>.
+                    While the flag is off, <code>TelemetryTrait::telemetry()</code> returns <code>null</code>
+                    and the core does not record events (except where the collector is passed explicitly — see below).
+                </p>
+
+                <h2 id="components" class="border-bottom pb-2 mb-3 mt-5">Telemetry components</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Class</th><th>Role</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>TelemetryServiceProvider</code></td>
+                                <td>Registers shared <code>TelemetryCollector</code> in the container</td>
+                            </tr>
+                            <tr>
+                                <td><code>TelemetryCollector</code></td>
+                                <td>Event storage: <code>start()</code>, <code>finish()</code>, <code>mark()</code>, <code>items()</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>TelemetryTrait</code></td>
+                                <td>Access to the collector respecting <code>telemetry.enabled</code> (in providers, <code>RouteStrategy</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>TelemetryEvent</code></td>
+                                <td>Event name constants (string identifiers)</td>
+                            </tr>
+                            <tr>
+                                <td><code>TelemetryItem</code></td>
+                                <td>Single record: context, <code>started_at</code>, <code>finished_at</code>, <code>duration</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>
+                    <code>TelemetryServiceProvider</code> is early in <code>bootstrap/providers/app.php</code>
+                    (after <code>ConfigServiceProvider</code> and <code>LocaleServiceProvider</code>), so other
+                    providers can write telemetry during <code>register()</code>.
+                </p>
+
+                <h2 id="builtin-records" class="border-bottom pb-2 mb-3 mt-5">Built-in records</h2>
+                <p>Identifiers in <code>Concept\Core\Telemetry\TelemetryEvent</code>:</p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Constant</th><th>Value</th><th>When recorded</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>FRAMEWORK_SERVICE_AWAKENING</code></td>
+                                <td><code>framework.service_awakening</code></td>
+                                <td>First creation of a service in a provider (<code>mark</code> with class name)</td>
+                            </tr>
+                            <tr>
+                                <td><code>FRAMEWORK_COMPONENT_REGISTERED</code></td>
+                                <td><code>framework.component_registered</code></td>
+                                <td><code>ComponentsServiceProvider::boot()</code> — each active component</td>
+                            </tr>
+                            <tr>
+                                <td><code>HTTP_ROUTE_CALLABLE_INVOKE</code></td>
+                                <td><code>http.route_callable_invoke</code></td>
+                                <td>Handler invocation in <code>RouteStrategy</code> (<code>start</code>/<code>finish</code>, context: route, handler)</td>
+                            </tr>
+                            <tr>
+                                <td><code>TPL_RENDERED</code></td>
+                                <td><code>tpl.rendered</code></td>
+                                <td>Twig render in <code>TwigView::render()</code> (template name, duration)</td>
+                            </tr>
+                            <tr>
+                                <td><code>DB_QUERY_EXECUTED</code></td>
+                                <td><code>db.query_executed</code></td>
+                                <td>SQL listener in <code>DatabaseServiceProvider</code> (if <code>log.query</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>HTTP_FORM_REQUEST_VALIDATED</code></td>
+                                <td><code>http.form_request_validated</code></td>
+                                <td>Reserved in the API; the core does not emit this record yet</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h2 id="api" class="border-bottom pb-2 mb-3 mt-5">Collector API</h2>
+                <h3 id="mark" class="mt-4"><code>mark()</code> — instant mark</h3>
+                <p>For point-in-time marks without duration measurement (service awakening):</p>
+                <pre class="mb-4"><code class="language-php">$this->telemetry()?->mark(
+    TelemetryEvent::FRAMEWORK_SERVICE_AWAKENING,
+    SessionInterface::class
+);</code></pre>
+
+                <h3 id="start-finish" class="mt-4"><code>start()</code> / <code>finish()</code> — span</h3>
+                <pre class="mb-4"><code class="language-php">$id = $this->telemetry()?->start(TelemetryEvent::HTTP_ROUTE_CALLABLE_INVOKE, [
+    'route' => $route,
+    'handler' => 'UserController::index',
+]);
+try {
+    // ...
+} finally {
+    $this->telemetry()?->finish(TelemetryEvent::HTTP_ROUTE_CALLABLE_INVOKE, (string) $id);
+}</code></pre>
+
+                <h3 id="read" class="mt-4">Reading data</h3>
+                <pre class="mb-4"><code class="language-php">/** @var TelemetryCollector $telemetry */
+$telemetry = $container->get(TelemetryCollector::class);
+
+$services = $telemetry->items(TelemetryEvent::FRAMEWORK_SERVICE_AWAKENING);
+$all = $telemetry->toArray();</code></pre>
+                <p>
+                    The collector is a singleton per request. After the HTTP request completes, data is not persisted across requests
+                    (unless the application exports it itself, e.g. to DebugBar).
+                </p>
+
+                <h2 id="trait" class="border-bottom pb-2 mb-3 mt-5">TelemetryTrait in providers</h2>
+                <p>
+                    Core providers (<code>HttpServiceProvider</code>, <code>SessionServiceProvider</code>,
+                    <code>DatabaseServiceProvider</code>, etc.) use <code>TelemetryTrait</code>:
+                </p>
+                <pre class="mb-4"><code class="language-php">private function telemetry(): ?TelemetryCollector
+{
+    // 1. Is TelemetryCollector in the container?
+    // 2. telemetry.enabled === true?
+    // 3. Otherwise — null (recording is skipped)
+}</code></pre>
+                <p>
+                    In your own bootable provider you can use the same trait if the class has
+                    <code>getContainer()</code> (as in <code>AbstractServiceProvider</code>).
+                </p>
+
+                <h2 id="debugbar" class="border-bottom pb-2 mb-3 mt-5">Example: DebugBar</h2>
+                <p>
+                    The DebugBar component reads <code>TelemetryCollector</code> and shows widgets for
+                    “Services”, route handler, and the last rendered template:
+                </p>
+                <pre class="mb-4"><code class="language-php">// ServicesDataCollector
+$items = $this->telemetryCollector->items(TelemetryEvent::FRAMEWORK_SERVICE_AWAKENING);
+foreach ($items as $item) {
+    $className = $item->getContext()['name'] ?? 'Unknown';
+    // ...
+}</code></pre>
+                <p>
+                    Enable <code>telemetry.enabled</code> and the <code>DebugBarComponent</code>
+                    in <code>config/dev/components.php</code>.
+                </p>
+
+                <h2 id="custom" class="border-bottom pb-2 mb-3 mt-5">Custom records</h2>
+                <p>In an application service or middleware:</p>
+                <pre class="mb-4"><code class="language-php">public function __construct(
+    private readonly TelemetryCollector $telemetry,
+    private readonly ConfigInterface $config,
+) {}
+
+public function heavyOperation(): void
+{
+    if (!$this->config->getBool('telemetry.enabled')) {
+        return;
+    }
+
+    $id = $this->telemetry->start('app.heavy_operation', ['step' => 'import']);
+    try {
+        // ...
+    } finally {
+        $this->telemetry->finish('app.heavy_operation', $id);
+    }
+}</code></pre>
+                <p>
+                    Name prefix (<code>app.</code>) is an application convention; the core does not validate arbitrary strings.
+                    For constants in your code, create a class like <code>AppTelemetryEvent</code>.
+                </p>
+
+                <h2 id="not-included" class="border-bottom pb-2 mb-3 mt-5">What is not in the core</h2>
+                <ul>
+                    <li>
+                        <strong>Domain events</strong> — listener/subscriber registration for business events;
+                        wire PSR-14 or Symfony EventDispatcher in your own provider
+                    </li>
+                    <li>
+                        <strong><code>EventServiceProvider</code></strong> — no such class in concept-core
+                        (see <a href="request-lifecycle.html">request lifecycle</a>)
+                    </li>
+                    <li>
+                        <strong>Illuminate <code>QueryExecuted</code></strong> — Eloquent’s internal dispatcher
+                        for SQL listeners; Concept SQL telemetry is a separate layer in <code>DatabaseServiceProvider</code>
+                        and depends on <code>log.query</code>
+                    </li>
+                </ul>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Telemetry is for debugging and profiling, not business logic.
+                        Do not rely on it in production code as a mechanism for integration between modules.
+                    </p>
+                </div>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="../assets/js/nav-en.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

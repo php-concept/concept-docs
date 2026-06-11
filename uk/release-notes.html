@@ -31,7 +31,7 @@
             <aside class="col-lg-3 col-xl-2">
                 <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
                     <div class="offcanvas-header border-bottom d-lg-none">
-                        <h5 class="offcanvas-title" id="docsSidebarLabel">Menu</h5>
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
                     </div>
                     <div class="offcanvas-body p-0 pt-lg-4">
@@ -42,10 +42,42 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Примітки до релізу</h1>
-                <div class="border border-secondary-subtle rounded text-center text-body-secondary p-5">
-                    <p class="mb-0">Ця сторінка є заглушкою. Зміст буде додано пізніше.</p>
-                </div>
-                <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
+
+                <p>
+                    Короткий огляд лінійки <strong>1.x</strong> Concept Core і супутньої документації.
+                    Детальний changelog релізів пакета — у
+                    <a href="https://github.com/php-concept/core/releases" target="_blank" rel="noopener">Releases на GitHub</a>.
+                </p>
+
+                <h2 id="core-1x" class="border-bottom pb-2 mb-3 mt-5">Concept Core 1.x</h2>
+                <p>Перша стабільна лінійка engine з акцентом на PSR і модульність:</p>
+                <ul>
+                    <li>PSR-7 HTTP, PSR-11 DI (League Container + Reflection), PSR-15 middleware</li>
+                    <li>League Route, <code>RouteStrategy</code> (FormRequest, route params, interceptors)</li>
+                    <li>Illuminate Database (Eloquent, міграції, pagination)</li>
+                    <li>Rakit validation, Valinor DTO casting, Twig views</li>
+                    <li>Компонентна реєстрація: routes, migrations, seeders, views, CLI</li>
+                    <li>CSRF, data masker, safe redirects, telemetry hooks</li>
+                    <li>Symfony Console, Whoops / production fallbacks</li>
+                </ul>
+
+                <h2 id="skeleton" class="border-bottom pb-2 mb-3 mt-5">Concept Skeleton</h2>
+                <p>
+                    Мінімальний застосунок для старту: <code>bootstrap/</code>, <code>config/</code>,
+                    <code>routes/web.php</code>, один контролер і frontend-шаблон.
+                </p>
+
+                <h2 id="docs-1x" class="border-bottom pb-2 mb-3 mt-5">Документація 1.x</h2>
+                <p>
+                    Статичний сайт (Bootstrap 5, Highlight.js): розділи від встановлення до компонентів,
+                    українська та англійська версії. Зміст звіряється з кодом у <code>code/core</code> і <code>code/skeleton</code>.
+                </p>
+
+                <p class="small text-body-secondary">
+                    При оновленні <code>php-concept/core</code> у проєкті див. також
+                    <a href="upgrade-guide.html">Оновлення</a>.
+                </p>
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
             </main>
 
             <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">

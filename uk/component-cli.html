@@ -89,7 +89,7 @@ final class UserListCommand extends Command
 
                 <h2 id="migrations-seeders" class="border-bottom pb-2 mb-3 mt-5">Міграції та сидери</h2>
                 <p>Шляхи з <code>migrations.paths</code> і класи з <code>seeders.list</code> додаються в registries ядра:</p>
-                <pre class="mb-4"><code class="language-bash">php bin/console.php db:migration:list
+                <pre class="mb-4"><code class="language-bash">php bin/console.php migration:list
 php bin/console.php db:migrate
 php bin/console.php db:seed
 php bin/console.php db:seed -c "Concept\Components\AuthAdmin\Database\Seeders\UserSeeder"</code></pre>
@@ -109,15 +109,12 @@ return [
 ];</code></pre>
                 <p>ConfigServiceProvider зливає override з <code>config/{APP_ENV}/</code> — у dev додається DebugBar без зміни production-списку.</p>
 
-                <h2 id="events" class="border-bottom pb-2 mb-3 mt-5">Події</h2>
-                <p>Під час boot для кожного модуля диспатчиться <code>ComponentRegistering</code> — можна підписатися для телеметрії або перевірок:</p>
-                <pre class="mb-4"><code class="language-php">$dispatcher->addListener(
-    EventName::FRAMEWORK_COMPONENT_REGISTERING,
-    function (ComponentRegistering $event) {
-        $component = $event->component;
-        // $component->name(), routes(), ...
-    }
-);</code></pre>
+                <h2 id="telemetry" class="border-bottom pb-2 mb-3 mt-5">Телеметрія компонентів</h2>
+                <p>
+                    Під час <code>ComponentsServiceProvider::boot()</code> для кожного активного модуля
+                    записується <code>TelemetryEvent::FRAMEWORK_COMPONENT_REGISTERED</code> (контекст — клас компонента).
+                    Дані доступні через <code>TelemetryCollector</code> — див. <a href="telemetry.html">Телеметрія</a>.
+                </p>
 
                 <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
             </main>

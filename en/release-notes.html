@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Release Notes — Concept Core Documentation">
-    <title>Release Notes - Concept Core Documentation</title>
+    <meta name="description" content="Release notes — Concept Core Documentation">
+    <title>Release notes - Concept Core Documentation</title>
     <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
     <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
@@ -19,8 +19,9 @@
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
             <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="../en/release-notes.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/release-notes.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/release-notes.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/release-notes.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -40,10 +41,42 @@
             </aside>
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
-                <h1 class="display-6 fw-bold mb-4">Release Notes</h1>
-                <div class="border border-secondary-subtle rounded text-center text-body-secondary p-5">
-                    <p class="mb-0">This page is a placeholder. Content will be added in a future update.</p>
-                </div>
+                <h1 class="display-6 fw-bold mb-4">Release notes</h1>
+
+                <p>
+                    Brief overview of the Concept Core <strong>1.x</strong> line and related documentation.
+                    Detailed package release changelog — on
+                    <a href="https://github.com/php-concept/core/releases" target="_blank" rel="noopener">GitHub Releases</a>.
+                </p>
+
+                <h2 id="core-1x" class="border-bottom pb-2 mb-3 mt-5">Concept Core 1.x</h2>
+                <p>First stable engine line focused on PSR and modularity:</p>
+                <ul>
+                    <li>PSR-7 HTTP, PSR-11 DI (League Container + Reflection), PSR-15 middleware</li>
+                    <li>League Route, <code>RouteStrategy</code> (FormRequest, route params, interceptors)</li>
+                    <li>Illuminate Database (Eloquent, migrations, pagination)</li>
+                    <li>Rakit validation, Valinor DTO casting, Twig views</li>
+                    <li>Component registration: routes, migrations, seeders, views, CLI</li>
+                    <li>CSRF, data masker, safe redirects, telemetry hooks</li>
+                    <li>Symfony Console, Whoops / production fallbacks</li>
+                </ul>
+
+                <h2 id="skeleton" class="border-bottom pb-2 mb-3 mt-5">Concept Skeleton</h2>
+                <p>
+                    Minimal starter application: <code>bootstrap/</code>, <code>config/</code>,
+                    <code>routes/web.php</code>, one controller and frontend template.
+                </p>
+
+                <h2 id="docs-1x" class="border-bottom pb-2 mb-3 mt-5">Documentation 1.x</h2>
+                <p>
+                    Static site (Bootstrap 5, Highlight.js): sections from installation through components,
+                    Ukrainian and English versions. Content is verified against code in <code>code/core</code> and <code>code/skeleton</code>.
+                </p>
+
+                <p class="small text-body-secondary">
+                    When updating <code>php-concept/core</code> in a project, also see
+                    <a href="upgrade-guide.html">Upgrade guide</a>.
+                </p>
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>
 

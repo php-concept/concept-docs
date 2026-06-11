@@ -44,14 +44,16 @@
                 <h1 class="display-6 fw-bold mb-4">Data Masking</h1>
 
                 <p>
-                    The core redacts sensitive values before they are written to logs, debug panels, and other
-                    diagnostics. The <code>Masker</code> component recursively processes arrays, objects, and strings
-                    using key patterns and regular expressions.
+                    The core hides sensitive values before they are written to logs, debug panels, and other places
+                    where data may be exposed to third parties. <code>DataMasker</code> recursively processes arrays,
+                    objects, and strings according to key and regex rules.
                 </p>
                 <p>
-                    Registration: <code>MaskerServiceProvider</code> in
+                    Registration: <code>DataMaskerServiceProvider</code> in
                     <a href="service-providers.html#http-providers">HTTP providers</a> (before
-                    <code>LogServiceProvider</code> so the logger receives the masker).
+                    <code>LogServiceProvider</code>, so the logger receives the masker).
+                    Default rules live in <code>config/masking.php</code>
+                    (see <a href="#config">configuration</a>, <a href="configuration.html#file-masking">Configuration → masking.php</a>).
                 </p>
 
                 <h2 id="architecture" class="border-bottom pb-2 mb-3 mt-5">Architecture</h2>
@@ -61,60 +63,136 @@
                             <tr><th>Class</th><th>Role</th></tr>
                         </thead>
                         <tbody>
-                            <tr><td><code>MaskerInterface</code></td><td>Contract: <code>mask(mixed $data): mixed</code></td></tr>
-                            <tr><td><code>DataMasker</code></td><td>Rule orchestrator, recursive traversal</td></tr>
-                            <tr><td><code>RegexMasker</code></td><td>Built-in string and key patterns</td></tr>
-                            <tr><td><code>MaskingRuleInterface</code></td><td>Custom rule (<code>apply</code>, <code>isSensitiveKey</code>)</td></tr>
+                            <tr><td><code>DataMaskerInterface</code></td><td>Contract: <code>mask()</code>, <code>clearRules()</code></td></tr>
+                            <tr><td><code>DataMasker</code></td><td>Rule orchestrator, recursion over structures</td></tr>
+                            <tr><td><code>RegexDataMaskerRule</code></td><td>Regex for strings and key patterns (from <code>config/masking.php</code>)</td></tr>
+                            <tr><td><code>DataMaskerRuleInterface</code></td><td>Custom rule (<code>apply</code>, <code>isSensitiveKey</code>)</td></tr>
                         </tbody>
                     </table>
                 </div>
+                <p>
+                    By default <code>DataMaskerServiceProvider</code> creates a <code>DataMasker</code> with one
+                    <code>RegexDataMaskerRule</code> using patterns from configuration. The service is a shared singleton.
+                </p>
 
-                <h2 id="default-rules" class="border-bottom pb-2 mb-3 mt-5">Built-in rules</h2>
-                <p><strong>Keys</strong> matching sensitive name patterns are replaced with <code>***</code>:</p>
+                <h2 id="config" class="border-bottom pb-2 mb-3 mt-5">config/masking.php</h2>
+                <p>
+                    In the skeleton, <code>config/masking.php</code> defines three groups of settings.
+                    <code>DataMaskerServiceProvider</code> reads them via <code>ConfigInterface</code>
+                    (<code>ConfigKey::MASKING_PATTERNS</code>, <code>MASKING_KEY_PATTERNS</code>, <code>MASKING_RULES</code>)
+                    and builds one <code>RegexDataMaskerRule</code> plus additional classes from <code>masking.rules</code>:
+                </p>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+return [
+    'masking' =&gt; [
+        // Regex for strings (log messages, scalar values)
+        'patterns' =&gt; [
+            '/[a-z0-9_\-\+\.]+@[a-z0-9\-]+\.[a-z]{2,}/i' =&gt; '***@***.***',
+            '/\d{4}-\d{4}-\d{4}-\d{4}/' =&gt; '****-****-****-****',
+            '/(password|token|api_key|...)[:=]+([^\s,;]+)/i' =&gt; '$1=*****',
+        ],
+        // Regex for key names in arrays/objects → value becomes ***
+        'key_patterns' =&gt; [
+            '/.*password.*/i',
+            '/.*token.*/i',
+            '/.*_csrf_token.*/i',
+            '/api_key/i',
+        ],
+        // DataMaskerRuleInterface classes — resolved from DI
+        'rules' =&gt; [
+            // MyCustomMaskerRule::class,
+        ],
+    ],
+];</code></pre>
+                <ul>
+                    <li><code>patterns</code> — <code>RegexDataMaskerRule::apply()</code> for strings (email, cards, <code>password=…</code> in text)</li>
+                    <li><code>key_patterns</code> — <code>isSensitiveKey()</code>: matching key name → <code>DataMasker::MASK_CHARS</code> (<code>***</code>)</li>
+                    <li><code>rules</code> — additional rules; class must implement <code>DataMaskerRuleInterface</code></li>
+                </ul>
+                <p>
+                    Changes to <code>masking.php</code> do not require PHP edits — a request restart is enough.
+                </p>
+
+                <h2 id="default-rules" class="border-bottom pb-2 mb-3 mt-5">Default rules (skeleton)</h2>
+                <p>What stock <code>config/masking.php</code> provides in Concept Skeleton:</p>
+                <p><strong>Keys</strong> (<code>key_patterns</code>) — field value is replaced with <code>***</code>:</p>
                 <ul class="small">
-                    <li><code>password</code>, <code>token</code>, <code>_csrf_token</code>, <code>secret</code></li>
+                    <li>names containing <code>password</code>, <code>token</code>, <code>_csrf_token</code>, <code>secret</code></li>
                     <li><code>api_key</code>, <code>authorization</code></li>
                 </ul>
-                <p><strong>Strings</strong> are scrubbed with regex for emails, card numbers, and <code>key=value</code> secrets.</p>
+                <p><strong>Strings</strong> (<code>patterns</code>) — regex replacement in text:</p>
+                <ul class="small">
+                    <li>email → <code>***@***.***</code></li>
+                    <li>card number <code>9999-9999-9999-9999</code> → asterisks</li>
+                    <li>pairs like <code>password=...</code>, <code>token=...</code>, <code>api_key=...</code> → value replaced with <code>*****</code></li>
+                </ul>
 
                 <h2 id="logger" class="border-bottom pb-2 mb-3 mt-5">Logger integration</h2>
                 <p>
-                    <code>Logger</code> registers a Monolog processor that runs
-                    <code>$masker->mask($record->context)</code> on every log entry.
+                    <code>LogServiceProvider</code> passes <code>DataMaskerInterface</code> to
+                    <code>Concept\Core\Components\Logger\Logger</code>. The Monolog processor masks
+                    <code>$record->context</code> before writing to file or stderr.
                 </p>
                 <pre class="mb-4"><code class="language-php">$logger->info('User updated', [
-    'email' => 'user@example.com',
-    'password' => 'secret123',  // logged as ***
+    'email' =&gt; 'user@example.com',
+    'password' =&gt; 'secret123',  // logged as ***
 ]);</code></pre>
-                <p>Log messages themselves are not masked — keep secrets in <code>context</code> only.</p>
+                <p>
+                    The message (<code>$message</code>) is not masked automatically — do not embed passwords or tokens
+                    in the message text; put them only in <code>context</code>.
+                </p>
 
                 <h2 id="manual" class="border-bottom pb-2 mb-3 mt-5">Manual usage</h2>
-                <pre class="mb-4"><code class="language-php">use Concept\Core\Components\Masker\Contracts\MaskerInterface;
+                <pre class="mb-4"><code class="language-php">use Concept\Core\Components\DataMasker\Contracts\DataMaskerInterface;
 
-/** @var MaskerInterface $masker */
-$masker = $container->get(MaskerInterface::class);
-$safe = $masker->mask($requestPayload);</code></pre>
-                <p><code>mask()</code> deep-clones arrays/objects; <code>maskRecursive()</code> mutates in place.</p>
+/** @var DataMaskerInterface $masker */
+$masker = $container-&gt;get(DataMaskerInterface::class);
+
+$safe = $masker-&gt;mask([
+    'login' =&gt; 'oleh',
+    'password' =&gt; 'hunter2',
+    'card' =&gt; '4111-1111-1111-1111',
+]);</code></pre>
+                <p>
+                    The <code>mask()</code> method for arrays and objects first performs a <code>deepClone</code> so
+                    the original is not modified. <code>maskRecursive()</code> modifies the passed structure in place — useful
+                    when cloning is unnecessary.
+                </p>
 
                 <h2 id="custom-rules" class="border-bottom pb-2 mb-3 mt-5">Custom rules</h2>
-                <p>In your own provider (registered after <code>MaskerServiceProvider</code>), rebuild the shared binding:</p>
-                <pre class="mb-4"><code class="language-php">$masker = new DataMasker();
-$masker->addRule(new RegexMasker(
-    customPatterns: ['/iban=\d+/i' => 'iban=***'],
-    customKeyPatterns: ['/.*_pin$/i']
-));
-$container->add(MaskerInterface::class, fn () => $masker)->setShared(true);</code></pre>
-                <p>Implement <code>MaskingRuleInterface</code> for domain-specific redaction logic.</p>
-
-                <h2 id="debugbar" class="border-bottom pb-2 mb-3 mt-5">DebugBar and other tools</h2>
                 <p>
-                    The DebugBar component injects the masker into its request collector so
-                    <code>$_POST</code> and <code>$_SESSION</code> are shown redacted. Follow the same pattern in custom diagnostics.
+                    Usually extending <code>config/masking.php</code> is enough (see <a href="#config">above</a>).
+                    If you need full control — in your own provider (after <code>DataMaskerServiceProvider</code>)
+                    you can override the binding:
+                </p>
+                <pre class="mb-4"><code class="language-php">use Concept\Core\Components\DataMasker\Contracts\DataMaskerInterface;
+use Concept\Core\Components\DataMasker\DataMasker;
+use Concept\Core\Components\DataMasker\RegexDataMaskerRule;
+
+$masker = new DataMasker();
+$masker-&gt;addRule(new RegexDataMaskerRule(
+    patterns: ['/iban=\d+/i' =&gt; 'iban=***'],
+    keyPatterns: ['/.*_pin$/i']
+));
+
+$container-&gt;add(DataMaskerInterface::class, fn () =&gt; $masker)-&gt;setShared(true);</code></pre>
+                <p>
+                    Or add a class to <code>masking.rules</code> in configuration — the provider will wire it through DI.
+                    For more complex logic, implement <code>DataMaskerRuleInterface</code>.
+                </p>
+
+                <h2 id="debugbar" class="border-bottom pb-2 mb-3 mt-5">DebugBar and other components</h2>
+                <p>
+                    The DebugBar component injects <code>DataMaskerInterface</code> into the request collector — the panel shows
+                    already masked values for <code>$_POST</code>, <code>$_SESSION</code>, etc.
+                    Any custom diagnostic tool should be built the same way.
                 </p>
 
                 <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
                     <p class="mb-0">
-                        Masking reduces leakage via logs and dev tools; it does not encrypt data at rest or strip fields from HTTP responses.
+                        Masking does not replace database encryption and does not remove sensitive fields from HTTP responses.
+                        It reduces the risk of leakage through logs and dev tools.
                     </p>
                 </div>
 

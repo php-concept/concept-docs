@@ -124,7 +124,7 @@ $router->group('/admin/users', function (RouteGroup $route) {
 })->lazyMiddleware(AuthMiddleware::class);</code></pre>
                 <p>
                     Публічний login — без <code>AuthMiddleware</code>; захищені групи — з middleware модуля.
-                    Імена маршрутів (<code>admin.*</code>) використовуються в <code>redirectByName()</code> і Twig <code>path()</code>.
+                    Імена маршрутів (<code>admin.*</code>) використовуються в <code>redirectByName()</code> і Twig <code>uri()</code>.
                 </p>
 
                 <h2 id="step-5" class="border-bottom pb-2 mb-3 mt-5">5. Middleware авторизації</h2>
@@ -163,7 +163,7 @@ public function showLogin(): ResponseInterface
                 <pre class="mb-4"><code class="language-twig">{# Views/login.twig — namespace auth-admin, layout з App #}
 {% extends '@dashboard/layouts/auth.twig' %}
 
-&lt;form method="post" action="{{ path('admin.login.submit') }}"&gt;
+&lt;form method="post" action="{{ uri('admin.login.submit') }}"&gt;
     &lt;input type="hidden" name="_csrf_token" value="{{ csrf_token }}"&gt;
     ...
 &lt;/form&gt;</code></pre>

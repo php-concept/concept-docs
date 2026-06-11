@@ -19,8 +19,9 @@
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
             <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="../en/console.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/console.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/console.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/console.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -41,10 +42,299 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Console</h1>
+
                 <p>
-                    Full documentation is available in
-                    <a href="../uk/console.html">Ukrainian</a>.
+                    The application CLI is built on
+                    <a href="https://symfony.com/doc/current/console.html" target="_blank" rel="noopener">Symfony Console</a>.
+                    Entry point — <code>bin/console.php</code>; commands are registered through the DI container and
+                    <code>ConsoleServiceProvider</code>.
                 </p>
+                <p>
+                    See also:
+                    <a href="setup.html#bin">Setup → bin/console.php</a>,
+                    <a href="service-providers.html#cli-providers">CLI providers</a>,
+                    <a href="console-commands.html">creating custom commands</a>,
+                    <a href="database.html#cli">Database → console commands</a>.
+                </p>
+
+                <h2 id="architecture" class="border-bottom pb-2 mb-3 mt-5">Core classes</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Class</th><th>Role</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>ConsoleServiceProvider</code></td>
+                                <td><code>Symfony\Component\Console\Application</code>, registration from <code>config/commands.php</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>ComponentsServiceProvider</code></td>
+                                <td>Adds component commands in <code>boot()</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>DisabledCommand</code></td>
+                                <td>Stub when a command cannot be created from DI</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h2 id="run" class="border-bottom pb-2 mb-3 mt-5">Running</h2>
+                <p>From the project root:</p>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php
+
+# help
+php bin/console.php list
+
+# help for one command
+php bin/console.php help db:migrate</code></pre>
+                <p>
+                    CLI bootstrap differs from HTTP: it loads
+                    <code>bootstrap/providers/console.php</code>. For details see
+                    <a href="setup.html#bootstrap-providers-console">Setup</a> and the
+                    <a href="#providers">providers and commands</a> section below.
+                </p>
+
+                <h2 id="how-it-works" class="border-bottom pb-2 mb-3 mt-5">How it works</h2>
+                <pre class="mb-4"><code class="language-php">require __DIR__ . '/../vendor/autoload.php';
+
+$rootPath = dirname(__DIR__);
+$paths = include $rootPath . '/bootstrap/paths.php';
+$app = App::create($rootPath, $paths);
+$app-&gt;registerServiceProviders([$rootPath . '/bootstrap/providers/console.php']);
+
+$console = $app-&gt;getContainer()-&gt;get(ConsoleApplication::class);
+$console-&gt;run();</code></pre>
+                <ol>
+                    <li><code>ConsoleServiceProvider</code> creates <code>Application</code> with name/version from <code>app.name</code> / <code>app.version</code></li>
+                    <li>Classes from <code>config/commands.php</code> (<code>ConfigKey::COMMANDS</code>) are resolved from DI and added to the application</li>
+                    <li>If a command dependency is unavailable — a <code>DisabledCommand</code> is registered with an error explanation</li>
+                    <li><code>ComponentsServiceProvider::boot()</code> adds commands from <code>commands</code> in each component <code>config.php</code></li>
+                </ol>
+                <pre class="mb-4"><code class="language-php">// config/commands.php (fragment)
+return [
+    'commands' =&gt; [
+        DbMigrateCommand::class,
+        RouteListCommand::class,
+        // ...
+    ],
+];</code></pre>
+
+                <h2 id="providers" class="border-bottom pb-2 mb-3 mt-5">Providers and command dependencies</h2>
+                <p>
+                    Each command is a regular Symfony Console service: dependencies are passed through the constructor and
+                    resolved from the DI container. If the provider that registers a service is missing from
+                    <code>bootstrap/providers/console.php</code>, the command is not created — instead a
+                    <a href="#disabled-commands"><code>DisabledCommand</code></a> appears.
+                </p>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Command</th>
+                                <th>Dependencies (DI)</th>
+                                <th>Required providers</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>db:migrate</code>, <code>db:rollback</code></td>
+                                <td><code>Migrator</code>, <code>MigrationRegistry</code></td>
+                                <td><code>DatabaseServiceProvider</code> (<code>boot()</code> — Capsule)</td>
+                            </tr>
+                            <tr>
+                                <td><code>migration:list</code></td>
+                                <td><code>CapsuleManager</code>, <code>ConfigInterface</code></td>
+                                <td><code>ConfigServiceProvider</code>, <code>DatabaseServiceProvider</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>db:seed</code></td>
+                                <td><code>SeederManager</code></td>
+                                <td><code>DatabaseServiceProvider</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>seeders:list</code></td>
+                                <td><code>SeederRegistry</code></td>
+                                <td><code>DatabaseServiceProvider</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>route:list</code></td>
+                                <td><code>RouterInterface</code></td>
+                                <td><code>HttpServiceProvider</code>, <code>ConfigServiceProvider</code> (paths to <code>routes/*.php</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>view:clear</code></td>
+                                <td><code>PathManager</code>, <code>ConfigInterface</code></td>
+                                <td><code>ConfigServiceProvider</code> (Twig not required in CLI)</td>
+                            </tr>
+                            <tr>
+                                <td><code>component:list</code>, <code>component:publish-assets</code></td>
+                                <td><code>ComponentRegistry</code></td>
+                                <td><code>ComponentsServiceProvider</code> (last, after <code>ConsoleServiceProvider</code>)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <p>Recommended minimum (<code>bootstrap/providers/console.php</code>):</p>
+                <pre class="mb-4"><code class="language-php">return [
+    ConfigServiceProvider::class,        // config, PathManager
+    HttpServiceProvider::class,          // RouterInterface → route:list
+    SessionServiceProvider::class,       // if commands/seeders touch session
+    ErrorHandlerServiceProvider::class,
+    LogServiceProvider::class,
+    DatabaseServiceProvider::class,      // db:*, migration:list, seeders:list
+    ConsoleServiceProvider::class,       // Application + commands from config/commands.php
+    DebugLoggerServiceProvider::class,
+    ComponentsServiceProvider::class,    // component:* + component commands
+];</code></pre>
+                <p class="small text-body-secondary">
+                    <code>ConsoleServiceProvider</code> must come <em>before</em> <code>ComponentsServiceProvider</code>:
+                    the latter adds component commands in <code>boot()</code> to an already created <code>ConsoleApplication</code>.
+                </p>
+
+                <h3 id="http-in-cli" class="mt-4">Why CLI needs <code>HttpServiceProvider</code></h3>
+                <p>
+                    At first glance the HTTP stack in the console seems unnecessary — CLI does not handle browser requests. But
+                    <code>route:list</code> injects <code>RouterInterface</code>, and the router is registered by
+                    <code>HttpServiceProvider</code>: it creates <code>League\Route\Router</code>, wires
+                    <code>RouteStrategy</code>, and loads files from <code>config/routes.php</code> (and component routes
+                    — via <code>ComponentsServiceProvider</code>).
+                </p>
+                <p>
+                    Without <code>HttpServiceProvider</code> the container does not know <code>RouterInterface</code> →
+                    <code>RouteListCommand</code> cannot be built → in <code>php bin/console.php list</code> you see
+                    <code>route:list</code> with a red disabled warning (as in the screenshot below).
+                    A full list of component routes additionally requires
+                    <code>ComponentsServiceProvider</code>, which loads each component’s <code>routes.php</code>.
+                </p>
+                <p>
+                    In CLI <strong><code>App::run()</code> is not called</strong> and no request is dispatched.
+                    The provider only builds the same route graph as the web application, so diagnostics
+                    (<code>route:list</code>, <code>-F</code> for middleware) show the real picture.
+                    <code>ServerRequestInterface</code> in CLI is an “empty” PSR-7 from <code>fromGlobals()</code>;
+                    that is enough for listing routes.
+                </p>
+                <p>
+                    Twig, Validation, and ViewRegistry are intentionally omitted from the console bootstrap — no built-in command needs them.
+                    <code>HttpServiceProvider</code> also registers
+                    <code>ResponseFactory</code> and <code>ViewResponseFactory</code>, but CLI commands do not resolve them.
+                </p>
+
+                <h3 id="disabled-commands" class="mt-4">If a provider is missing — <code>DisabledCommand</code></h3>
+                <p>
+                    In <code>ConsoleServiceProvider::addConsoleCommands()</code> each class from
+                    <code>config/commands.php</code> is created via <code>$container-&gt;get($className)</code>.
+                    Any <code>Throwable</code> (missing binding, autowire failure, provider not
+                    registered) is caught — instead of the real command a
+                    <code>DisabledCommand</code> is added with the same name (<code>COMMAND_NAME</code> from the original class).
+                </p>
+                <p>In <code>php bin/console.php list</code> output such commands have the description:</p>
+                <pre class="mb-3"><code class="language-text text-danger">!!! WARNING: This command is disabled (possible missing dependencies).
+Run command to see details. !!!</code></pre>
+                <p>Typical picture with a “trimmed” <code>console.php</code> (without HTTP and components):</p>
+                <ul class="small">
+                    <li><code>route:list</code> — disabled (no <code>HttpServiceProvider</code>)</li>
+                    <li><code>component:list</code>, <code>component:publish-assets</code> — disabled (no <code>ComponentsServiceProvider</code>)</li>
+                    <li><code>db:migrate</code>, <code>db:rollback</code> — disabled (missing or <code>boot()</code> not completed for <code>DatabaseServiceProvider</code>)</li>
+                    <li><code>db:seed</code>, <code>seeders:list</code>, <code>migration:list</code>, <code>view:clear</code> — often remain active because their dependencies are simpler or do not need the full HTTP stack</li>
+                </ul>
+                <p>To see the exact reason, run the disabled command:</p>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php route:list</code></pre>
+                <p>Example output:</p>
+                <pre class="mb-4"><code class="language-text text-warning">Command Disabled: route:list
+
+ [WARNING] This command cannot be executed because its dependencies are not met.
+           Likely a required ServiceProvider is not registered in bootstrap/providers/.
+
+ Original Class   Concept\Core\Console\Commands\RouteListCommand
+ Error Detail     ... (container exception text, e.g. class not found)</code></pre>
+                <p>
+                    Fix: add the corresponding provider to <code>bootstrap/providers/console.php</code>
+                    (see table above) and restart the console. For custom commands — same rule: if a command
+                    needs <code>DatabaseInterface</code>, without <code>DatabaseServiceProvider</code> it will also become
+                    disabled.
+                </p>
+
+                <h2 id="built-in" class="border-bottom pb-2 mb-3 mt-5">Core commands</h2>
+                <p>Registered in <code>config/commands.php</code>:</p>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Command</th><th>Purpose</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>db:migrate</code></td><td>Run migrations</td></tr>
+                            <tr><td><code>migration:list</code></td><td>List rows in the <code>migrations</code> table (<code>-l</code> — limit)</td></tr>
+                            <tr><td><code>db:rollback</code></td><td>Rollback the last migration batch</td></tr>
+                            <tr><td><code>db:seed</code></td><td>All seeders; <code>-c "Fully\Qualified\Class"</code> — one (full FQCN)</td></tr>
+                            <tr><td><code>seeders:list</code></td><td>List registered seeders</td></tr>
+                            <tr><td><code>route:list</code></td><td>Route table; <code>-F</code> / <code>--full-middleware</code> — middleware FQCN</td></tr>
+                            <tr><td><code>view:clear</code></td><td>Clear Twig cache directory (<code>storage/cache/{view.cache_dir}</code>)</td></tr>
+                            <tr><td><code>component:list</code></td><td>List enabled components (<code>ComponentRegistry</code>)</td></tr>
+                            <tr><td><code>component:publish-assets</code></td><td>Copy <code>assets</code> from component <code>config.php</code> to <code>public/</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="examples" class="mt-4">Examples</h3>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php db:migrate
+php bin/console.php migration:list
+php bin/console.php db:seed
+php bin/console.php db:seed -c "Concept\Components\AuthAdmin\Database\Seeders\UserSeeder"
+php bin/console.php seeders:list
+php bin/console.php route:list
+php bin/console.php route:list -F
+php bin/console.php component:list
+php bin/console.php view:clear</code></pre>
+
+                <h2 id="component-commands" class="border-bottom pb-2 mb-3 mt-5">Component commands</h2>
+                <p>
+                    A component adds commands in the <code>commands</code> section of its <code>config.php</code>.
+                    During <code>ComponentsServiceProvider::boot()</code> they are resolved from the container
+                    and added to the same <code>ConsoleApplication</code>.
+                    CLI does not register component view extensions/paths (only commands, migrations, seeders, providers).
+                </p>
+                <pre class="mb-4"><code class="language-php">// src/Components/AuthAdmin/config.php
+'commands' =&gt; [
+    UserListCommand::class,
+],
+
+// php bin/console.php user:list
+// php bin/console.php user:list --limit=5</code></pre>
+                <p>
+                    Application custom commands go in <code>config/commands.php</code> under
+                    <code>// Custom Business Commands</code>. Details — <a href="console-commands.html">Creating commands</a>.
+                </p>
+
+                <h2 id="exit-codes" class="border-bottom pb-2 mb-3 mt-5">Exit codes</h2>
+                <p>
+                    Commands return <code>Command::SUCCESS</code> (0) or <code>Command::FAILURE</code> (1).
+                    In CI scripts check the exit code after <code>php bin/console.php ...</code>.
+                </p>
+
+                <h2 id="env" class="border-bottom pb-2 mb-3 mt-5">Environment and config</h2>
+                <p>
+                    CLI uses the same <code>.env</code> and <code>ConfigServiceProvider</code> as HTTP.
+                    <code>APP_ENV</code> drives <code>config/{env}/</code> overrides and the component list
+                    (for example DebugBar only in <code>config/dev/components.php</code>).
+                </p>
+                <p>
+                    Migrations and seeders require a correct DB connection in
+                    <a href="database.html#configuration"><code>config/db.php</code></a> (or via <code>.env</code>).
+                </p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        The console is for maintenance (migrations, cache, diagnostics) and local development.
+                        Long-running business logic belongs in services; keep the command as a thin call.
+                        If a command is “disabled” — first check <a href="#providers">CLI providers</a>, not the command itself.
+                    </p>
+                </div>
+
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>
 
@@ -56,6 +346,8 @@
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/bash.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
     <script src="../assets/js/nav-en.js"></script>
     <script src="../assets/js/docs.js"></script>

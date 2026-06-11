@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Route Interceptors — Concept Core Documentation">
+    <title>Route Interceptors - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="route-interceptors">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/route-interceptors.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/route-interceptors.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Menu</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Route Interceptors</h1>
+
+                <p>
+                    Route interceptors are global pre-handler hooks that the core invokes in
+                    <code>RouteStrategy</code> <strong>after</strong> middleware but <strong>before</strong>
+                    autowiring and the controller call. They are convenient for access control (ACL),
+                    policies, and business constraints at the named-route level.
+                </p>
+                <p>
+                    The core provides only the <code>RouteInterceptorInterface</code> — exception types,
+                    ACL rules, and responses (403, redirect) are defined by the application.
+                </p>
+                <p>
+                    See also: <a href="middleware.html">Middleware</a>,
+                    <a href="routing.html">Routing</a>,
+                    <a href="request-lifecycle.html#controller">request lifecycle → RouteStrategy</a>.
+                </p>
+
+                <h2 id="vs-middleware" class="border-bottom pb-2 mb-3 mt-5">Interceptors and middleware</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>Route interceptors</th>
+                                <th>Middleware</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Contract</td>
+                                <td><code>RouteInterceptorInterface::intercept()</code></td>
+                                <td>PSR-15 <code>MiddlewareInterface::process()</code></td>
+                            </tr>
+                            <tr>
+                                <td>Registration</td>
+                                <td><code>config/routes.php</code> → <code>routes.interceptors</code></td>
+                                <td><code>lazyMiddleware()</code> in route files</td>
+                            </tr>
+                            <tr>
+                                <td>Scope</td>
+                                <td>Global for all route matches</td>
+                                <td>Global, group, or single route</td>
+                            </tr>
+                            <tr>
+                                <td>Typical denial</td>
+                                <td>Throw an exception (403, 401…)</td>
+                                <td>Return <code>ResponseInterface</code> (redirect)</td>
+                            </tr>
+                            <tr>
+                                <td>Example</td>
+                                <td>ACL by route <code>setName()</code></td>
+                                <td><code>AuthMiddleware</code> → redirect to login</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>
+                    In practice, both approaches are often combined: middleware on the <code>/admin</code> group
+                    checks “is logged in” and redirects; an interceptor checks “is this named route allowed”
+                    and throws an exception.
+                </p>
+
+                <h2 id="registration" class="border-bottom pb-2 mb-3 mt-5">Registration</h2>
+                <p>Add interceptor classes to <code>config/routes.php</code>:</p>
+                <pre class="mb-4"><code class="language-php">return [
+    'routes' => [
+        'interceptors' => [
+            AclRouteAuthorization::class,
+        ],
+        'list' => [
+            dirname(__DIR__) . '/routes/web.php',
+        ],
+    ],
+];</code></pre>
+                <p>
+                    Order in the array is the invocation order. The class is resolved from the DI container
+                    (constructor dependencies are injected automatically).
+                </p>
+
+                <h2 id="acl-example" class="border-bottom pb-2 mb-3 mt-5">Example: access control check</h2>
+                <p>
+                    An interceptor receives a <code>League\Route\Route</code> object and a PSR-7 request.
+                    The route name (<code>setName()</code>) is convenient as a permission key:
+                </p>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+namespace Concept\App\Http\Interceptors;
+
+use Concept\App\Exceptions\AccessDeniedException;
+use Concept\App\Services\AclService;
+use Concept\Core\Http\Contracts\RouteInterceptorInterface;
+use League\Route\Route;
+use Psr\Http\Message\ServerRequestInterface;
+
+final class AclRouteAuthorization implements RouteInterceptorInterface
+{
+    public function __construct(
+        private readonly AclService $acl,
+    ) {}
+
+    public function intercept(Route $route, ServerRequestInterface $request): void
+    {
+        $routeName = $route->getName();
+        if ($routeName === null) {
+            return;
+        }
+
+        if (!$this->acl->canAccessRoute($routeName)) {
+            throw new AccessDeniedException(
+                sprintf('Access denied for route [%s]', $routeName)
+            );
+        }
+    }
+}</code></pre>
+                <p>Application-specific exception (the core does not define this type):</p>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+namespace Concept\App\Exceptions;
+
+use RuntimeException;
+
+final class AccessDeniedException extends RuntimeException
+{
+}</code></pre>
+
+                <h2 id="exceptions" class="border-bottom pb-2 mb-3 mt-5">What happens to the exception</h2>
+                <p>
+                    An interceptor does not return a response — it only throws an exception or completes without action.
+                    An unhandled exception is caught by Whoops (<code>ErrorHandlerServiceProvider</code>):
+                </p>
+                <ul>
+                    <li><strong>JSON / AJAX</strong> — <code>RequestFormat::expectsJson()</code> → <code>JsonResponseHandler</code></li>
+                    <li><strong>Debug web</strong> — <code>app.debug</code> → Pretty Page</li>
+                    <li><strong>Production web</strong> — fallback from <code>PathName::ERRORS_FALLBACK_VIEWS</code></li>
+                </ul>
+                <p>
+                    For a predictable 403 or redirect response, wrap the handler in
+                    middleware (next section) rather than relying solely on Whoops.
+                </p>
+
+                <h2 id="middleware-redirect" class="border-bottom pb-2 mb-3 mt-5">Redirect and 403 via middleware</h2>
+                <p>
+                    Middleware can catch an exception from an interceptor (similar to
+                    <code>HandleValidationExceptionMiddleware</code>) and return a redirect or JSON:
+                </p>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+namespace Concept\App\Http\Middlewares;
+
+use Concept\App\Exceptions\AccessDeniedException;
+use Concept\Core\Http\Contracts\ResponseFactoryInterface;
+use Concept\Core\Http\Protocol\HttpStatusCode;
+use Concept\Core\Http\RequestFormat;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\MiddlewareInterface;
+use Psr\Http\Server\RequestHandlerInterface;
+
+final class HandleAccessDeniedMiddleware implements MiddlewareInterface
+{
+    public function __construct(
+        private readonly ResponseFactoryInterface $response,
+        private readonly RequestFormat $requestFormat,
+    ) {}
+
+    public function process(
+        ServerRequestInterface $request,
+        RequestHandlerInterface $handler
+    ): ResponseInterface {
+        try {
+            return $handler->handle($request);
+        } catch (AccessDeniedException $e) {
+            if ($this->requestFormat->expectsJson($request)) {
+                return $this->response->jsonError(
+                    $e->getMessage(),
+                    HttpStatusCode::FORBIDDEN
+                );
+            }
+
+            return $this->response->redirectByName('admin.login');
+        }
+    }
+}</code></pre>
+                <p>Register middleware <strong>outside</strong> the interceptor chain (first in the route file):</p>
+                <pre class="mb-4"><code class="language-php">$router->lazyMiddleware(HandleAccessDeniedMiddleware::class);
+$router->lazyMiddleware(HandleValidationExceptionMiddleware::class);
+// ... other middleware</code></pre>
+                <p>
+                    This keeps the interceptor “thin” (check + throw only), while response format
+                    (HTML redirect vs JSON 403) is centralized in middleware.
+                </p>
+
+                <h2 id="auth-middleware-only" class="border-bottom pb-2 mb-3 mt-5">Alternative: middleware only (redirect)</h2>
+                <p>
+                    If a simple “logged in / active user” check is enough without ACL by named route,
+                    redirect can be done without an interceptor —
+                    <code>AuthMiddleware</code>:
+                </p>
+                <pre class="mb-4"><code class="language-php">public function process(
+    ServerRequestInterface $request,
+    RequestHandlerInterface $handler
+): ResponseInterface {
+    if (!$this->auth->check()) {
+        return new RedirectResponse('/admin/login', HttpStatusCode::FOUND);
+    }
+
+    return $handler->handle($request);
+}</code></pre>
+                <p>
+                    Or via <code>ResponseFactoryInterface::redirectByName()</code> — see
+                    <a href="middleware.html#auth-middleware">Middleware → authorization examples</a>.
+                </p>
+
+                <h2 id="combined-flow" class="border-bottom pb-2 mb-3 mt-5">Combined scenario</h2>
+                <div class="docs-mermaid mb-4">
+                    <pre class="mermaid">flowchart TB
+    REQ["HTTP request"]
+    MW1["HandleAccessDeniedMiddleware"]
+    MW2["AuthMiddleware on /admin"]
+    MATCH["Router match"]
+    INT["AclRouteAuthorization"]
+    CTRL["Controller"]
+
+    REQ --> MW1 --> MW2 --> MATCH --> INT
+    INT -->|"can access"| CTRL
+    INT -->|"AccessDeniedException"| MW1
+    MW2 -->|"not logged in"| REDIR["RedirectResponse login"]
+    MW1 -->|"catch"| RESP["JSON 403 or redirect"]</pre>
+                </div>
+                <ol>
+                    <li><code>AuthMiddleware</code> on the group — coarse session check, redirect without exception.</li>
+                    <li><code>AclRouteAuthorization</code> — fine-grained permission check for named route, <code>throw</code>.</li>
+                    <li><code>HandleAccessDeniedMiddleware</code> — catches the exception, responds to the client.</li>
+                </ol>
+
+                <h2 id="tips" class="border-bottom pb-2 mb-3 mt-5">Tips</h2>
+                <ul>
+                    <li>Always name routes (<code>setName()</code>) if ACL is tied to the name.</li>
+                    <li>Do not duplicate login checks in interceptor and middleware — separate roles.</li>
+                    <li>For API — JSON via <code>HandleAccessDeniedMiddleware</code> + <code>expectsJson()</code>.</li>
+                    <li>Interceptor does not replace CSRF — <code>VerifyCsrfTokenMiddleware</code> stays in the stack.</li>
+                </ul>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'dark', securityLevel: 'loose' });
+    </script>
+    <script src="../assets/js/nav-en.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

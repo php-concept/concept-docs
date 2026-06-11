@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Install Concept Core via Composer">
+    <meta name="description" content="Installing Concept Skeleton or the php-concept/core package">
     <title>Installation - Concept Core Documentation</title>
     <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
@@ -19,8 +19,9 @@
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
             <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="installation.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/installation.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/installation.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/installation.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -42,49 +43,112 @@
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Installation</h1>
 
-                <h2 id="meet-php" class="border-bottom pb-2 mb-3 mt-5">Meet Concept</h2>
                 <p>
-                    The recommended way to start a new project is to use the official skeleton application, which already
-                    includes <code>php-concept/core</code> and a working bootstrap.
+                    Concept Core is distributed as the Composer package <code>php-concept/core</code>.
+                    You can start in two ways: with the ready-made <strong>Concept Skeleton</strong> (recommended for new projects)
+                    or by adding <strong>core only</strong> to your own application.
                 </p>
 
-                <h2 id="requirements" class="border-bottom pb-2 mb-3 mt-5">Server Requirements</h2>
-                <p>Concept Core requires:</p>
+                <h2 id="requirements" class="border-bottom pb-2 mb-3 mt-5">Requirements</h2>
+                <p>For <code>php-concept/core</code> you need:</p>
                 <ul>
-                    <li>PHP 8.4 or higher</li>
-                    <li>Composer 2.x</li>
-                    <li>Extensions: <code>mbstring</code>, <code>json</code>, <code>pdo</code> (when using the database component)</li>
+                    <li>PHP <strong>8.4</strong> or newer</li>
+                    <li>Composer <strong>2.x</strong></li>
+                    <li>PHP extensions: <code>json</code>, <code>mbstring</code>, <code>dom</code>, <code>xml</code></li>
+                    <li><code>pdo</code> — if you use a database (Eloquent, migrations)</li>
                 </ul>
-
-                <h2 id="composer" class="border-bottom pb-2 mb-3 mt-5">Installing via Composer</h2>
-                <pre class="mb-4"><code class="language-bash">composer require php-concept/core:^1.0</code></pre>
-
-                <h2 id="bootstrap" class="border-bottom pb-2 mb-3 mt-5">Bootstrapping the Application</h2>
-                <p>Create the application instance in your front controller (e.g. <code>public/index.php</code>):</p>
-                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
-
-use Concept\Core\App;
-
-$app = App::create(
-    rootPath: dirname(__DIR__),
-    paths: [
-        'config' =&gt; 'config',
-        'storage' =&gt; 'storage',
-        'routes' =&gt; 'routes',
-    ],
-);
-
-$app-&gt;registerServiceProviders([
-    $app-&gt;getRootPath() . '/bootstrap/providers/app.php',
-]);
-
-$app-&gt;run();</code></pre>
-
-                <h2 id="next-steps" class="border-bottom pb-2 mb-3 mt-5">Next Steps</h2>
                 <p>
-                    After installation, configure your environment in
-                    <a href="configuration.html">Configuration</a> and register routes.
+                    Concept Skeleton additionally expects <code>pdo_mysql</code>, <code>mysqli</code>, <code>zip</code>
+                    (see <code>Dockerfile</code> in the skeleton repository). For local development without Docker,
+                    PHP with these extensions and a web server with document root on <code>public/</code> is enough.
                 </p>
+
+                <h2 id="skeleton" class="border-bottom pb-2 mb-3 mt-5">Concept Skeleton</h2>
+                <p>
+                    <a href="https://github.com/php-concept/concept-skeleton" target="_blank" rel="noopener">Concept Skeleton</a>
+                    is a minimal starter application: core already wired, bootstrap, providers, <code>/</code> route
+                    with a landing page, Twig, config, and a CLI example. The fastest way to see Concept Core in action.
+                </p>
+
+                <h3 id="skeleton-install" class="h5 mt-4">Step 1. Clone and dependencies</h3>
+                <pre class="mb-4"><code class="language-bash">git clone https://github.com/php-concept/concept-skeleton.git my-app
+cd my-app
+
+composer install</code></pre>
+
+                <h3 id="skeleton-env" class="h5 mt-4">Step 2. Environment</h3>
+                <pre class="mb-4"><code class="language-bash">cp .env.example .env</code></pre>
+                <p>
+                    Edit <code>.env</code>: <code>APP_ENV</code>, <code>APP_DEBUG</code>, DB settings, etc.
+                    More details — in <a href="configuration.html">Configuration</a>.
+                </p>
+
+                <h3 id="skeleton-web" class="h5 mt-4">Step 3. Web server</h3>
+                <p>
+                    Document root must point to the <code>public/</code> directory. Front controller —
+                    <code>public/index.php</code>; it loads autoload and <code>bootstrap/app.php</code>.
+                </p>
+                <p>For a quick local check:</p>
+                <pre class="mb-4"><code class="language-bash">php -S localhost:8080 -t public</code></pre>
+                <p>Open <code>http://localhost:8080/</code> — the Concept Skeleton landing page should appear.</p>
+
+                <h3 id="skeleton-docker" class="h5 mt-4">Docker (optional)</h3>
+                <pre class="mb-4"><code class="language-bash">cp docker-compose.yml.example docker-compose.yml
+# Edit container_name and volumes
+docker compose up -d
+
+docker exec -it container_name bash
+composer install</code></pre>
+                <p>
+                    Apache vhost in skeleton: <code>docker/apache/vhost.conf</code> (<code>DocumentRoot</code> → <code>public/</code>).
+                </p>
+
+                <h3 id="skeleton-includes" class="h5 mt-4">What is already configured in skeleton</h3>
+                <ul>
+                    <li><code>php-concept/core</code> in <code>composer.json</code></li>
+                    <li><code>bootstrap/paths.php</code>, <code>bootstrap/app.php</code>, HTTP and CLI providers</li>
+                    <li>Routes in <code>routes/web.php</code>, views in <code>resources/views/frontend/</code></li>
+                    <li>PSR-4: namespace <code>Concept\</code> → <code>src/</code></li>
+                    <li>CLI: <code>php bin/console.php route:list</code></li>
+                </ul>
+                <p>
+                    Bootstrap, entry points, and <code>paths.php</code> are described in detail in
+                    <a href="setup.html">Setup</a>.
+                </p>
+
+                <h2 id="core-only" class="border-bottom pb-2 mb-3 mt-5">Core only</h2>
+                <p>
+                    Install only <code>php-concept/core</code> if you integrate Concept into an existing project
+                    or assemble the directory structure yourself. Core does not create files for you — after Composer
+                    you must manually set up bootstrap, config, routes, and entry points.
+                </p>
+                <pre class="mb-4"><code class="language-bash">composer require php-concept/core</code></pre>
+                <p>Then create at minimum:</p>
+                <ul>
+                    <li><code>bootstrap/paths.php</code>, <code>bootstrap/app.php</code>, <code>bootstrap/providers/app.php</code></li>
+                    <li><code>public/index.php</code> (HTTP) and optionally <code>bin/console.php</code> (CLI)</li>
+                    <li><code>config/</code>, <code>routes/</code>, <code>storage/</code> — depending on enabled providers</li>
+                </ul>
+                <p>
+                    Step-by-step bootstrap, <code>paths.php</code>, providers, and console —
+                    in <a href="setup.html#core-only">Setup</a>.
+                    Directory organization options — in <a href="directory-structure.html">Directory structure</a>.
+                </p>
+
+                <div class="alert alert-secondary border-start border-secondary border-4 rounded-end" role="note">
+                    <h3 class="h6 alert-heading">Skeleton vs core only</h3>
+                    <ul class="mb-0">
+                        <li><strong>Skeleton</strong> — ready project; clone, configure <code>.env</code>, start working.</li>
+                        <li><strong>Core only</strong> — full control over structure; more manual bootstrap and config work.</li>
+                    </ul>
+                </div>
+
+                <h2 id="next-steps" class="border-bottom pb-2 mb-3 mt-5">Next steps</h2>
+                <ul>
+                    <li><strong>Skeleton:</strong> <a href="configuration.html">Configuration</a> → <a href="request-lifecycle.html">Request lifecycle</a></li>
+                    <li><strong>Core only:</strong> <a href="setup.html">Setup</a> → <a href="configuration.html">Configuration</a></li>
+                    <li><a href="directory-structure.html">Directory structure</a> — organizing <code>src/</code></li>
+                </ul>
 
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>

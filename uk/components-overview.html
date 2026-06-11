@@ -150,7 +150,7 @@ return [
                 <h2 id="boot" class="border-bottom pb-2 mb-3 mt-5">Що відбувається при boot</h2>
                 <p><code>ComponentsServiceProvider::boot()</code> для кожного активного компонента:</p>
                 <ol>
-                    <li>Диспатчить подію <code>ComponentRegistering</code></li>
+                    <li>Записує телеметрію <code>FRAMEWORK_COMPONENT_REGISTERED</code> (<a href="telemetry.html">Телеметрія</a>)</li>
                     <li>Реєструє console-команди, шляхи міграцій і seeders</li>
                     <li>Підключає nested service providers з <code>config.php</code></li>
                     <li>Виконує <code>require</code> файлів <code>routes.php</code> (доступна змінна <code>$router</code>)</li>

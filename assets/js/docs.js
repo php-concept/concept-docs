@@ -104,8 +104,8 @@
         var html = '';
 
         if (chain.prev) {
-            html += '<a class="text-decoration-none col" href="' + pageHref(chain.prev) + '">';
-            html += '<div class="text-body-secondary small text-uppercase">' + prevLabel + '</div>';
+            html += '<a class="text-decoration-none col docs-next-prev-link" href="' + pageHref(chain.prev) + '" aria-label="' + prevLabel + ': ' + findLabel(chain.prev) + '">';
+            html += '<div class="docs-next-prev-icon text-body-secondary" aria-hidden="true"><i class="bi bi-chevron-left"></i></div>';
             html += '<div class="fw-semibold text-body-emphasis">' + findLabel(chain.prev) + '</div>';
             html += '</a>';
         } else {
@@ -113,8 +113,8 @@
         }
 
         if (chain.next) {
-            html += '<a class="text-decoration-none col text-end" href="' + pageHref(chain.next) + '">';
-            html += '<div class="text-body-secondary small text-uppercase">' + nextLabel + '</div>';
+            html += '<a class="text-decoration-none col text-end docs-next-prev-link" href="' + pageHref(chain.next) + '" aria-label="' + nextLabel + ': ' + findLabel(chain.next) + '">';
+            html += '<div class="docs-next-prev-icon text-body-secondary" aria-hidden="true"><i class="bi bi-chevron-right"></i></div>';
             html += '<div class="fw-semibold text-body-emphasis">' + findLabel(chain.next) + '</div>';
             html += '</a>';
         }

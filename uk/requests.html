@@ -56,11 +56,43 @@
                     <a href="middleware.html#core-middleware">HandleValidationExceptionMiddleware</a>.
                 </p>
 
+                <h2 id="architecture" class="border-bottom pb-2 mb-3 mt-5">Класи ядра</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Клас</th><th>Роль</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>Concept\Core\Http\Requests\FormRequest</code></td>
+                                <td><code>rules()</code>, <code>validate()</code>, <code>validated()</code>, <code>toDto()</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>RouteStrategy</code></td>
+                                <td>Резолвить FormRequest з DI, викликає <code>validate()</code> до action</td>
+                            </tr>
+                            <tr>
+                                <td><code>ValidationException</code></td>
+                                <td>Помилки + <code>all()</code> для flash «старий ввід»</td>
+                            </tr>
+                            <tr>
+                                <td><code>HandleValidationExceptionMiddleware</code></td>
+                                <td>422 JSON або flash + <code>back()</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>RequestFormat</code></td>
+                                <td><code>expectsJson()</code> — вибір формату відповіді при помилці</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
                 <h2 id="flow" class="border-bottom pb-2 mb-3 mt-5">Як це працює</h2>
                 <ol>
-                    <li>У action контролера оголошується тип <code>MyRequest $request</code> (нащадок <code>FormRequest</code>).</li>
-                    <li><code>RouteStrategy</code> створює FormRequest з контейнера і викликає <code>validate()</code> <em>до</em> входу в метод.</li>
-                    <li>Якщо правила не виконані — <code>ValidationException</code> → middleware повертає 422 (JSON) або redirect назад із flash.</li>
+                    <li>У action оголошується тип <code>MyRequest $request</code> (нащадок <code>FormRequest</code>).</li>
+                    <li><code>RouteStrategy</code> спочатку запускає <a href="route-interceptors.html">route interceptors</a>, потім кладе сегменти URL у атрибути запиту.</li>
+                    <li>Для параметра FormRequest контейнер створює екземпляр і викликає <code>validate()</code> <em>до</em> входу в метод.</li>
+                    <li>Якщо правила не виконані — <code>ValidationException</code> з <code>errors()</code> і повним <code>all()</code> → middleware повертає 422 (JSON) або redirect назад із flash.</li>
                     <li>Якщо все гаразд — виконується метод контролера; дані читаються через <code>validated()</code> або <code>toDto()</code>.</li>
                 </ol>
 
@@ -98,7 +130,15 @@
 {
     protected ?string $dtoClass = CreateProjectDto::class;
 
-    public function rules(): array { /* ... */ }
+    public function rules(): array
+    {
+        return [
+            'title' =&gt; ['required', 'min:3', 'max:255'],
+            'service_type' =&gt; ['required', 'in:' . implode(',', ProjectModel::SERVICE_TYPES)],
+            'budget' =&gt; ['required', 'max:100'],
+            'description' =&gt; ['required', 'min:10'],
+        ];
+    }
 }
 
 // Контролер
@@ -149,39 +189,38 @@ $this-&gt;postModel-&gt;newQuery()-&gt;create(
 
                 <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
 
-namespace Concept\Components\UserCabinet\Requests;
+namespace Concept\Components\AuthAdmin\Requests\Users;
 
-use Concept\Components\AuthAdmin\Dto\LoginDto;
+use Concept\Components\AuthAdmin\Dto\User\StoreUserDto;
+use Concept\Components\AuthAdmin\Enums\UserStatus;
 use Concept\Core\Http\Requests\FormRequest;
 
-/** @extends FormRequest&lt;LoginDto&gt; */
-class LoginRequest extends FormRequest
+/** @extends FormRequest&lt;StoreUserDto&gt; */
+class StoreUserRequest extends FormRequest
 {
-    protected ?string $dtoClass = LoginDto::class;
+    protected ?string $dtoClass = StoreUserDto::class;
 
-    /** Поля, які не потраплять у validated() (навіть якщо пройшли валідацію) */
-    protected array $except = [];
-
-    /** Якщо не порожній — у validated() лишаться лише ці ключі */
-    protected array $only = [];
+    /** Не потрапляють у validated() / DTO після валідації */
+    protected array $except = [
+        'password_confirmation',
+    ];
 
     public function rules(): array
     {
         return [
-            'email' =&gt; ['required', 'email'],
-            'password' =&gt; ['required'],
-            'remember' =&gt; ['nullable', 'boolean'],
-        ];
-    }
-
-    public function aliases(): array
-    {
-        return [
-            'email' =&gt; 'Email Address',
-            'password' =&gt; 'Password',
+            'name' =&gt; ['required', 'min:3'],
+            'email' =&gt; ['required', 'email', 'unique:users,email'],
+            'password' =&gt; ['required', 'min:8'],
+            'password_confirmation' =&gt; ['required', 'min:8', 'same:password'],
+            'status' =&gt; ['required', 'in:' . implode(',', array_column(UserStatus::cases(), 'value'))],
+            'is_admin' =&gt; ['nullable', 'boolean'],
         ];
     }
 }</code></pre>
+                <p class="small text-body-secondary">
+                    Мінімальний login-запит без <code>$except</code> — <code>LoginRequest</code>
+                    (лише <code>email</code> і <code>password</code>, DTO <code>LoginDto</code> з optional <code>remember</code>).
+                </p>
 
                 <h3 id="rules" class="mt-4">Правила <code>rules()</code></h3>
                 <p>Два формати (як у Rakit):</p>
@@ -192,13 +231,21 @@ class LoginRequest extends FormRequest
                 <p>
                     Доступні стандартні правила Rakit (<code>required</code>, <code>email</code>, <code>min</code>,
                     <code>max</code>, <code>same</code>, <code>in</code>, <code>nullable</code>, <code>boolean</code> тощо).
-                    У skeleton додано правила БД: <code>unique</code>, <code>exists</code> (див. <a href="#custom-rules">власні правила</a>).
+                    (див. <a href="#custom-rules">власні правила</a>).
                 </p>
 
                 <h3 id="aliases" class="mt-4">Псевдоніми <code>aliases()</code></h3>
                 <p>
-                    Людські назви полів у повідомленнях про помилки («Email Address» замість «email»).
-                    Необов’язковий метод — за замовчуванням порожній масив.
+                    Людські назви полів у повідомленнях про помилки («Project title» замість «title»).
+                    Необов’язковий метод — за замовчуванням порожній масив. Зливаються з глобальними псевдонімами з
+                    <code>resources/lang/validator/{locale}.php</code> (<code>ValidationTranslationsLoader</code>).
+                </p>
+
+                <h3 id="messages" class="mt-4">Повідомлення <code>messages()</code></h3>
+                <p>
+                    Перевизначення текстів окремих правил для конкретного FormRequest
+                    (ключ — ім’я правила Rakit, наприклад <code>'required' =&gt; 'Заповніть :attribute'</code>).
+                    Глобальні переклади — у тих самих файлах <code>resources/lang/validator/</code>.
                 </p>
 
                 <h3 id="except-only" class="mt-4"><code>$except</code> і <code>$only</code></h3>
@@ -250,8 +297,11 @@ class LoginRequest extends FormRequest
 
                 <h3 id="logging" class="mt-4">Логування</h3>
                 <p>
-                    При <code>log.validation_data = true</code> у конфігурації FormRequest логує вхідні дані
-                    та результат валідації (див. <a href="configuration.html">Configuration</a>).
+                    При <code>log.validation_data = true</code> у <code>config/log.php</code>
+                    (<code>ConfigKey::LOG_VALIDATION_DATA</code>) FormRequest логує вхідні дані в <code>all()</code>
+                    і результат <code>validate()</code> — див.
+                    <a href="configuration.html#file-log">Конфігурація → log.php</a>.
+                    Логер маскує чутливі поля через <code>DataMaskerInterface</code>.
                     У production зазвичай вимкнено.
                 </p>
 
@@ -259,22 +309,20 @@ class LoginRequest extends FormRequest
                 <p>Оголосіть FormRequest у сигнатурі методу — валідація відбудеться автоматично:</p>
                 <pre class="mb-4"><code class="language-php">public function store(StoreUserRequest $request): ResponseInterface
 {
-    // Варіант 1: масив
+    // Варіант 1: масив validated()
     $this-&gt;userModel-&gt;newQuery()-&gt;create(
         $this-&gt;normalizeUserPayload($request-&gt;validated())
     );
-
     return $this-&gt;response-&gt;redirectByName('admin.users');
 }
 
-public function login(LoginRequest $request): ResponseInterface
+public function store(CreateProjectRequest $request): ResponseInterface
 {
     // Варіант 2: DTO
-    $loginDto = $request-&gt;toDto();
-    if ($loginDto) {
-        $this-&gt;auth-&gt;attempt($loginDto-&gt;email, $loginDto-&gt;password, $loginDto-&gt;remember);
-    }
-    // ...
+    /** @var CreateProjectDto $data */
+    $data = $request-&gt;toDto();
+    $this-&gt;projectModel-&gt;newQuery()-&gt;create([/* поля з $data */]);
+    return $this-&gt;response-&gt;redirectByName('cabinet.projects');
 }</code></pre>
                 <p>
                     <code>toDto()</code> викликайте після успішної валідації (у методі контролера це вже гарантовано).
@@ -282,14 +330,25 @@ public function login(LoginRequest $request): ResponseInterface
                 </p>
 
                 <h2 id="validation-errors" class="border-bottom pb-2 mb-3 mt-5">Помилки валідації</h2>
-                <p>При невдалій валідації:</p>
+                <p>При невдалій валідації <code>HandleValidationExceptionMiddleware</code>:</p>
                 <ul>
-                    <li><strong>JSON / API</strong> — <code>422</code>, тіло через <code>jsonError()</code> з масивом помилок</li>
-                    <li><strong>HTML-форма</strong> — flash <code>error</code>, <code>_validation_errors</code>, <code>_validation_data</code>, redirect <code>back()</code></li>
+                    <li>
+                        <strong>JSON / API</strong> — якщо <code>RequestFormat::expectsJson()</code>
+                        (<code>Accept: application/json</code> або <code>X-Requested-With: XMLHttpRequest</code>) —
+                        <code>422</code>, тіло <code>jsonError()</code> з полем <code>errors</code>
+                    </li>
+                    <li>
+                        <strong>HTML-форма</strong> — flash <code>error</code>,
+                        <code>SessionKey::VALIDATION_ERRORS</code> (<code>_validation_errors</code>),
+                        <code>SessionKey::VALIDATION_DATA</code> (<code>_validation_data</code>),
+                        redirect <code>back()</code>
+                    </li>
                 </ul>
                 <p>
-                    <code>ShareViewDataMiddleware</code> передає в Twig змінні
-                    <code>errors</code> та <code>old</code> (попередній ввід):
+                    У flash «старий ввід» потрапляє повний <code>all()</code> (query + body), не лише
+                    <code>validated()</code>. <code>ShareViewDataMiddleware</code> мапить flash у Twig:
+                    <code>ViewKey::ERRORS</code> → <code>errors</code>,
+                    <code>ViewKey::OLD_INPUT</code> → <code>old</code>.
                 </p>
                 <pre class="mb-4"><code class="language-twig">&lt;label for="email"&gt;Email&lt;/label&gt;
 &lt;input id="email" type="email" name="email" required
@@ -311,8 +370,14 @@ public function login(LoginRequest $request): ResponseInterface
                 </p>
 
                 <h2 id="custom-rules" class="border-bottom pb-2 mb-3 mt-5">Власні правила валідації</h2>
-                <p>Реєстрація в <code>config/validator.php</code>:</p>
-                <pre class="mb-4"><code class="language-php">return [
+                <p>
+                    Реєстрація в <code>config/validator.php</code>
+                    (<code>ValidationServiceProvider</code> → <code>ConfigKey::VALIDATOR_RULES</code>):
+                </p>
+                <pre class="mb-4"><code class="language-php">use Concept\App\Validation\Rules\ExistsRule;
+use Concept\App\Validation\Rules\UniqueRule;
+
+return [
     'validator' =&gt; [
         'rules' =&gt; [
             'unique' =&gt; UniqueRule::class,
@@ -322,8 +387,11 @@ public function login(LoginRequest $request): ResponseInterface
 ];</code></pre>
                 <p>
                     Клас правила реалізує <code>RuleInterface</code>, успадковує <code>Concept\Core\Components\Validator\Rule</code>.
-                    У правилах: <code>'email' =&gt; ['unique:users,email']</code>,
-                    <code>'email' =&gt; ['unique:users,email,5,id']</code> (except id при update).
+                    Наприклад:
+                    <code>'email' =&gt; ['unique:users,email']</code> у <code>StoreUserRequest</code>,
+                    <code>'email' =&gt; ['exists:users,email']</code> у <code>ForgotPasswordRequest</code>.
+                    Для update except id: <code>'unique:users,email,' . $this-&gt;getRouteParam('id') . ',id'</code>
+                    у <code>rules()</code> (третій параметр — id запису, який ігнорувати).
                 </p>
 
                 <h2 id="dto" class="border-bottom pb-2 mb-3 mt-5">DTO (Data Transfer Object)</h2>
@@ -418,6 +486,7 @@ return $this-&gt;caster-&gt;cast($this-&gt;validated(), $this-&gt;dtoClass);</co
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
     <script src="../assets/js/nav-uk.js"></script>
     <script src="../assets/js/docs.js"></script>

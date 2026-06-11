@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Вступ до Concept Core — ядро PHP-фреймворку">
+    <meta name="description" content="Вступ до Concept Core — strict-typed PHP engine на PSR-стандартах">
     <title>Вступ - Concept Core Documentation</title>
     <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
@@ -43,26 +43,24 @@
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Concept Core</h1>
 
-                <ul>
-                    <li><a href="#introduction">Вступ</a></li>
-                    <li><a href="#why-concept">Чому Concept?</a></li>
-                    <li><a href="#learning-concept">Вивчення Concept</a></li>
-                </ul>
-
                 <h2 id="introduction" class="border-bottom pb-2 mb-3 mt-5">Вступ</h2>
                 <p>
-                    Concept Core — це ядро PHP-фреймворку Concept. Воно забезпечує bootstrap застосунку,
-                    контейнер сервісів, HTTP-шар, маршрутизацію, представлення, валідацію та підключаємі компоненти.
+                    Concept Core — це strict-typed PHP-движок (engine) для PHP&nbsp;8.4+, побудований на PSR-стандартах.
+                    Він з'єднує маршрутизацію, DI, валідацію, доступ до БД, представлення та CLI в одну цілісну
+                    runtime-систему — і не нав'язує зайвих прихованих конвенцій.
                 </p>
                 <p>
-                    Ця документація описує пакет <code>php-concept/core</code> — фундамент для skeleton-проєктів
-                    та власних рішень.
+                    Ця документація описує пакет <a href="https://github.com/php-concept/concept-core" target="_blank" rel="noopener">Concept Core</a> — фундамент для
+                    <a href="https://github.com/php-concept/concept-skeleton" target="_blank" rel="noopener">Concept Skeleton</a>
+                    та власних застосунків. Concept Core — <strong>не</strong> CMS і <strong>не</strong> повноцінний
+                    monolith-framework: це ядро, на якому збираються features через компоненти та service providers.
                 </p>
 
                 <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
                     <h3 class="h6 alert-heading">Вперше з Concept?</h3>
                     <p class="mb-0">
                         Рекомендуємо почати з <a href="installation.html" class="alert-link">Встановлення</a>, потім
+                        <a href="setup.html" class="alert-link">Налаштування</a>,
                         <a href="configuration.html" class="alert-link">Конфігурація</a> та
                         <a href="request-lifecycle.html" class="alert-link">Життєвий цикл запиту</a>.
                     </p>
@@ -70,18 +68,65 @@
 
                 <h2 id="why-concept" class="border-bottom pb-2 mb-3 mt-5">Чому Concept?</h2>
                 <p>
-                    Concept створений для розробників, яким потрібен сучасний PHP-стек без зайвої ваги моноліту:
+                    Concept Core дає зручності, схожі на framework, без ваги повного monolith — явна конфігурація,
+                    PSR-сумісність і модульна композиція замість «магії».
                 </p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                        <tr><th>Що отримуєте</th><th>Без Concept Core</th></tr>
+                        </thead>
+                        <tbody>
+                        <tr>
+                            <td>Named routes, middleware, FormRequest, DTO casting</td>
+                            <td>Кожен проєкт з нуля збирає половину framework</td>
+                        </tr>
+                        <tr>
+                            <td>Illuminate Database (Eloquent, migrations, pagination)</td>
+                            <td>Підключення всього Laravel лише заради ORM</td>
+                        </tr>
+                        <tr>
+                            <td>Twig або Plates — на вибір</td>
+                            <td>Lock-in на один templating engine</td>
+                        </tr>
+                        <tr>
+                            <td>Component registry — Auth, ACL, CMS як пакети</td>
+                            <td>Копіювання модулів між репозиторіями</td>
+                        </tr>
+                        <tr>
+                            <td>PSR-7, PSR-11 container, PSR-15 middleware</td>
+                            <td>Боротьба з legacy globals</td>
+                        </tr>
+                        <tr>
+                            <td>Whoops у dev, безпечні fallback views у prod</td>
+                            <td>Білі екрани та тихі збої</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Основні бібліотеки, які core з'єднує в один стек:</p>
                 <ul>
                     <li><strong>League Container</strong> — впровадження залежностей</li>
                     <li><strong>League Route</strong> — HTTP-маршрутизація</li>
-                    <li><strong>Twig</strong> — шаблони</li>
-                    <li><strong>Illuminate Database</strong> — моделі в стилі Eloquent</li>
+                    <li><strong>Rakit Validation</strong> — правила валідації через FormRequest</li>
                     <li><strong>Valinor</strong> — мапінг даних запиту в DTO</li>
+                    <li><strong>Twig</strong> або <strong>Plates</strong> — шаблони</li>
+                    <li><strong>Illuminate Database</strong> — Eloquent, migrations, pagination</li>
                 </ul>
 
+                <h2 id="components" class="border-bottom pb-2 mb-3 mt-5">Компоненти</h2>
+                <p>
+                    Головна ідея Concept Core — <strong>компоненти</strong>: вертикальні модулі з власними маршрутами,
+                    migrations, seeders, views, console commands та assets. Зареєструйте клас компонента в конфігурації —
+                    і <code>ComponentsServiceProvider</code> підключить усе автоматично.
+                </p>
+                <p>
+                    Детальніше: <a href="components-overview.html">Концепція компонентів</a>,
+                    <a href="creating-components.html">Створення компонента</a>.
+                </p>
+
                 <h2 id="official-docs" class="border-bottom pb-2 mb-3 mt-5">Офіційна документація бібліотек</h2>
-                <p>Concept Core інтегрує ці пакети; деталі API — у їхніх docs:</p>
+                <p>Concept Core інтегрує ці пакети; деталі API — у їхній документації:</p>
                 <div class="table-responsive mb-4">
                     <table class="table table-dark table-striped table-bordered align-middle small">
                         <thead>
@@ -95,41 +140,75 @@
                         </tr>
                         <tr>
                             <td>League Route</td>
-                            <td>Маршрути, middleware, резолв контролерів з контейнера</td>
+                            <td>Маршрути, middleware, резолв контролерів</td>
                             <td><a href="https://route.thephpleague.com/" target="_blank" rel="noopener">route.thephpleague.com</a></td>
                         </tr>
                         <tr>
-                            <td>Twig</td>
-                            <td>Шаблони HTML</td>
-                            <td><a href="https://twig.symfony.com/doc/" target="_blank" rel="noopener">twig.symfony.com</a></td>
-                        </tr>
-                        <tr>
                             <td>Laminas Diactoros</td>
-                            <td>PSR-7 запити/відповіді</td>
+                            <td>PSR-7 запити та відповіді</td>
                             <td><a href="https://docs.laminas.dev/laminas-diactoros/" target="_blank" rel="noopener">laminas-diactoros</a></td>
                         </tr>
                         <tr>
-                            <td>League Event</td>
-                            <td>Події ядра, телеметрія</td>
-                            <td><a href="https://event.thephpleague.com/" target="_blank" rel="noopener">event.thephpleague.com</a></td>
+                            <td>Laminas HttpHandlerRunner</td>
+                            <td>Відправка PSR-7 response у SAPI</td>
+                            <td><a href="https://docs.laminas.dev/laminas-httphandlerrunner/" target="_blank" rel="noopener">laminas-httphandlerrunner</a></td>
                         </tr>
                         <tr>
-                            <td>PSR-7 / PSR-15</td>
-                            <td>HTTP message, middleware</td>
+                            <td>PSR-7 / PSR-11 / PSR-15</td>
+                            <td>HTTP messages, container, middleware</td>
                             <td>
                                 <a href="https://www.php-fig.org/psr/psr-7/" target="_blank" rel="noopener">PSR-7</a>,
+                                <a href="https://www.php-fig.org/psr/psr-11/" target="_blank" rel="noopener">PSR-11</a>,
                                 <a href="https://www.php-fig.org/psr/psr-15/" target="_blank" rel="noopener">PSR-15</a>
                             </td>
                         </tr>
                         <tr>
+                            <td>Twig / Plates</td>
+                            <td>Шаблони HTML</td>
+                            <td>
+                                <a href="https://twig.symfony.com/doc/" target="_blank" rel="noopener">Twig</a>,
+                                <a href="https://platesphp.com/" target="_blank" rel="noopener">Plates</a>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Rakit Validation</td>
+                            <td>Правила валідації FormRequest</td>
+                            <td><a href="https://github.com/rakit/validation" target="_blank" rel="noopener">rakit/validation</a></td>
+                        </tr>
+                        <tr>
+                            <td>Valinor</td>
+                            <td>DTO mapping, casting route params</td>
+                            <td><a href="https://github.com/CuyZ/Valinor" target="_blank" rel="noopener">cuyz/valinor</a></td>
+                        </tr>
+                        <tr>
                             <td>Illuminate Database</td>
-                            <td>Eloquent / Capsule, міграції</td>
+                            <td>Eloquent / Capsule, migrations</td>
                             <td><a href="https://laravel.com/docs/eloquent" target="_blank" rel="noopener">Eloquent</a></td>
                         </tr>
                         <tr>
                             <td>Symfony HttpFoundation</td>
-                            <td>Сесія, flash</td>
+                            <td>Сесія, flash messages</td>
                             <td><a href="https://symfony.com/doc/current/components/http_foundation.html" target="_blank" rel="noopener">HttpFoundation</a></td>
+                        </tr>
+                        <tr>
+                            <td>Symfony Console</td>
+                            <td>CLI-команди (<code>bin/console.php</code>)</td>
+                            <td><a href="https://symfony.com/doc/current/components/console.html" target="_blank" rel="noopener">Console</a></td>
+                        </tr>
+                        <tr>
+                            <td>Monolog</td>
+                            <td>Логування, query log</td>
+                            <td><a href="https://github.com/Seldaek/monolog" target="_blank" rel="noopener">monolog/monolog</a></td>
+                        </tr>
+                        <tr>
+                            <td>Whoops</td>
+                            <td>Debug-сторінки помилок у dev</td>
+                            <td><a href="https://github.com/filp/whoops" target="_blank" rel="noopener">filp/whoops</a></td>
+                        </tr>
+                        <tr>
+                            <td>Noodlehaus Config</td>
+                            <td>PHP config files</td>
+                            <td><a href="https://github.com/hassankhan/config" target="_blank" rel="noopener">hassankhan/config</a></td>
                         </tr>
                         <tr>
                             <td>phpdotenv</td>
@@ -141,9 +220,12 @@
                 </div>
 
                 <h2 id="learning-concept" class="border-bottom pb-2 mb-3 mt-5">Вивчення Concept</h2>
-                <p>
-                    Перегляньте код у <code>vendor/php-concept/core</code> та skeleton-застосунок.
-                </p>
+                <p>Рекомендований шлях:</p>
+                <ol>
+                    <li>Пройдіть розділ <a href="installation.html">Початок роботи</a> у цій документації.</li>
+                    <li>Клонуйте <a href="https://github.com/php-concept/concept-skeleton" target="_blank" rel="noopener">Concept Skeleton</a> і запустіть landing page локально.</li>
+                    <li>Перегляньте вихідний код у <code>vendor/php-concept/core</code> або в каталозі <code>code/core</code> цього репозиторію.</li>
+                </ol>
 
                 <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
             </main>

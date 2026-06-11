@@ -44,9 +44,9 @@
                 <h1 class="display-6 fw-bold mb-4">Життєвий цикл запиту</h1>
 
                 <p>
-                    HTTP-запит проходить від веб-сервера через <code>public/index.php</code>, bootstrap провайдерів
-                    і диспетчеризацію League Route. Нижче — повний ланцюжок з урахуванням middleware,
-                    компонентів і обробки помилок.
+                    HTTP-запит проходить від веб-сервера через <code>public/index.php</code>, реєстрацію service providers,
+                    резолв <code>Router</code> і PSR-7 <code>Request</code>, диспетчеризацію League Route і відправку відповіді
+                    через <code>SapiEmitter</code>.
                 </p>
                 <p>
                     Передумови: <a href="setup.html">налаштування</a> точок входу,
@@ -54,15 +54,41 @@
                 </p>
 
                 <h2 id="overview" class="border-bottom pb-2 mb-3 mt-5">Огляд</h2>
+                <div class="docs-mermaid mb-4">
+                    <pre class="mermaid">flowchart TB
+    WS["Веб-сервер"]
+    IDX["public/index.php"]
+    BOOT["bootstrap/app.php"]
+    PROV["registerServiceProviders()"]
+    RUN["App::run()"]
+    ROUTER["Router::dispatch(Request)"]
+    MW["Middleware stack"]
+    STRAT["RouteStrategy"]
+    INT["Route interceptors"]
+    RES["Autowire: FormRequest, params, Request"]
+    CTRL["Controller / closure"]
+    EMIT["SapiEmitter"]
+
+    WS --> IDX --> BOOT --> PROV
+    IDX --> RUN --> ROUTER --> MW --> STRAT
+    STRAT --> INT --> RES --> CTRL --> EMIT</pre>
+                </div>
                 <pre class="mb-4"><code class="language-text">Веб-сервер → public/index.php
     → vendor/autoload.php
-    → bootstrap/app.php (App::create, провайдери)
+    → bootstrap/app.php
+        → App::create() + registerServiceProviders()
+            → для кожного провайдера: register(), потім boot()
+            → ComponentsServiceProvider::boot() підключає routes компонентів
     → App::run()
-        → Router::dispatch(PSR-7 Request)
-            → глобальний middleware (CSRF, сесія, views…)
-            → middleware маршруту (якщо є)
-            → RouteStrategy → контролер / closure
-        → SapiEmitter → відповідь клієнту</code></pre>
+        → container->get(RouterInterface)
+        → container->get(ServerRequestInterface)
+        → Router::dispatch(Request)
+            → middleware (глобальний + маршруту)
+            → RouteStrategy::invokeRouteCallable()
+                → route interceptors
+                → autowire аргументів handler
+            → PSR-7 Response
+        → SapiEmitter → клієнт</code></pre>
 
                 <h2 id="entry" class="border-bottom pb-2 mb-3 mt-5">1. Точка входу</h2>
                 <p>
@@ -70,47 +96,59 @@
                     Він не містить бізнес-логіки:
                 </p>
                 <pre class="mb-4"><code class="language-php">require_once __DIR__ . '/../vendor/autoload.php';
+
+/** @var \Concept\Core\App $app */
 $app = require_once __DIR__ . '/../bootstrap/app.php';
+
 $app->run();</code></pre>
 
                 <h2 id="bootstrap-phase" class="border-bottom pb-2 mb-3 mt-5">2. Bootstrap (до run)</h2>
                 <p><code>bootstrap/app.php</code> виконує:</p>
                 <ol>
-                    <li><code>App::create($rootPath, $paths)</code> — контейнер League, <code>PathManager</code>, ранній Whoops (з <code>APP_DEBUG</code> з оточення).</li>
+                    <li><code>App::create($rootPath, $paths)</code> — League Container, <code>ReflectionContainer</code>, <code>PathManager</code>, ранній Whoops (читає <code>APP_DEBUG</code> з <code>$_ENV</code>).</li>
                     <li><code>registerServiceProviders()</code> — підключення списку з <code>bootstrap/providers/app.php</code>.</li>
                 </ol>
                 <p>
-                    Для кожного провайдера в списку: <code>register()</code>, потім одразу <code>boot()</code>
-                    (якщо реалізовано <code>BootableServiceProviderInterface</code>) — див.
+                    League Container для кожного провайдера викликає <code>register()</code>, потім одразу
+                    <code>boot()</code> (якщо реалізовано <code>BootableServiceProviderInterface</code>) — див.
                     <a href="service-providers.html#register-boot">Провайдери → register і boot</a>.
+                    Порядок у <code>providers/app.php</code> критичний: провайдер N у <code>boot()</code> може
+                    використовувати сервіси лише від провайдерів вище у списку.
                 </p>
 
-                <h3 id="providers-order" class="mt-4">Порядок провайдерів (HTTP)</h3>
-                <p>Типовий порядок у <code>bootstrap/providers/app.php</code>:</p>
+                <h3 id="providers-order" class="mt-4">Порядок провайдерів (HTTP, skeleton)</h3>
+                <p>Фактичний порядок у <code>bootstrap/providers/app.php</code>:</p>
                 <ol class="small">
-                    <li><strong>Config</strong> — конфіг, <code>.env</code>, часовий пояс</li>
-                    <li><strong>ErrorHandler</strong> — Whoops (HTML / JSON / production fallback)</li>
-                    <li><strong>Event</strong> — диспетчер подій</li>
-                    <li><strong>Http</strong> — PSR-7 запит, Router, фабрики відповідей</li>
-                    <li><strong>Session</strong> — Symfony Session (стартує при першому зверненні)</li>
-                    <li><strong>Log, View, Validation, Database, Caster</strong></li>
-                    <li><strong>Components</strong> — реєстрація модулів (див. крок 3)</li>
+                    <li><strong>ConfigServiceProvider</strong> — конфіг, <code>.env</code>, часовий пояс</li>
+                    <li><strong>LocaleServiceProvider</strong> — локаль для перекладів валідації</li>
+                    <li><strong>TelemetryServiceProvider</strong> — збір телеметрії (якщо увімкнено)</li>
+                    <li><strong>ErrorHandlerServiceProvider</strong> — Whoops (HTML / JSON / production fallback)</li>
+                    <li><strong>HttpServiceProvider</strong> — PSR-7 запит, Router, фабрики відповідей</li>
+                    <li><strong>SessionServiceProvider</strong> — Symfony Session (стартує при першому зверненні)</li>
+                    <li><strong>DataMaskerServiceProvider</strong> — маскування чутливих даних у логах</li>
+                    <li><strong>LogServiceProvider</strong> — Monolog</li>
+                    <li><strong>ViewRegistryServiceProvider</strong>, <strong>TwigServiceProvider</strong></li>
+                    <li><strong>ValidationServiceProvider</strong>, <strong>DatabaseServiceProvider</strong>, <strong>CastingServiceProvider</strong></li>
+                    <li><strong>DebugLoggerServiceProvider</strong> — in-memory debug log (dev)</li>
+                    <li><strong>ComponentsServiceProvider</strong> — модулі (останній у списку)</li>
                 </ol>
 
                 <h3 id="components-boot" class="mt-4">Що робить ComponentsServiceProvider::boot()</h3>
                 <p>
-                    Під час <code>boot()</code> <code>ComponentsServiceProvider</code> (одразу після його реєстрації,
-                    ще до <code>run()</code>), якщо увімкнені компоненти:
+                    <code>ComponentsServiceProvider</code> стоїть останнім, щоб у <code>boot()</code> уже були
+                    <code>ConfigInterface</code>, <code>RouterInterface</code>, view registries тощо.
+                    Під час <code>boot()</code> (ще до <code>App::run()</code>), якщо увімкнені компоненти:
                 </p>
                 <ul>
-                    <li>реєструються консольні команди, міграції, сидери компонентів;</li>
-                    <li>підключаються додаткові service providers компонентів;</li>
+                    <li>реєструються CLI-команди, міграції та сидери компонентів;</li>
+                    <li>підключаються додаткові service providers компонентів (<code>addServiceProvider()</code>);</li>
                     <li><code>require</code> файлів <code>routes.php</code> кожного компонента — маршрути додаються в той самий <code>Router</code>;</li>
-                    <li>реєструються Twig paths, extensions, contexts для views компонентів.</li>
+                    <li>реєструються Twig paths, extensions, contexts для views компонентів (лише HTTP, не CLI).</li>
                 </ul>
                 <p>
-                    Глобальні маршрути з <code>routes/web.php</code> підключаються раніше — у
-                    <code>HttpServiceProvider</code> з масиву <code>config/routes.php</code>.
+                    Глобальні маршрути з <code>routes/web.php</code> підключаються при першому резолві
+                    <code>RouterInterface</code> у фабриці <code>HttpServiceProvider</code> — зазвичай під час
+                    <code>ComponentsServiceProvider::boot()</code>, коли він запитує Router для component routes.
                 </p>
 
                 <h2 id="request-object" class="border-bottom pb-2 mb-3 mt-5">3. PSR-7 запит</h2>
@@ -118,97 +156,115 @@ $app->run();</code></pre>
                     <code>ServerRequestInterface</code> створюється в контейнері через
                     <code>Laminas\Diactoros\ServerRequestFactory::fromGlobals()</code> —
                     дані з <code>$_SERVER</code>, <code>$_GET</code>, <code>$_POST</code>, <code>$_COOKIE</code>, <code>$_FILES</code>.
+                    У типовому HTTP-циклі резолв відбувається в <code>App::run()</code> перед <code>dispatch()</code>.
                 </p>
                 <p>
                     Після збігу маршруту <code>RouteStrategy</code> додає параметри URL у атрибути запиту
-                    (<code>{id}</code> → <code>$request->getAttribute('id')</code>) і оновлює екземпляр у контейнері.
+                    (<code>{id}</code> → <code>$request->getAttribute('id')</code>) і оновлює shared-екземпляр
+                    у контейнері.
                 </p>
 
                 <h2 id="run" class="border-bottom pb-2 mb-3 mt-5">4. App::run()</h2>
-                <pre class="mb-4"><code class="language-php">$router = $this->container->get(Router::class);
+                <pre class="mb-4"><code class="language-php">/** @var RouterInterface $router */
+$router = $this->container->get(RouterInterface::class);
+/** @var ServerRequestInterface $request */
 $request = $this->container->get(ServerRequestInterface::class);
+
 $response = $router->dispatch($request);
 (new SapiEmitter)->emit($response);</code></pre>
                 <p>
-                    <code>Router</code> налаштований із <code>RouteStrategy</code> — кастомна стратегія Concept Core
-                    замість стандартної League: DI параметрів контролера, FormRequest, події маршруту.
+                    <code>Router</code> (клас <code>Concept\Core\Http\Routing\Router</code>) — обгортка над League Route
+                    з <code>RouteStrategy</code>: DI параметрів handler, FormRequest, route interceptors, телеметрія.
                 </p>
 
                 <h2 id="middleware" class="border-bottom pb-2 mb-3 mt-5">5. Middleware</h2>
                 <p>
-                    Глобальний middleware реєструється в файлах маршрутів через
+                    Middleware реєструється в файлах маршрутів через
                     <code>$router->lazyMiddleware(ClassName::class)</code> (League Route).
-                    Middleware створюється з контейнера при обробці запиту.
-                </p>
-                <p>Приклад із <code>routes/web.php</code>:</p>
-                <ul class="small">
-                    <li><code>HandleValidationExceptionMiddleware</code> — перетворює помилки валідації на відповідь</li>
-                    <li><code>VerifyCsrfTokenMiddleware</code> — CSRF для POST/PUT/DELETE</li>
-                    <li><code>StorePreviousUrlMiddleware</code> — зберігає URL для редіректів</li>
-                    <li><code>ShareViewDataMiddleware</code> — спільні змінні для Twig</li>
-                </ul>
-                <p>
+                    Класи створюються з контейнера під час обробки запиту.
                     Кожен middleware реалізує <code>MiddlewareInterface::process($request, $handler)</code>
                     і викликає <code>$handler->handle($request)</code> для передачі далі по ланцюгу.
-                    Детальніше — у розділі <a href="middleware.html">Middleware</a>.
+                </p>
+                <p>У ядрі є, зокрема:</p>
+                <ul class="small">
+                    <li><code>HandleValidationExceptionMiddleware</code> — перетворює <code>ValidationException</code> на відповідь</li>
+                    <li><code>VerifyCsrfTokenMiddleware</code> — CSRF для небезпечних методів</li>
+                    <li><code>StorePreviousUrlMiddleware</code> — зберігає URL для редіректів</li>
+                    <li><code>ShareViewDataMiddleware</code> — спільні змінні для Twig (csrf_token тощо)</li>
+                    <li><code>ParseJsonBodyMiddleware</code>, <code>ForceJsonResponseMiddleware</code> — JSON API</li>
+                </ul>
+                <p>
+                    Мінімальний skeleton не підключає middleware глобально — лише маршрут <code>/</code>.
+                    Детальніше — <a href="middleware.html">Middleware</a>.
                 </p>
 
-                <h2 id="controller" class="border-bottom pb-2 mb-3 mt-5">6. Контролер і RouteStrategy</h2>
-                <p>Після middleware виконується callable маршруту, наприклад:</p>
-                <pre class="mb-4"><code class="language-php">$router->get('/', [IndexController::class, 'index'])->setName('home');</code></pre>
-                <p><code>RouteStrategy</code> розв’язує аргументи методу action:</p>
+                <h2 id="controller" class="border-bottom pb-2 mb-3 mt-5">6. RouteStrategy: interceptors і handler</h2>
+                <p>Після middleware League Route викликає <code>RouteStrategy::invokeRouteCallable()</code>:</p>
                 <ol>
-                    <li><strong>FormRequest</strong> — створення з контейнера, валідація, події <code>FormRequestValidating</code> / <code>FormRequestValidated</code></li>
-                    <li><strong>ServerRequestInterface</strong> — поточний запит</li>
-                    <li><strong>Параметри URL</strong> — з маршруту, з приведенням типів через Caster</li>
-                    <li><strong>Значення за замовчуванням</strong> — якщо оголошені в сигнатурі</li>
+                    <li><strong>Route interceptors</strong> — класи з <code>config/routes.php</code> → <code>routes.interceptors</code> (<code>RouteInterceptorInterface::intercept()</code>); для ACL, політик тощо — див. <a href="route-interceptors.html">Route interceptors</a>.</li>
+                    <li><strong>Параметри URL у Request</strong> — <code>{id}</code> стає атрибутом запиту.</li>
+                    <li><strong>Autowire аргументів handler</strong> — для методу контролера або closure:
+                        <ul>
+                            <li><code>FormRequest</code> — з контейнера, валідація; при помилці — <code>ValidationException</code></li>
+                            <li><code>ServerRequestInterface</code> — поточний запит</li>
+                            <li>параметри маршруту — з приведенням типів через <code>CasterInterface</code> (Valinor)</li>
+                            <li>значення за замовчуванням у сигнатурі</li>
+                        </ul>
+                    </li>
                 </ol>
+                <p>Приклад маршруту:</p>
+                <pre class="mb-4"><code class="language-php">$router->get('/', [IndexController::class, 'index'])->setName('home');</code></pre>
                 <p>
-                    Залежності сервісів (<code>ViewResponseFactoryInterface</code>, моделі тощо) — через
-                    <strong>конструктор</strong> контролера (автовайринг League Container + ReflectionContainer).
+                    Контролер <code>[Class, 'method']</code> резолвиться з контейнера — залежності конструктора
+                    (<code>ViewResponseFactoryInterface</code> тощо) інжектуються через League Container +
+                    <code>ReflectionContainer</code>.
                     Детальніше — <a href="controllers.html#autowiring">Контролери → автовайринг</a>,
                     <a href="controllers.html#method-args">аргументи методу</a>.
                 </p>
                 <p>
-                    Події <code>RouteCallableInvoking</code> / <code>RouteCallableInvoked</code> дозволяють вимірювати час виконання handler.
+                    Якщо <code>telemetry.enabled</code>, <code>RouteStrategy</code> фіксує
+                    <code>TelemetryEvent::HTTP_ROUTE_CALLABLE_INVOKE</code> (час виконання handler).
                 </p>
 
                 <h2 id="response" class="border-bottom pb-2 mb-3 mt-5">7. Відповідь</h2>
-                <p>Контролер повертає <code>ResponseInterface</code> (PSR-7). Типові варіанти:</p>
+                <p>Handler повертає <code>ResponseInterface</code> (PSR-7). Типові варіанти:</p>
                 <ul>
                     <li><code>ViewResponseFactoryInterface::create('@frontend/index')</code> — HTML через Twig</li>
                     <li><code>ResponseFactoryInterface</code> — JSON, redirect, порожня відповідь</li>
                 </ul>
                 <p>
-                    <code>SapiEmitter</code> (Laminas) відправляє заголовки та тіло в PHP SAPI (Apache, FPM, built-in server).
-                    Детальніше — <a href="responses.html">Відповіді</a>.
+                    <code>SapiEmitter</code> (Laminas HttpHandlerRunner) відправляє заголовки та тіло в PHP SAPI
+                    (Apache, FPM, built-in server). Детальніше — <a href="responses.html">Відповіді</a>.
                 </p>
 
                 <h2 id="errors" class="border-bottom pb-2 mb-3 mt-5">8. Обробка помилок</h2>
                 <ul>
-                    <li><strong>До bootstrap</strong> — ранній Whoops у <code>App::create()</code> (читає <code>APP_DEBUG</code> з <code>$_ENV</code>).</li>
-                    <li><strong>Після Config</strong> — <code>ErrorHandlerServiceProvider::boot()</code> перемикає Whoops: PrettyPage (debug), JSON (API), production fallback views.</li>
-                    <li><strong>Валідація</strong> — <code>ValidationException</code> з FormRequest; middleware може перехопити й повернути 422 / redirect.</li>
+                    <li><strong>До провайдерів</strong> — ранній Whoops у <code>App::create()</code> (читає <code>APP_DEBUG</code> з <code>$_ENV</code>).</li>
+                    <li><strong>ErrorHandlerServiceProvider::boot()</strong> — перемикає Whoops: PrettyPage (debug), PlainText (CLI), JSON (<code>RequestFormat::expectsJson()</code>), production fallback з <code>PathName::ERRORS_FALLBACK_VIEWS</code>.</li>
+                    <li><strong>Валідація</strong> — <code>ValidationException</code> з FormRequest; <code>HandleValidationExceptionMiddleware</code> може повернути 422 / redirect.</li>
                     <li><strong>CSRF</strong> — <code>CsrfException</code> при невалідному токені.</li>
-                    <li><strong>404 / метод</strong> — League Route; обробка залежить від налаштувань router.</li>
+                    <li><strong>404 / метод</strong> — League Route; відповідь залежить від налаштувань router і middleware.</li>
                 </ul>
 
-                <h2 id="events" class="border-bottom pb-2 mb-3 mt-5">9. Події (опційно)</h2>
+                <h2 id="telemetry" class="border-bottom pb-2 mb-3 mt-5">9. Телеметрія (опційно)</h2>
                 <p>
-                    Якщо <code>app.debug</code> увімкнено, <code>EventServiceProvider</code> буферизує події framework/HTTP
-                    для debug-панелі. Підписники можна додавати на події ядра та власні події застосунку.
+                    Якщо <code>telemetry.enabled = true</code>, ядро записує етапи bootstrap і HTTP через
+                    <code>TelemetryCollector</code>: пробудження сервісів (<code>FRAMEWORK_SERVICE_AWAKENING</code>),
+                    реєстрацію компонентів, виклик handler (<code>HTTP_ROUTE_CALLABLE_INVOKE</code>).
                 </p>
 
                 <h2 id="cli-note" class="border-bottom pb-2 mb-3 mt-5">CLI — окремий цикл</h2>
                 <p>
                     <code>bin/console.php</code> не викликає <code>App::run()</code>.
-                    Використовує той самий <code>paths.php</code>, але провайдери з <code>bootstrap/providers/console.php</code>
-                    і Symfony Console <code>Application::run()</code>. HTTP middleware і PSR-7 запит у CLI не застосовуються.
+                    Використовує той самий <code>paths.php</code> і <code>App::create()</code>, але провайдери з
+                    <code>bootstrap/providers/console.php</code> і Symfony Console <code>Application::run()</code>.
+                    HTTP middleware, PSR-7 запит і <code>Router::dispatch()</code> у CLI не застосовуються.
                 </p>
 
                 <h2 id="related" class="border-bottom pb-2 mb-3 mt-5">Далі</h2>
                 <ul>
                     <li><a href="routing.html">Маршрутизація</a> — оголошення маршрутів, імена, групи</li>
+                    <li><a href="route-interceptors.html">Route interceptors</a> — ACL, винятки, редирект через middleware</li>
                     <li><a href="middleware.html">Middleware</a> — власний middleware</li>
                     <li><a href="controllers.html">Контролери</a></li>
                     <li><a href="requests.html">Запити та валідація</a> — FormRequest</li>
@@ -225,7 +281,12 @@ $response = $router->dispatch($request);
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'dark', securityLevel: 'loose' });
+    </script>
     <script src="../assets/js/nav-uk.js"></script>
     <script src="../assets/js/docs.js"></script>
 </body>

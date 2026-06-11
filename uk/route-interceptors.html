@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html lang="uk" data-bs-theme="dark">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Route interceptors — Concept Core Documentation">
+    <title>Route interceptors - Concept Core Documentation</title>
+    <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
+    <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
+    <link rel="stylesheet" href="../assets/css/docs.css">
+</head>
+<body data-page="route-interceptors">
+    <header class="navbar navbar-dark bg-dark border-bottom sticky-top">
+        <div class="container-xxl d-flex align-items-center">
+            <button class="navbar-toggler d-lg-none me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#docsSidebar" aria-controls="docsSidebar" aria-label="Відкрити навігацію">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
+            <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
+            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
+                <li class="nav-item"><a class="nav-link p-1" href="../en/route-interceptors.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../uk/route-interceptors.html">УКР</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
+            </ul>
+        </div>
+    </header>
+
+    <div class="container-xxl">
+        <div class="row">
+            <aside class="col-lg-3 col-xl-2">
+                <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
+                    <div class="offcanvas-header border-bottom d-lg-none">
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
+                    </div>
+                    <div class="offcanvas-body p-0 pt-lg-4">
+                        <nav id="docs-sidebar" class="nav flex-column"></nav>
+                    </div>
+                </div>
+            </aside>
+
+            <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
+                <h1 class="display-6 fw-bold mb-4">Route interceptors</h1>
+
+                <p>
+                    Route interceptors — глобальні pre-handler хуки, які ядро викликає в
+                    <code>RouteStrategy</code> <strong>після</strong> middleware, але <strong>до</strong>
+                    autowire та виклику контролера. Вони зручні для перевірки прав доступу (ACL),
+                    політик і бізнес-обмежень на рівні імені маршруту.
+                </p>
+                <p>
+                    Ядро надає лише інтерфейс <code>RouteInterceptorInterface</code> — типи винятків,
+                    правила ACL і відповіді (403, redirect) визначає застосунок.
+                </p>
+                <p>
+                    Див. також: <a href="middleware.html">Middleware</a>,
+                    <a href="routing.html">Маршрутизація</a>,
+                    <a href="request-lifecycle.html#controller">життєвий цикл → RouteStrategy</a>.
+                </p>
+
+                <h2 id="vs-middleware" class="border-bottom pb-2 mb-3 mt-5">Interceptors і middleware</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>Route interceptors</th>
+                                <th>Middleware</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Контракт</td>
+                                <td><code>RouteInterceptorInterface::intercept()</code></td>
+                                <td>PSR-15 <code>MiddlewareInterface::process()</code></td>
+                            </tr>
+                            <tr>
+                                <td>Реєстрація</td>
+                                <td><code>config/routes.php</code> → <code>routes.interceptors</code></td>
+                                <td><code>lazyMiddleware()</code> у файлах маршрутів</td>
+                            </tr>
+                            <tr>
+                                <td>Область</td>
+                                <td>Глобально для всіх збігів маршруту</td>
+                                <td>Глобально, група або один маршрут</td>
+                            </tr>
+                            <tr>
+                                <td>Типова відмова</td>
+                                <td>Кинути виняток (403, 401…)</td>
+                                <td>Повернути <code>ResponseInterface</code> (redirect)</td>
+                            </tr>
+                            <tr>
+                                <td>Приклад</td>
+                                <td>ACL за <code>setName()</code> маршруту</td>
+                                <td><code>AuthMiddleware</code> → redirect на login</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>
+                    На практиці часто поєднують обидва підходи: middleware на групі <code>/admin</code>
+                    перевіряє «чи залогінений» і робить redirect; interceptor перевіряє «чи дозволено цей
+                    named route» і кидає виняток.
+                </p>
+
+                <h2 id="registration" class="border-bottom pb-2 mb-3 mt-5">Реєстрація</h2>
+                <p>Додайте класи interceptors у <code>config/routes.php</code>:</p>
+                <pre class="mb-4"><code class="language-php">return [
+    'routes' => [
+        'interceptors' => [
+            AclRouteAuthorization::class,
+        ],
+        'list' => [
+            dirname(__DIR__) . '/routes/web.php',
+        ],
+    ],
+];</code></pre>
+                <p>
+                    Порядок у масиві — порядок виклику. Клас резолвиться з DI-контейнера
+                    (залежності конструктора підставляються автоматично).
+                </p>
+
+                <h2 id="acl-example" class="border-bottom pb-2 mb-3 mt-5">Приклад: перевірка прав доступу</h2>
+                <p>
+                    Interceptor отримує об’єкт <code>League\Route\Route</code> і PSR-7 запит.
+                    Ім’я маршруту (<code>setName()</code>) зручно використовувати як ключ дозволу:
+                </p>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+namespace Concept\App\Http\Interceptors;
+
+use Concept\App\Exceptions\AccessDeniedException;
+use Concept\App\Services\AclService;
+use Concept\Core\Http\Contracts\RouteInterceptorInterface;
+use League\Route\Route;
+use Psr\Http\Message\ServerRequestInterface;
+
+final class AclRouteAuthorization implements RouteInterceptorInterface
+{
+    public function __construct(
+        private readonly AclService $acl,
+    ) {}
+
+    public function intercept(Route $route, ServerRequestInterface $request): void
+    {
+        $routeName = $route->getName();
+        if ($routeName === null) {
+            return;
+        }
+
+        if (!$this->acl->canAccessRoute($routeName)) {
+            throw new AccessDeniedException(
+                sprintf('Access denied for route [%s]', $routeName)
+            );
+        }
+    }
+}</code></pre>
+                <p>Власний виняток застосунку (ядро не визначає такий тип):</p>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+namespace Concept\App\Exceptions;
+
+use RuntimeException;
+
+final class AccessDeniedException extends RuntimeException
+{
+}</code></pre>
+
+                <h2 id="exceptions" class="border-bottom pb-2 mb-3 mt-5">Що відбувається з винятком</h2>
+                <p>
+                    Interceptor не повертає відповідь — лише кидає виняток або завершується без дій.
+                    Необроблений виняток перехоплює Whoops (<code>ErrorHandlerServiceProvider</code>):
+                </p>
+                <ul>
+                    <li><strong>JSON / AJAX</strong> — <code>RequestFormat::expectsJson()</code> → <code>JsonResponseHandler</code></li>
+                    <li><strong>Debug web</strong> — <code>app.debug</code> → Pretty Page</li>
+                    <li><strong>Production web</strong> — fallback з <code>PathName::ERRORS_FALLBACK_VIEWS</code></li>
+                </ul>
+                <p>
+                    Для передбачуваної відповіді 403 або redirect краще обгорнути handler у
+                    middleware (наступний розділ), а не покладатися лише на Whoops.
+                </p>
+
+                <h2 id="middleware-redirect" class="border-bottom pb-2 mb-3 mt-5">Redirect і 403 через middleware</h2>
+                <p>
+                    Middleware може перехопити виняток з interceptor (за аналогією з
+                    <code>HandleValidationExceptionMiddleware</code>) і повернути redirect або JSON:
+                </p>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+namespace Concept\App\Http\Middlewares;
+
+use Concept\App\Exceptions\AccessDeniedException;
+use Concept\Core\Http\Contracts\ResponseFactoryInterface;
+use Concept\Core\Http\Protocol\HttpStatusCode;
+use Concept\Core\Http\RequestFormat;
+use Psr\Http\Message\ResponseInterface;
+use Psr\Http\Message\ServerRequestInterface;
+use Psr\Http\Server\MiddlewareInterface;
+use Psr\Http\Server\RequestHandlerInterface;
+
+final class HandleAccessDeniedMiddleware implements MiddlewareInterface
+{
+    public function __construct(
+        private readonly ResponseFactoryInterface $response,
+        private readonly RequestFormat $requestFormat,
+    ) {}
+
+    public function process(
+        ServerRequestInterface $request,
+        RequestHandlerInterface $handler
+    ): ResponseInterface {
+        try {
+            return $handler->handle($request);
+        } catch (AccessDeniedException $e) {
+            if ($this->requestFormat->expectsJson($request)) {
+                return $this->response->jsonError(
+                    $e->getMessage(),
+                    HttpStatusCode::FORBIDDEN
+                );
+            }
+
+            return $this->response->redirectByName('admin.login');
+        }
+    }
+}</code></pre>
+                <p>Зареєструйте middleware <strong>зовні</strong> interceptor-ланцюжка (першим у файлі маршрутів):</p>
+                <pre class="mb-4"><code class="language-php">$router->lazyMiddleware(HandleAccessDeniedMiddleware::class);
+$router->lazyMiddleware(HandleValidationExceptionMiddleware::class);
+// ... інші middleware</code></pre>
+                <p>
+                    Так interceptor лишається «тонким» (лише перевірка + throw), а формат відповіді
+                    (HTML redirect vs JSON 403) централізовано в middleware.
+                </p>
+
+                <h2 id="auth-middleware-only" class="border-bottom pb-2 mb-3 mt-5">Альтернатива: лише middleware (redirect)</h2>
+                <p>
+                    Якщо достатньо перевірки «залогінений / активний користувач» без ACL за named route,
+                    redirect можна зробити без interceptor
+                    <code>AuthMiddleware</code>:
+                </p>
+                <pre class="mb-4"><code class="language-php">public function process(
+    ServerRequestInterface $request,
+    RequestHandlerInterface $handler
+): ResponseInterface {
+    if (!$this->auth->check()) {
+        return new RedirectResponse('/admin/login', HttpStatusCode::FOUND);
+    }
+
+    return $handler->handle($request);
+}</code></pre>
+                <p>
+                    Або через <code>ResponseFactoryInterface::redirectByName()</code> — див.
+                    <a href="middleware.html#auth-middleware">Middleware → приклади авторизації</a>.
+                </p>
+
+                <h2 id="combined-flow" class="border-bottom pb-2 mb-3 mt-5">Поєднаний сценарій</h2>
+                <div class="docs-mermaid mb-4">
+                    <pre class="mermaid">flowchart TB
+    REQ["HTTP запит"]
+    MW1["HandleAccessDeniedMiddleware"]
+    MW2["AuthMiddleware на /admin"]
+    MATCH["Router match"]
+    INT["AclRouteAuthorization"]
+    CTRL["Controller"]
+
+    REQ --> MW1 --> MW2 --> MATCH --> INT
+    INT -->|"can access"| CTRL
+    INT -->|"AccessDeniedException"| MW1
+    MW2 -->|"not logged in"| REDIR["RedirectResponse login"]
+    MW1 -->|"catch"| RESP["JSON 403 або redirect"]</pre>
+                </div>
+                <ol>
+                    <li><code>AuthMiddleware</code> на групі — груба перевірка сесії, redirect без винятку.</li>
+                    <li><code>AclRouteAuthorization</code> — тонка перевірка права на named route, <code>throw</code>.</li>
+                    <li><code>HandleAccessDeniedMiddleware</code> — перехоплює виняток, відповідає клієнту.</li>
+                </ol>
+
+                <h2 id="tips" class="border-bottom pb-2 mb-3 mt-5">Поради</h2>
+                <ul>
+                    <li>Завжди іменуйте маршрути (<code>setName()</code>), якщо ACL прив’язаний до імені.</li>
+                    <li>Не дублюйте перевірку login у interceptor і middleware — розділіть ролі.</li>
+                    <li>Для API — JSON через <code>HandleAccessDeniedMiddleware</code> + <code>expectsJson()</code>.</li>
+                    <li>Interceptor не замінює CSRF — <code>VerifyCsrfTokenMiddleware</code> лишається в стеку.</li>
+                </ul>
+
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
+            </main>
+
+            <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">
+                <nav id="docs-toc" class="nav flex-column small position-sticky top-0 pt-1"></nav>
+            </aside>
+        </div>
+    </div>
+
+    <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
+    <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'dark', securityLevel: 'loose' });
+    </script>
+    <script src="../assets/js/nav-uk.js"></script>
+    <script src="../assets/js/docs.js"></script>
+</body>
+</html>

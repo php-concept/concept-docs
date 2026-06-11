@@ -31,7 +31,7 @@
             <aside class="col-lg-3 col-xl-2">
                 <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
                     <div class="offcanvas-header border-bottom d-lg-none">
-                        <h5 class="offcanvas-title" id="docsSidebarLabel">Menu</h5>
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
                     </div>
                     <div class="offcanvas-body p-0 pt-lg-4">
@@ -51,13 +51,42 @@
                 <p>
                     HTTP і CLI працюють з однією конфігурацією (<code>config/db.php</code>, <code>.env</code>);
                     схему оновлюють консольними командами <code>db:*</code> (див. <a href="console.html#built-in">Консоль</a>).
+                    Шляхи міграцій і сидерів компонентів підключає <code>ComponentsServiceProvider</code>
+                    (див. <a href="creating-components.html">Створення компонента</a>).
                 </p>
+
+                <h2 id="architecture" class="border-bottom pb-2 mb-3 mt-5">Класи ядра</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Клас</th><th>Роль</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>DatabaseServiceProvider</code></td>
+                                <td>Capsule, Eloquent, <code>Migrator</code>, реєстри міграцій/сидерів</td>
+                            </tr>
+                            <tr>
+                                <td><code>DatabaseInterface</code></td>
+                                <td>Обгортка <code>capsule()</code> для query builder поза моделлю</td>
+                            </tr>
+                            <tr>
+                                <td><code>MigrationRegistry</code></td>
+                                <td>Шляхи до каталогів міграцій (додаток + компоненти)</td>
+                            </tr>
+                            <tr>
+                                <td><code>SeederRegistry</code> / <code>SeederManager</code></td>
+                                <td>Список сидерів і запуск через <code>db:seed</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
                 <h2 id="configuration" class="border-bottom pb-2 mb-3 mt-5">Підключення</h2>
                 <p>
                     Параметри з <code>config/db.php</code> перекриваються змінними оточення
                     (<code>DB_HOST</code> → <code>db.host</code> тощо). Детальна таблиця — у
-                    <a href="configuration.html#env-db">Конфігурація → Змінні БД</a>.
+                    <a href="configuration.html#file-db">Конфігурація → db.php</a> та змінні оточення в тому ж розділі.
                 </p>
                 <pre class="mb-4"><code class="language-php">// config/db.php
 return [
@@ -74,11 +103,16 @@ return [
                 <p>
                     У <code>DatabaseServiceProvider::boot()</code> створюється глобальний
                     <code>Illuminate\Database\Capsule\Manager</code>, викликається <code>bootEloquent()</code>,
-                    реєструється слухач SQL (лог при <code>app.debug</code> або <code>log.query</code>).
+                    підключається <code>Dispatcher</code> для подій запитів.
+                    SQL логується при <code>app.debug</code> або <code>log.query</code>; за <code>log.query</code>
+                    також пишеться телеметрія <code>TelemetryEvent::DB_QUERY_EXECUTED</code>.
                 </p>
                 <p>
-                    Фасад низького рівня — <code>DatabaseInterface</code> (обгортка над Capsule), якщо потрібен доступ
-                    поза Eloquent-моделями.
+                    Низькорівневий доступ — <code>Concept\Core\Components\Database\Contracts\DatabaseInterface</code>
+                    і метод <code>capsule()</code> (наприклад у правилах <code>unique</code> / <code>exists</code>).
+                    Ключ <code>db.port</code> є в конфігу, але <code>getConnectionOptions()</code> ядра наразі
+                    передає в Capsule лише <code>driver</code>, <code>host</code>, <code>database</code>,
+                    <code>username</code>, <code>password</code>, <code>charset</code>.
                 </p>
 
                 <h2 id="models" class="border-bottom pb-2 mb-3 mt-5">Моделі Eloquent</h2>
@@ -87,22 +121,28 @@ return [
                     <code>Illuminate\Database\Eloquent\Model</code>). Компоненти оголошують моделі у власному namespace,
                     наприклад <code>Concept\Components\AuthAdmin\Models\UserModel</code>.
                 </p>
-                <p>Рекомендовані практики в skeleton:</p>
+                <p>Рекомендовані практики:</p>
                 <ul>
                     <li>константи полів <code>FIELD_*</code> замість «магічних» рядків у запитах і <code>fillable</code>;</li>
-                    <li>трейт <code>IdTrait</code> для типізованого <code>getId()</code>;</li>
-                    <li><code>$fillable</code>, <code>$hidden</code>, <code>$casts</code> — як у Laravel;</li>
-                    <li>модель у конструктор контролера або сервісу — через DI контейнера (autowiring).</li>
+                    <li><code>BaseModel::getId()</code>, <code>FIELD_ID</code>, <code>SORT_ASC</code> / <code>SORT_DESC</code>;</li>
+                    <li><code>$fillable</code>, <code>$hidden</code>, <code>$casts</code>, <code>SoftDeletes</code> — як у Laravel;</li>
+                    <li>модель у конструктор контролера або сервісу — autowiring (<code>UserModel $userModel</code>).</li>
                 </ul>
-                <pre class="mb-4"><code class="language-php">class UserModel extends BaseModel
+                <pre class="mb-4"><code class="language-php">use Concept\App\Models\BaseModel;
+use Illuminate\Database\Eloquent\SoftDeletes;
+
+class UserModel extends BaseModel
 {
-    use IdTrait;
+    use SoftDeletes;
 
     public const string FIELD_EMAIL = 'email';
+    public const string FIELD_PASSWORD = 'password';
+    public const string FIELD_CREATED_AT = 'created_at';
 
     protected $table = 'users';
 
     protected $fillable = [self::FIELD_EMAIL, /* ... */];
+    protected $hidden = [self::FIELD_PASSWORD];
 }</code></pre>
 
                 <h2 id="queries" class="border-bottom pb-2 mb-3 mt-5">Запити в коді</h2>
@@ -153,27 +193,41 @@ return [
     'paths' =&gt; ['src/Components/AuthAdmin/Database/Migrations'],
 ],</code></pre>
                 <p>
-                    Файл міграції — клас, що розширює <code>Migration</code>, з методами <code>up()</code> / <code>down()</code>.
-                    Для схеми використовуйте <code>CapsuleManager::schema()</code>:
+                    Файл міграції — анонімний клас, що розширює <code>Migration</code>, з методами <code>up()</code> / <code>down()</code>.
+                    Приклад іменування файлів: <code>V2026_03_23_120000_CreatePagesTable.php</code>.
                 </p>
-                <pre class="mb-4"><code class="language-php">use Illuminate\Database\Capsule\Manager as CapsuleManager;
+                <pre class="mb-4"><code class="language-php">use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\Capsule\Manager as CapsuleManager;
 
-CapsuleManager::schema()-&gt;create('pages', function (Blueprint $table) {
-    $table-&gt;increments('id');
-    $table-&gt;string('slug', 255)-&gt;unique();
-    $table-&gt;timestamps();
-});</code></pre>
+return new class extends Migration
+{
+    public function up(): void
+    {
+        CapsuleManager::schema()-&gt;create('pages', function (Blueprint $table) {
+            $table-&gt;increments('id');
+            $table-&gt;string('slug', 255)-&gt;unique();
+            $table-&gt;timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        CapsuleManager::schema()-&gt;dropIfExists('pages');
+    }
+};</code></pre>
                 <p>
-                    Історія виконаних міграцій зберігається в таблиці <code>migrations</code> (ім’я з конфігу).
+                    <code>db:migrate</code> створює таблицю <code>migrations</code>, якщо її ще немає, і застосовує
+                    всі невиконані файли з усіх зареєстрованих шляхів.
                     Документація Laravel: <a href="https://laravel.com/docs/migrations" target="_blank" rel="noopener">Migrations</a>.
                 </p>
 
                 <h2 id="seeders" class="border-bottom pb-2 mb-3 mt-5">Сидери</h2>
                 <p>
                     Класи сидерів перелічуються в <code>config/seeders.php</code> і в <code>seeders.list</code> компонента.
-                    Компонентні сидери реалізують <code>SeederInterface</code> (метод <code>run(): void</code>);
-                    додаткові сидери додатку можуть наслідувати <code>Illuminate\Database\Seeder</code>.
+                    <code>SeederManager</code> викликає <code>run()</code> лише для класів, що реалізують
+                    <code>Concept\Core\Components\Database\Contracts\SeederInterface</code>.
+                    Зазвичай сидер також extends <code>Illuminate\Database\Seeder</code>.
                 </p>
                 <pre class="mb-4"><code class="language-php">// config/seeders.php
 use Database\Seeders\PageSeeder;
@@ -182,7 +236,16 @@ return [
     'seeders' =&gt; [
         'list' =&gt; [PageSeeder::class],
     ],
-];</code></pre>
+];
+
+// database/seeders/PageSeeder.php — обов'язково SeederInterface
+use Concept\Core\Components\Database\Contracts\SeederInterface;
+use Illuminate\Database\Seeder;
+
+class PageSeeder extends Seeder implements SeederInterface
+{
+    public function run(): void { /* ... */ }
+}</code></pre>
                 <p>
                     <code>db:seed</code> без опцій запускає всі зареєстровані сидери.
                     Щоб виконати <strong>один</strong> сидер, передайте <strong>повний FQCN</strong> класу через
@@ -191,7 +254,7 @@ return [
                 </p>
                 <pre class="mb-3"><code class="language-bash">php bin/console.php db:seed -c "Concept\Components\AuthAdmin\Database\Seeders\UserSeeder"</code></pre>
                 <p class="small text-body-secondary">
-                    Список доступних класів: <code>php bin/console.php db:seeders:list</code>.
+                    Список доступних класів: <code>php bin/console.php seeders:list</code>.
                 </p>
 
                 <h2 id="cli" class="border-bottom pb-2 mb-3 mt-5">Консоль</h2>
@@ -203,9 +266,9 @@ return [
                         <tbody>
                             <tr><td><code>db:migrate</code></td><td>Застосувати нові міграції</td></tr>
                             <tr><td><code>db:rollback</code></td><td>Відкат останнього batch</td></tr>
-                            <tr><td><code>db:migration:list</code></td><td>Список міграцій і статус</td></tr>
+                            <tr><td><code>migration:list</code></td><td>Список міграцій і статус</td></tr>
                             <tr><td><code>db:seed</code></td><td>Усі сидери; <code>-c "Fully\Qualified\Class"</code> — один сидер (повний FQCN)</td></tr>
-                            <tr><td><code>db:seeders:list</code></td><td>Зареєстровані сидери</td></tr>
+                            <tr><td><code>seeders:list</code></td><td>Зареєстровані сидери</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -246,6 +309,8 @@ src/Components/*/Database/Seeders/</code></pre>
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/bash.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
     <script src="../assets/js/nav-uk.js"></script>
     <script src="../assets/js/docs.js"></script>

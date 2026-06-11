@@ -18,9 +18,10 @@
             </button>
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
-            <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="../en/request-lifecycle.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/request-lifecycle.html">UK</a></li>
+            <ul class="navbar-nav flex-row gap-1 ms-auto">
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/request-lifecycle.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/request-lifecycle.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -41,10 +42,234 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Request Lifecycle</h1>
+
                 <p>
-                    Full documentation is available in
-                    <a href="../uk/request-lifecycle.html">Ukrainian</a> (Життєвий цикл запиту).
+                    An HTTP request flows from the web server through <code>public/index.php</code>, service provider registration,
+                    resolution of <code>Router</code> and PSR-7 <code>Request</code>, League Route dispatch, and response emission
+                    via <code>SapiEmitter</code>.
                 </p>
+                <p>
+                    Prerequisites: <a href="setup.html">setup</a> entry points,
+                    <a href="configuration.html">configuration</a>.
+                </p>
+
+                <h2 id="overview" class="border-bottom pb-2 mb-3 mt-5">Overview</h2>
+                <div class="docs-mermaid mb-4">
+                    <pre class="mermaid">flowchart TB
+    WS["Web server"]
+    IDX["public/index.php"]
+    BOOT["bootstrap/app.php"]
+    PROV["registerServiceProviders()"]
+    RUN["App::run()"]
+    ROUTER["Router::dispatch(Request)"]
+    MW["Middleware stack"]
+    STRAT["RouteStrategy"]
+    INT["Route interceptors"]
+    RES["Autowire: FormRequest, params, Request"]
+    CTRL["Controller / closure"]
+    EMIT["SapiEmitter"]
+
+    WS --> IDX --> BOOT --> PROV
+    IDX --> RUN --> ROUTER --> MW --> STRAT
+    STRAT --> INT --> RES --> CTRL --> EMIT</pre>
+                </div>
+                <pre class="mb-4"><code class="language-text">Web server → public/index.php
+    → vendor/autoload.php
+    → bootstrap/app.php
+        → App::create() + registerServiceProviders()
+            → for each provider: register(), then boot()
+            → ComponentsServiceProvider::boot() loads component routes
+    → App::run()
+        → container->get(RouterInterface)
+        → container->get(ServerRequestInterface)
+        → Router::dispatch(Request)
+            → middleware (global + route)
+            → RouteStrategy::invokeRouteCallable()
+                → route interceptors
+                → autowire handler arguments
+            → PSR-7 Response
+        → SapiEmitter → client</code></pre>
+
+                <h2 id="entry" class="border-bottom pb-2 mb-3 mt-5">1. Entry point</h2>
+                <p>
+                    <code>public/index.php</code> is the only file the document root should point to.
+                    It contains no business logic:
+                </p>
+                <pre class="mb-4"><code class="language-php">require_once __DIR__ . '/../vendor/autoload.php';
+
+/** @var \Concept\Core\App $app */
+$app = require_once __DIR__ . '/../bootstrap/app.php';
+
+$app->run();</code></pre>
+
+                <h2 id="bootstrap-phase" class="border-bottom pb-2 mb-3 mt-5">2. Bootstrap (before run)</h2>
+                <p><code>bootstrap/app.php</code> performs:</p>
+                <ol>
+                    <li><code>App::create($rootPath, $paths)</code> — League Container, <code>ReflectionContainer</code>, <code>PathManager</code>, early Whoops (reads <code>APP_DEBUG</code> from <code>$_ENV</code>).</li>
+                    <li><code>registerServiceProviders()</code> — loads the list from <code>bootstrap/providers/app.php</code>.</li>
+                </ol>
+                <p>
+                    League Container calls <code>register()</code> for each provider, then immediately
+                    <code>boot()</code> (if <code>BootableServiceProviderInterface</code> is implemented) — see
+                    <a href="service-providers.html#register-boot">Service providers → register and boot</a>.
+                    Order in <code>providers/app.php</code> is critical: provider N in <code>boot()</code> can
+                    use services only from providers higher in the list.
+                </p>
+
+                <h3 id="providers-order" class="mt-4">Provider order (HTTP, skeleton)</h3>
+                <p>Actual order in <code>bootstrap/providers/app.php</code>:</p>
+                <ol class="small">
+                    <li><strong>ConfigServiceProvider</strong> — config, <code>.env</code>, timezone</li>
+                    <li><strong>LocaleServiceProvider</strong> — locale for validation translations</li>
+                    <li><strong>TelemetryServiceProvider</strong> — telemetry collection (if enabled)</li>
+                    <li><strong>ErrorHandlerServiceProvider</strong> — Whoops (HTML / JSON / production fallback)</li>
+                    <li><strong>HttpServiceProvider</strong> — PSR-7 request, Router, response factories</li>
+                    <li><strong>SessionServiceProvider</strong> — Symfony Session (starts on first access)</li>
+                    <li><strong>DataMaskerServiceProvider</strong> — masking sensitive data in logs</li>
+                    <li><strong>LogServiceProvider</strong> — Monolog</li>
+                    <li><strong>ViewRegistryServiceProvider</strong>, <strong>TwigServiceProvider</strong></li>
+                    <li><strong>ValidationServiceProvider</strong>, <strong>DatabaseServiceProvider</strong>, <strong>CastingServiceProvider</strong></li>
+                    <li><strong>DebugLoggerServiceProvider</strong> — in-memory debug log (dev)</li>
+                    <li><strong>ComponentsServiceProvider</strong> — modules (last in the list)</li>
+                </ol>
+
+                <h3 id="components-boot" class="mt-4">What ComponentsServiceProvider::boot() does</h3>
+                <p>
+                    <code>ComponentsServiceProvider</code> is last so that in <code>boot()</code> it already has
+                    <code>ConfigInterface</code>, <code>RouterInterface</code>, view registries, and so on.
+                    During <code>boot()</code> (still before <code>App::run()</code>), if components are enabled:
+                </p>
+                <ul>
+                    <li>component CLI commands, migrations, and seeders are registered;</li>
+                    <li>additional component service providers are loaded (<code>addServiceProvider()</code>);</li>
+                    <li><code>require</code> of each component’s <code>routes.php</code> — routes are added to the same <code>Router</code>;</li>
+                    <li>Twig paths, extensions, and contexts for component views are registered (HTTP only, not CLI).</li>
+                </ul>
+                <p>
+                    Global routes from <code>routes/web.php</code> are loaded on first resolution of
+                    <code>RouterInterface</code> in the <code>HttpServiceProvider</code> factory — usually during
+                    <code>ComponentsServiceProvider::boot()</code>, when it requests the Router for component routes.
+                </p>
+
+                <h2 id="request-object" class="border-bottom pb-2 mb-3 mt-5">3. PSR-7 request</h2>
+                <p>
+                    <code>ServerRequestInterface</code> is created in the container via
+                    <code>Laminas\Diactoros\ServerRequestFactory::fromGlobals()</code> —
+                    data from <code>$_SERVER</code>, <code>$_GET</code>, <code>$_POST</code>, <code>$_COOKIE</code>, <code>$_FILES</code>.
+                    In a typical HTTP cycle, resolution happens in <code>App::run()</code> before <code>dispatch()</code>.
+                </p>
+                <p>
+                    After a route match, <code>RouteStrategy</code> adds URL parameters to request attributes
+                    (<code>{id}</code> → <code>$request->getAttribute('id')</code>) and updates the shared instance
+                    in the container.
+                </p>
+
+                <h2 id="run" class="border-bottom pb-2 mb-3 mt-5">4. App::run()</h2>
+                <pre class="mb-4"><code class="language-php">/** @var RouterInterface $router */
+$router = $this->container->get(RouterInterface::class);
+/** @var ServerRequestInterface $request */
+$request = $this->container->get(ServerRequestInterface::class);
+
+$response = $router->dispatch($request);
+(new SapiEmitter)->emit($response);</code></pre>
+                <p>
+                    <code>Router</code> (class <code>Concept\Core\Http\Routing\Router</code>) — wrapper around League Route
+                    with <code>RouteStrategy</code>: DI for handler parameters, FormRequest, route interceptors, telemetry.
+                </p>
+
+                <h2 id="middleware" class="border-bottom pb-2 mb-3 mt-5">5. Middleware</h2>
+                <p>
+                    Middleware is registered in route files via
+                    <code>$router->lazyMiddleware(ClassName::class)</code> (League Route).
+                    Classes are created from the container during request handling.
+                    Each middleware implements <code>MiddlewareInterface::process($request, $handler)</code>
+                    and calls <code>$handler->handle($request)</code> to pass control down the chain.
+                </p>
+                <p>Core includes, among others:</p>
+                <ul class="small">
+                    <li><code>HandleValidationExceptionMiddleware</code> — converts <code>ValidationException</code> to a response</li>
+                    <li><code>VerifyCsrfTokenMiddleware</code> — CSRF for unsafe methods</li>
+                    <li><code>StorePreviousUrlMiddleware</code> — stores URL for redirects</li>
+                    <li><code>ShareViewDataMiddleware</code> — shared variables for Twig (csrf_token, etc.)</li>
+                    <li><code>ParseJsonBodyMiddleware</code>, <code>ForceJsonResponseMiddleware</code> — JSON API</li>
+                </ul>
+                <p>
+                    Minimal skeleton does not attach middleware globally — only the <code>/</code> route.
+                    More details — <a href="middleware.html">Middleware</a>.
+                </p>
+
+                <h2 id="controller" class="border-bottom pb-2 mb-3 mt-5">6. RouteStrategy: interceptors and handler</h2>
+                <p>After middleware, League Route calls <code>RouteStrategy::invokeRouteCallable()</code>:</p>
+                <ol>
+                    <li><strong>Route interceptors</strong> — classes from <code>config/routes.php</code> → <code>routes.interceptors</code> (<code>RouteInterceptorInterface::intercept()</code>); for ACL, policies, etc. — see <a href="route-interceptors.html">Route interceptors</a>.</li>
+                    <li><strong>URL parameters in Request</strong> — <code>{id}</code> becomes a request attribute.</li>
+                    <li><strong>Autowire handler arguments</strong> — for a controller method or closure:
+                        <ul>
+                            <li><code>FormRequest</code> — from the container, validation; on failure — <code>ValidationException</code></li>
+                            <li><code>ServerRequestInterface</code> — current request</li>
+                            <li>route parameters — type-cast via <code>CasterInterface</code> (Valinor)</li>
+                            <li>default values in the signature</li>
+                        </ul>
+                    </li>
+                </ol>
+                <p>Route example:</p>
+                <pre class="mb-4"><code class="language-php">$router->get('/', [IndexController::class, 'index'])->setName('home');</code></pre>
+                <p>
+                    Controller <code>[Class, 'method']</code> is resolved from the container — constructor dependencies
+                    (<code>ViewResponseFactoryInterface</code>, etc.) are injected via League Container +
+                    <code>ReflectionContainer</code>.
+                    More details — <a href="controllers.html#autowiring">Controllers → autowiring</a>,
+                    <a href="controllers.html#method-args">method arguments</a>.
+                </p>
+                <p>
+                    If <code>telemetry.enabled</code>, <code>RouteStrategy</code> records
+                    <code>TelemetryEvent::HTTP_ROUTE_CALLABLE_INVOKE</code> (handler execution time).
+                </p>
+
+                <h2 id="response" class="border-bottom pb-2 mb-3 mt-5">7. Response</h2>
+                <p>The handler returns <code>ResponseInterface</code> (PSR-7). Typical options:</p>
+                <ul>
+                    <li><code>ViewResponseFactoryInterface::create('@frontend/index')</code> — HTML via Twig</li>
+                    <li><code>ResponseFactoryInterface</code> — JSON, redirect, empty response</li>
+                </ul>
+                <p>
+                    <code>SapiEmitter</code> (Laminas HttpHandlerRunner) sends headers and body to the PHP SAPI
+                    (Apache, FPM, built-in server). More details — <a href="responses.html">Responses</a>.
+                </p>
+
+                <h2 id="errors" class="border-bottom pb-2 mb-3 mt-5">8. Error handling</h2>
+                <ul>
+                    <li><strong>Before providers</strong> — early Whoops in <code>App::create()</code> (reads <code>APP_DEBUG</code> from <code>$_ENV</code>).</li>
+                    <li><strong>ErrorHandlerServiceProvider::boot()</strong> — switches Whoops: PrettyPage (debug), PlainText (CLI), JSON (<code>RequestFormat::expectsJson()</code>), production fallback from <code>PathName::ERRORS_FALLBACK_VIEWS</code>.</li>
+                    <li><strong>Validation</strong> — <code>ValidationException</code> from FormRequest; <code>HandleValidationExceptionMiddleware</code> may return 422 / redirect.</li>
+                    <li><strong>CSRF</strong> — <code>CsrfException</code> on invalid token.</li>
+                    <li><strong>404 / method</strong> — League Route; response depends on router settings and middleware.</li>
+                </ul>
+
+                <h2 id="telemetry" class="border-bottom pb-2 mb-3 mt-5">9. Telemetry (optional)</h2>
+                <p>
+                    If <code>telemetry.enabled = true</code>, the core records bootstrap and HTTP stages via
+                    <code>TelemetryCollector</code>: service awakening (<code>FRAMEWORK_SERVICE_AWAKENING</code>),
+                    component registration, handler invocation (<code>HTTP_ROUTE_CALLABLE_INVOKE</code>).
+                </p>
+
+                <h2 id="cli-note" class="border-bottom pb-2 mb-3 mt-5">CLI — separate cycle</h2>
+                <p>
+                    <code>bin/console.php</code> does not call <code>App::run()</code>.
+                    It uses the same <code>paths.php</code> and <code>App::create()</code>, but providers from
+                    <code>bootstrap/providers/console.php</code> and Symfony Console <code>Application::run()</code>.
+                    HTTP middleware, PSR-7 request, and <code>Router::dispatch()</code> do not apply in CLI.
+                </p>
+
+                <h2 id="related" class="border-bottom pb-2 mb-3 mt-5">Next steps</h2>
+                <ul>
+                    <li><a href="routing.html">Routing</a> — declaring routes, names, groups</li>
+                    <li><a href="route-interceptors.html">Route interceptors</a> — ACL, exceptions, redirect via middleware</li>
+                    <li><a href="middleware.html">Middleware</a> — custom middleware</li>
+                    <li><a href="controllers.html">Controllers</a></li>
+                    <li><a href="requests.html">Requests and validation</a> — FormRequest</li>
+                </ul>
+
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>
 
@@ -56,7 +281,12 @@
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'dark', securityLevel: 'loose' });
+    </script>
     <script src="../assets/js/nav-en.js"></script>
     <script src="../assets/js/docs.js"></script>
 </body>

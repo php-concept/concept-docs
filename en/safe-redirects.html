@@ -45,53 +45,153 @@
 
                 <p>
                     Open redirects (<code>?next=https://evil.com</code>) are a common vulnerability. Concept Core
-                    limits “go back” and fallback targets to in-app URLs via
+                    restricts “back” and fallback URLs to internal application addresses via
                     <code>StorePreviousUrlMiddleware</code> and <code>ResponseFactory::back()</code>.
                 </p>
+                <p>
+                    See also: <a href="responses.html#redirects">Responses → redirects</a>,
+                    <a href="middleware.html#core-middleware">Middleware → StorePreviousUrlMiddleware</a>,
+                    <a href="requests.html#validation-errors">validation errors</a>.
+                </p>
+
+                <h2 id="architecture" class="border-bottom pb-2 mb-3 mt-5">Core classes</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Class</th><th>Role</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>StorePreviousUrlMiddleware</code></td>
+                                <td>URL chain in session + <code>RequestAttribute::SAFE_BACK_URL</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>ResponseFactory::back()</code></td>
+                                <td>Referer → safe back → fallback, with <code>isInternalUrl()</code> check</td>
+                            </tr>
+                            <tr>
+                                <td><code>ResponseFactory::redirectByName()</code></td>
+                                <td>Redirect by route name via <code>UrlGenerator::uri()</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>HandleValidationExceptionMiddleware</code></td>
+                                <td>HTML: flash + <code>back()</code> after <code>ValidationException</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
                 <h2 id="middleware" class="border-bottom pb-2 mb-3 mt-5">StorePreviousUrlMiddleware</h2>
-                <p>The middleware tracks two session keys:</p>
+                <p>The middleware tracks two URLs in the session:</p>
                 <ul>
-                    <li><code>SessionKey::CURRENT_URL</code> — latest non-AJAX GET page</li>
-                    <li><code>SessionKey::PREVIOUS_URL</code> — page before that</li>
+                    <li><code>SessionKey::CURRENT_URL</code> (<code>_url_current</code>) — last GET page (non-AJAX)</li>
+                    <li><code>SessionKey::PREVIOUS_URL</code> (<code>_url_previous</code>) — previous GET page</li>
                 </ul>
-                <p>Each request gets <code>RequestAttribute::SAFE_BACK_URL</code>:</p>
+                <p>
+                    On <strong>GET</strong> (non-AJAX) the middleware stores the full request URI
+                    (<code>(string) $request-&gt;getUri()</code>, including the query string).
+                    If the URI differs from the current session value, the previous <code>CURRENT_URL</code>
+                    becomes <code>PREVIOUS_URL</code>, and the new URI becomes <code>CURRENT_URL</code>.
+                </p>
+                <p>On every request the PSR-7 attribute <code>RequestAttribute::SAFE_BACK_URL</code> (<code>safe_back_url</code>) is set:</p>
                 <ul>
-                    <li><strong>GET</strong> → previous page URL</li>
-                    <li><strong>POST</strong> (and others) → current form page URL</li>
+                    <li><strong>GET</strong> — <code>PREVIOUS_URL</code> (the page you came from)</li>
+                    <li><strong>POST</strong>, <strong>PUT</strong>, <strong>PATCH</strong>, <strong>DELETE</strong>, and other non-GET methods — <code>CURRENT_URL</code> (the form page)</li>
                 </ul>
-                <pre class="mb-4"><code class="language-php">$router->lazyMiddleware(StorePreviousUrlMiddleware::class);</code></pre>
-                <p>AJAX requests (<code>X-Requested-With: XMLHttpRequest</code>) do not update the URL chain.</p>
+                <p>Typical stack position — after CSRF, before <code>ShareViewDataMiddleware</code>:</p>
+                <pre class="mb-4"><code class="language-php">$router->lazyMiddleware(HandleValidationExceptionMiddleware::class);
+$router->lazyMiddleware(VerifyCsrfTokenMiddleware::class);
+$router->lazyMiddleware(StorePreviousUrlMiddleware::class);
+$router->lazyMiddleware(ShareViewDataMiddleware::class);</code></pre>
+                <p>
+                    AJAX requests (<code>HttpHeader::X_REQUESTED_WITH</code> = <code>XMLHttpRequest</code>) do not update the URL chain,
+                    so background poll requests do not break “back” after a form submit.
+                    The <code>SAFE_BACK_URL</code> attribute is still set from the session on such requests.
+                </p>
 
                 <h2 id="back" class="border-bottom pb-2 mb-3 mt-5">ResponseFactory::back()</h2>
-                <pre class="mb-4"><code class="language-php">return $responseFactory->back(status: 302, fallback: '/cabinet');</code></pre>
-                <p>Target resolution order:</p>
+                <p>Controllers or middleware after validation often redirect back:</p>
+                <pre class="mb-4"><code class="language-php">return $this-&gt;response-&gt;back();
+return $this-&gt;response-&gt;back(
+    status: HttpStatusCode::FOUND,
+    fallback: '/cabinet'
+);</code></pre>
+                <p>Target selection algorithm:</p>
                 <ol>
-                    <li><strong>Referer</strong> header, if internal</li>
-                    <li><strong>SAFE_BACK_URL</strong> request attribute</li>
-                    <li><strong>Fallback</strong> path (default <code>/</code>)</li>
+                    <li><strong>Referer</strong> — if the header is not empty (priority #1)</li>
+                    <li><strong>SAFE_BACK_URL</strong> — from the request attribute, only when Referer is absent</li>
+                    <li><strong>Check</strong> — the chosen URL passes <code>isInternalUrl()</code>; otherwise — fallback</li>
+                    <li><strong>Fallback</strong> — second method argument (default <code>/</code>)</li>
                 </ol>
+                <p class="small text-body-secondary">
+                    An external Referer (different host) is not used — fallback applies.
+                    Default status is <code>HttpStatusCode::FOUND</code> (302).
+                </p>
 
-                <h2 id="internal-url" class="border-bottom pb-2 mb-3 mt-5">Internal URL rules</h2>
+                <h2 id="internal-url" class="border-bottom pb-2 mb-3 mt-5">What counts as “internal”</h2>
+                <p>Private method <code>ResponseFactory::isInternalUrl()</code>:</p>
                 <ul>
-                    <li>Relative paths starting with <code>/</code> are allowed</li>
-                    <li>Absolute URLs must match the current request host</li>
-                    <li>External hosts are rejected → fallback</li>
+                    <li>Empty string — rejected</li>
+                    <li>No host in <code>parse_url()</code> — allowed only if the string starts with <code>/</code></li>
+                    <li>With host — only if <code>host</code> strictly matches the current PSR-7 request host</li>
+                    <li>External domains, <code>//evil.com</code>, <code>javascript:</code>, etc. — rejected → fallback</li>
                 </ul>
+                <p>
+                    The check applies only in <code>back()</code>. Methods
+                    <code>redirect($url)</code> and <code>redirectByName()</code> do not filter the target —
+                    do not pass untrusted user input there.
+                </p>
+
+                <h2 id="redirect-methods" class="border-bottom pb-2 mb-3 mt-5">Three redirect methods</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Method</th><th>When</th><th>URL check</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>back()</code></td>
+                                <td>Return to form, validation error</td>
+                                <td>Yes (<code>isInternalUrl</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>redirectByName()</code></td>
+                                <td>PRG after POST, fixed target</td>
+                                <td>No (path from route generator)</td>
+                            </tr>
+                            <tr>
+                                <td><code>redirect($url)</code></td>
+                                <td>Known static path</td>
+                                <td>No (developer responsibility)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
                 <h2 id="validation" class="border-bottom pb-2 mb-3 mt-5">After validation errors</h2>
                 <p>
-                    <code>HandleValidationExceptionMiddleware</code> flashes errors and calls <code>back()</code> for HTML —
-                    users return to the form without trusting a user-supplied return URL.
+                    <code>HandleValidationExceptionMiddleware</code> for HTML requests flashes errors and calls
+                    <code>back()</code> — the user returns to the form with the same URL, without an arbitrary
+                    <code>redirect($_GET['return'])</code>.
+                </p>
+                <p>
+                    See <a href="requests.html#validation-errors">Requests → validation errors</a>
+                    and <a href="middleware.html#core-middleware">Middleware</a>.
                 </p>
 
                 <h2 id="named-routes" class="border-bottom pb-2 mb-3 mt-5">Named routes</h2>
-                <pre class="mb-4"><code class="language-php">return $responseFactory->redirectByName('cabinet.dashboard');</code></pre>
-                <p>Use <code>back()</code> for form UX; use <code>redirectByName()</code> when the destination is fixed.</p>
+                <p>For fixed targets, a named redirect is safer — the path is built by <code>UrlGeneratorInterface::uri()</code>:</p>
+                <pre class="mb-4"><code class="language-php">return $this-&gt;response-&gt;redirectByName('cabinet.home');
+return $this-&gt;response-&gt;redirectByName('admin.user.edit', ['id' =&gt; $id]);</code></pre>
+                <p>
+                    Use <code>back()</code> for “return to form” UX, and
+                    <code>redirectByName()</code> when the target is always known (login, dashboard).
+                </p>
 
                 <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
                     <p class="mb-0">
-                        Never redirect to raw user input. Whitelist paths or route names if you need a <code>?next=</code> parameter.
+                        Do not accept redirect URLs from untrusted user input without a whitelist. If you need a
+                        <code>?next=</code> parameter, compare against an allowlist of paths or route names.
                     </p>
                 </div>
 
@@ -106,6 +206,7 @@
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
     <script src="../assets/js/nav-en.js"></script>
     <script src="../assets/js/docs.js"></script>

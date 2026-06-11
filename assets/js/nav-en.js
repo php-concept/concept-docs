@@ -26,6 +26,7 @@ window.DOCS_NAV = {
             items: [
                 { slug: 'routing', label: 'Routing' },
                 { slug: 'middleware', label: 'Middleware' },
+                { slug: 'route-interceptors', label: 'Route Interceptors' },
                 { slug: 'controllers', label: 'Controllers' },
                 { slug: 'requests', label: 'Requests & Validation' },
                 { slug: 'responses', label: 'Responses' },
@@ -46,7 +47,7 @@ window.DOCS_NAV = {
             items: [
                 { slug: 'service-container', label: 'Service Container' },
                 { slug: 'service-providers', label: 'Service Providers' },
-                { slug: 'events', label: 'Events' }
+                { slug: 'telemetry', label: 'Telemetry' }
             ]
         },
         {
@@ -76,8 +77,9 @@ window.DOCS_NAV = {
         'directory-structure': { prev: 'configuration', next: 'request-lifecycle' },
         'request-lifecycle': { prev: 'directory-structure', next: 'routing' },
         'routing': { prev: 'request-lifecycle', next: 'middleware' },
-        'middleware': { prev: 'routing', next: 'controllers' },
-        'controllers': { prev: 'middleware', next: 'requests' },
+        'middleware': { prev: 'routing', next: 'route-interceptors' },
+        'route-interceptors': { prev: 'middleware', next: 'controllers' },
+        'controllers': { prev: 'route-interceptors', next: 'requests' },
         'requests': { prev: 'controllers', next: 'responses' },
         'responses': { prev: 'requests', next: 'views' },
         'views': { prev: 'responses', next: 'database' },
@@ -86,9 +88,9 @@ window.DOCS_NAV = {
         'data-masking': { prev: 'csrf', next: 'safe-redirects' },
         'safe-redirects': { prev: 'data-masking', next: 'service-container' },
         'service-container': { prev: 'safe-redirects', next: 'service-providers' },
-        'service-providers': { prev: 'service-container', next: 'events' },
-        'events': { prev: 'service-providers', next: 'console' },
-        'console': { prev: 'events', next: 'console-commands' },
+        'service-providers': { prev: 'service-container', next: 'telemetry' },
+        'telemetry': { prev: 'service-providers', next: 'console' },
+        'console': { prev: 'telemetry', next: 'console-commands' },
         'console-commands': { prev: 'console', next: 'components-overview' },
         'components-overview': { prev: 'console-commands', next: 'creating-components' },
         'creating-components': { prev: 'components-overview', next: 'component-cli' },

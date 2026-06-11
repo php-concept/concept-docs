@@ -19,8 +19,9 @@
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
             <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="../en/contributing.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/contributing.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/contributing.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/contributing.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -41,8 +42,64 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Contributing</h1>
-                <div class="border border-secondary-subtle rounded text-center text-body-secondary p-5">
-                    <p class="mb-0">This page is a placeholder. Content will be added in a future update.</p>
+
+                <p>
+                    Concept Core, Concept Skeleton, and this documentation are separate repositories in the
+                    <a href="https://github.com/php-concept" target="_blank" rel="noopener">php-concept</a> ecosystem.
+                    Below is how to contribute changes to code and docs consistently.
+                </p>
+
+                <h2 id="repositories" class="border-bottom pb-2 mb-3 mt-5">Repositories</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Project</th><th>Purpose</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><a href="https://github.com/php-concept/core" target="_blank" rel="noopener">concept-core</a></td>
+                                <td>Core: HTTP, DI, validation, DB, views, CLI</td>
+                            </tr>
+                            <tr>
+                                <td><a href="https://github.com/php-concept/concept-skeleton" target="_blank" rel="noopener">concept-skeleton</a></td>
+                                <td>Starter application, config, bootstrap</td>
+                            </tr>
+                            <tr>
+                                <td><a href="https://github.com/php-concept/concept-docs" target="_blank" rel="noopener">concept-docs</a></td>
+                                <td>Static HTML documentation (this site)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h2 id="docs" class="border-bottom pb-2 mb-3 mt-5">Documentation (concept-docs)</h2>
+                <ul>
+                    <li>Two languages: <code>uk/</code> and <code>en/</code>; primary content is often written in Ukrainian first.</li>
+                    <li>Before updating a page, verify against code in <code>code/core</code> and <code>code/skeleton</code> (mirrors for doc authors).</li>
+                    <li>Do not change <code>code/</code> content in documentation PRs — only HTML/CSS/JS in the repository root.</li>
+                    <li>Navigation: <code>assets/js/nav-uk.js</code>, <code>nav-en.js</code>; new page — slug in sections and <code>nextPrev</code>.</li>
+                    <li>Detailed rules for AI agents — <code>AGENTS.md</code> in the repository root.</li>
+                </ul>
+
+                <h2 id="code" class="border-bottom pb-2 mb-3 mt-5">Core and skeleton code</h2>
+                <ul>
+                    <li>PHP <strong>8.4+</strong>, <code>declare(strict_types=1)</code> in public API.</li>
+                    <li>Core changes — via PR to <code>php-concept/core</code>; skeleton pulls new version through Composer.</li>
+                    <li>After API changes, update corresponding doc sections (routing, providers, config).</li>
+                    <li>Tests and CI — per each repository setup (check PR status on GitHub).</li>
+                </ul>
+
+                <h2 id="style" class="border-bottom pb-2 mb-3 mt-5">Documentation style</h2>
+                <ul>
+                    <li>Examples from real skeleton code, not invented APIs.</li>
+                    <li>Do not duplicate TOC in text — “On this page” is already on the right.</li>
+                    <li>Code in <code>&lt;pre&gt;&lt;code class="language-php"&gt;</code> for Highlight.js.</li>
+                </ul>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Questions and suggestions — via Issues/Discussions on the relevant GitHub repository.
+                    </p>
                 </div>
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>

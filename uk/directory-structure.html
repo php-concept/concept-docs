@@ -50,8 +50,10 @@
                     і в PSR-4 автозавантаженні <code>composer.json</code>.
                 </p>
                 <p>
-                    Нижче наведено <strong>рекомендовану кореневу структуру</strong> проєкту та два поширені підходи
-                    до організації коду всередині папки <code>src</code>. Це орієнтири, а не обов’язковий стандарт.
+                    <a href="installation.html">Concept Skeleton</a> постачає готовий каркас із розкладкою
+                    <code>src/App/</code> (component-ready). Нижче — рекомендована коренева структура проєкту
+                    та три поширені підходи до організації коду всередині <code>src</code>.
+                    Це орієнтири, а не обов’язковий стандарт.
                 </p>
 
                 <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
@@ -63,27 +65,78 @@
                 </div>
 
                 <h2 id="project-root" class="border-bottom pb-2 mb-3 mt-5">Рекомендована коренева структура</h2>
+                <p>
+                    Відповідає <a href="https://github.com/php-concept/concept-skeleton" target="_blank" rel="noopener">Concept Skeleton</a>
+                    і ключам у <a href="setup.html#paths-php"><code>bootstrap/paths.php</code></a>:
+                </p>
                 <pre class="mb-4"><code class="language-text">project/
-├── public/           # document root, index.php
-├── bootstrap/        # app.php, paths.php, providers/
-├── bin/              # console.php
-├── config/           # PHP-конфіг + config/{env}/
-├── routes/           # маршрути (підключаються з config)
-├── resources/views/  # спільні Twig-шаблони (layouts)
-├── database/         # міграції/сидери за замовчуванням
-├── storage/          # logs, cache
-├── src/              # код застосунку (організація — варіанти нижче)
-└── tests/</code></pre>
+├── public/                      # document root: index.php, assets, vendor/
+│   ├── index.php
+│   ├── assets/
+│   └── vendor/
+├── bootstrap/
+│   ├── app.php
+│   ├── paths.php
+│   └── providers/               # app.php, console.php
+├── bin/console.php
+├── config/                      # PHP-конфіг + config/{dev,production}/
+├── routes/                      # маршрути (підключаються з config)
+├── resources/
+│   ├── lang/validator/          # PathName::VALIDATOR_TRANSLATIONS
+│   └── views/
+│       ├── errors/fallback/     # PathName::ERRORS_FALLBACK_VIEWS
+│       └── frontend/
+├── database/
+│   ├── migrations/              # PathName::MIGRATIONS
+│   └── seeders/                 # PathName::SEEDERS
+├── storage/
+│   ├── logs/                    # PathName::LOGS
+│   └── cache/                   # PathName::CACHE
+├── src/                         # PathName::SRC — код застосунку
+├── tests/
+├── .env.example
+└── composer.json</code></pre>
                 <p>
                     Шлях до кожного з цих каталогів задається в
                     <a href="setup.html#paths-php"><code>paths.php</code></a>
-                    (<code>CONFIG_DIR</code>, <code>SRC_DIR</code>, <code>LOGS_DIR</code>…).
+                    через константи <code>PathName</code> (<code>PathName::CONFIG</code>, <code>PathName::SRC</code>,
+                    <code>PathName::LOGS</code> тощо). Ядро звертається до них через
+                    <code>PathManager::get(PathName::…)</code>, а не через жорстко прошиті рядки.
                     Наприклад, код можна тримати в <code>app/</code> замість <code>src/</code> — достатньо змінити
-                    <code>PathManager::SRC_DIR</code> і namespace у Composer.
+                    значення для <code>PathName::SRC</code> і namespace у Composer.
+                </p>
+
+                <h2 id="skeleton-default" class="border-bottom pb-2 mb-3 mt-5">Concept Skeleton за замовчуванням</h2>
+                <p>
+                    Стартовий шаблон використовує <strong>component-ready</strong> розкладку: спільний код у
+                    <code>src/App/</code>, глобальні маршрути в <code>routes/web.php</code>, landing-шаблони в
+                    <code>resources/views/frontend/</code>. Компоненти (<code>src/Components/</code>) додаються за потреби.
+                </p>
+                <pre class="mb-4"><code class="language-text">src/App/
+├── Controllers/              # Concept\App\Controllers\* (IndexController)
+└── Extensions/Twig/          # Concept\App\Extensions\Twig\*
+
+routes/web.php                # глобальні маршрути + middleware стек
+resources/views/frontend/     # @frontend/… — landing, спільні сторінки</code></pre>
+                <p><strong>Composer (skeleton):</strong></p>
+                <pre class="mb-4"><code class="language-json">"autoload": {
+    "psr-4": {
+        "Concept\\": "src/",
+        "Database\\Seeders\\": "database/seeders/"
+    }
+}</code></pre>
+                <p>
+                    <code>paths.php</code>: повний набір ключів <code>PathName</code>
+                    (<a href="setup.html#paths-php">деталі</a>).
+                    Провайдери вже підключені в <code>bootstrap/providers/</code> — див.
+                    <a href="setup.html">Налаштування</a>.
                 </p>
 
                 <h2 id="src-variants" class="border-bottom pb-2 mb-3 mt-5">Організація коду в каталозі src</h2>
-                <p>Далі — два типові варіанти. Обидва сумісні з Concept Core.</p>
+                <p>
+                    Окрім розкладки skeleton (<code>src/App/</code>), можна обрати шарову MVC або модульні компоненти.
+                    Усі три варіанти сумісні з Concept Core.
+                </p>
 
                 <h2 id="variant-layered" class="border-bottom pb-2 mb-3 mt-5">1. Шарова MVC (package by layer)</h2>
                 <p>
@@ -96,8 +149,8 @@
                     на кшталт <code>App</code> чи <code>Components</code>:
                 </p>
                 <pre class="mb-4"><code class="language-text">src/
-├── Controllers/       # Concept\App\Controllers\*
-├── Models/            # Concept\App\Models\*
+├── Controllers/       # Concept\Controllers\*
+├── Models/            # Concept\Models\*
 ├── Requests/          # FormRequest, DTO-запити
 ├── Validation/
 │   └── Rules/
@@ -105,6 +158,11 @@
 │   └── Twig/
 ├── Services/          # опційно: бізнес-логіка
 └── Middlewares/       # опційно: HTTP middleware</code></pre>
+                <p>
+                    Namespace відповідає PSR-4: при <code>"Concept\\": "src/"</code> клас
+                    <code>src/Controllers/HomeController.php</code> має namespace
+                    <code>Concept\Controllers</code>, а не <code>Concept\App\Controllers</code>.
+                </p>
                 <p><strong>Коли обирати:</strong> невеликі застосунки, один домен, мало модулів; команда звикла до класичного MVC (Symfony 2–4, ранній Laravel).</p>
                 <p><strong>Мінуси:</strong> при зростанні проєкту складно знайти «все про замовлення» — файли розкидані по шарах.</p>
                 <p><strong>Composer (приклад):</strong></p>
@@ -114,7 +172,7 @@
     }
 }</code></pre>
                 <p>
-                    <code>paths.php</code>: <code>PathManager::SRC_DIR => 'src'</code>
+                    <code>paths.php</code>: <code>PathName::SRC =&gt; 'src'</code>
                     (<a href="setup.html#paths-php">деталі</a>).
                 </p>
 
@@ -131,22 +189,36 @@
 │   ├── Models/                   # BaseModel, спільні трейти
 │   ├── Requests/
 │   ├── Validation/Rules/
-│   └── Extensions/Twig/
+│   ├── Extensions/Twig/
+│   └── Services/
 └── Components/                   # функціональні модулі
     ├── AuthAdmin/
+    │   ├── AuthAdminComponent.php
+    │   ├── config.php
+    │   ├── routes.php
     │   ├── Controllers/
     │   ├── Models/
-    │   ├── Views/                # Twig модуля
-    │   ├── routes.php
-    │   ├── config.php
-    │   ├── Database/Migrations/
-    │   └── AuthAdminComponent.php
+    │   ├── Requests/
+    │   ├── Dto/
+    │   ├── Middlewares/
+    │   ├── Commands/
+    │   ├── Services/
+    │   ├── Enums/
+    │   ├── Extensions/
+    │   ├── Views/                # Twig модуля (@auth-admin/…)
+    │   ├── Assets/               # JS/CSS → public через CLI
+    │   └── Database/
+    │       ├── Migrations/
+    │       └── Seeders/
     ├── UserCabinet/
     └── ProjectManager/</code></pre>
                 <p>
-                    Компоненти реєструються в <code>config/components.php</code>, можуть мати власні маршрути,
-                    views, міграції та assets. Каталог <code>App</code> — для спільних речей (базові моделі,
-                    Twig extensions, правила валідації).
+                    Кожен компонент реалізує <code>ComponentInterface</code> (можна реалізувати через
+                    <code>BaseComponent</code>). Активні модулі перелічуються в
+                    <code>config/components.php</code> або <code>config/{env}/components.php</code>.
+                    Компоненти можуть мати власні маршрути, views, міграції, сидери, CLI-команди та assets.
+                    Каталог <code>App</code> — для спільних речей (базові моделі, Twig extensions, правила валідації).
+                    Покроковий приклад — <a href="creating-components.html">AuthAdmin</a>.
                 </p>
                 <p><strong>Коли обирати:</strong> кілька підсистем (адмінка, кабінет, публічна частина), потрібно
                     вмикати або вимикати модулі через конфіг, різні команди працюють над окремими компонентами.</p>
@@ -159,6 +231,7 @@
                                 <th></th>
                                 <th>Шарова MVC</th>
                                 <th>Компоненти</th>
+                                <th>Concept Skeleton</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -166,38 +239,127 @@
                                 <td>Академічна назва</td>
                                 <td>Layered / package by layer</td>
                                 <td>Modular monolith, package by feature</td>
+                                <td>Component-ready <code>App/</code></td>
                             </tr>
                             <tr>
                                 <td>Розмір проєкту</td>
                                 <td>Малий — середній</td>
                                 <td>Середній — великий</td>
+                                <td>Старт — будь-який</td>
+                            </tr>
+                            <tr>
+                                <td>Організація <code>src</code></td>
+                                <td><code>Controllers/</code> на верхньому рівні</td>
+                                <td><code>App/</code> + <code>Components/</code></td>
+                                <td><code>App/</code> (+ опційно <code>Components/</code>)</td>
+                            </tr>
+                            <tr>
+                                <td>Namespace (приклад)</td>
+                                <td><code>Concept\Controllers\*</code></td>
+                                <td><code>Concept\App\*</code>, <code>Concept\Components\*</code></td>
+                                <td><code>Concept\App\*</code></td>
                             </tr>
                             <tr>
                                 <td>Маршрути</td>
                                 <td><code>routes/web.php</code></td>
                                 <td>+ <code>routes.php</code> у кожному компоненті</td>
+                                <td><code>routes/web.php</code></td>
                             </tr>
                             <tr>
                                 <td>Concept Core</td>
                                 <td>Повна підтримка</td>
                                 <td>+ підсистема компонентів</td>
+                                <td>Готовий каркас + провайдери</td>
+                            </tr>
+                            <tr>
+                                <td>Composer PSR-4</td>
+                                <td><code>Concept\\</code> → <code>src/</code></td>
+                                <td><code>Concept\\</code> → <code>src/</code></td>
+                                <td>+ <code>Database\\Seeders\\</code></td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
 
-                <h2 id="views-storage" class="border-bottom pb-2 mb-3 mt-5">Де зберігати views і дані</h2>
-                <p>Шляхи знову ж налаштовуються в <a href="setup.html#paths-php"><code>paths.php</code></a>.</p>
-                <ul>
-                    <li><strong>Спільні layouts</strong> — типово <code>resources/views/</code> (<code>VIEWS_DIR</code>).</li>
-                    <li><strong>Шаблони модуля</strong> — у варіанті з компонентами: каталог <code>Views/</code> всередині модуля.</li>
-                    <li><strong>Міграції</strong> — типово <code>database/migrations</code>; додаткові шляхи в <code>config/migrations.php</code>.</li>
-                    <li><strong>Логи, кеш</strong> — типово <code>storage/</code> (<code>LOGS_DIR</code>, <code>CACHE_DIR</code>).</li>
-                </ul>
+                <h2 id="views-storage" class="border-bottom pb-2 mb-3 mt-5">Views, lang, storage</h2>
+                <p>
+                    Шляхи налаштовуються в <a href="setup.html#paths-php"><code>paths.php</code></a>
+                    через константи <code>Concept\Core\Foundation\PathName</code>.
+                    Ядро звертається до них через <code>PathManager::get(PathName::…)</code>.
+                </p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Що</th>
+                                <th>PathName</th>
+                                <th>Шлях у skeleton</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Спільні Twig-шаблони</td>
+                                <td><code>PathName::VIEWS</code></td>
+                                <td><code>resources/views/</code> (<code>@frontend/</code>, layouts)</td>
+                            </tr>
+                            <tr>
+                                <td>Fallback-шаблони помилок</td>
+                                <td><code>PathName::ERRORS_FALLBACK_VIEWS</code></td>
+                                <td><code>resources/views/errors/fallback/</code></td>
+                            </tr>
+                            <tr>
+                                <td>Мовні файли</td>
+                                <td><code>PathName::LANG</code></td>
+                                <td><code>resources/lang/</code></td>
+                            </tr>
+                            <tr>
+                                <td>Переклади валідатора</td>
+                                <td><code>PathName::VALIDATOR_TRANSLATIONS</code></td>
+                                <td><code>resources/lang/validator/</code></td>
+                            </tr>
+                            <tr>
+                                <td>Шаблони модуля</td>
+                                <td>— (у <code>config.php</code> компонента)</td>
+                                <td><code>src/Components/{Name}/Views/</code> → <code>@auth-admin/…</code></td>
+                            </tr>
+                            <tr>
+                                <td>Міграції застосунку</td>
+                                <td><code>PathName::MIGRATIONS</code></td>
+                                <td><code>database/migrations/</code> + шляхи в <code>config/migrations.php</code></td>
+                            </tr>
+                            <tr>
+                                <td>Сидери застосунку</td>
+                                <td><code>PathName::SEEDERS</code></td>
+                                <td><code>database/seeders/</code> (namespace <code>Database\Seeders\</code>)</td>
+                            </tr>
+                            <tr>
+                                <td>Логи</td>
+                                <td><code>PathName::LOGS</code></td>
+                                <td><code>storage/logs/</code></td>
+                            </tr>
+                            <tr>
+                                <td>Кеш</td>
+                                <td><code>PathName::CACHE</code></td>
+                                <td><code>storage/cache/</code> (Twig, Valinor тощо)</td>
+                            </tr>
+                            <tr>
+                                <td>Assets компонента</td>
+                                <td>— (у <code>config.php</code> компонента)</td>
+                                <td><code>component:publish-assets</code> → <code>public/components/…</code> (<code>php bin/console.php component:publish-assets</code>)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>
+                    Повний перелік ключів — у <a href="setup.html#paths-keys">таблиці PathName</a>.
+                    Міграції та сидери окремих компонентів реєструються в їхньому <code>config.php</code>,
+                    а не через глобальні <code>PathName::MIGRATIONS</code> / <code>PathName::SEEDERS</code>.
+                </p>
 
                 <h2 id="choose" class="border-bottom pb-2 mb-3 mt-5">Що обрати</h2>
                 <ul>
-                    <li><strong>Шарова MVC</strong> — простий старт, один домен, мало модулів.</li>
+                    <li><strong>Concept Skeleton</strong> — швидкий старт: HTTP + Twig, <code>src/App/</code>, готові провайдери; компоненти додаються за потреби.</li>
+                    <li><strong>Шарова MVC</strong> — простий старт без <code>App/</code>, один домен, мало модулів.</li>
                     <li><strong>Компоненти</strong> — кілька підсистем, потрібна ізоляція модулів і підтримка ядра Concept.</li>
                 </ul>
                 <p>

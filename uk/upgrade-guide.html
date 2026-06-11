@@ -31,7 +31,7 @@
             <aside class="col-lg-3 col-xl-2">
                 <div class="offcanvas-lg offcanvas-start text-bg-dark border-end" tabindex="-1" id="docsSidebar" aria-labelledby="docsSidebarLabel">
                     <div class="offcanvas-header border-bottom d-lg-none">
-                        <h5 class="offcanvas-title" id="docsSidebarLabel">Menu</h5>
+                        <h5 class="offcanvas-title" id="docsSidebarLabel">Меню</h5>
                         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="offcanvas" data-bs-target="#docsSidebar" aria-label="Close"></button>
                     </div>
                     <div class="offcanvas-body p-0 pt-lg-4">
@@ -42,10 +42,61 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Оновлення</h1>
-                <div class="border border-secondary-subtle rounded text-center text-body-secondary p-5">
-                    <p class="mb-0">Ця сторінка є заглушкою. Зміст буде додано пізніше.</p>
+
+                <p>
+                    Рекомендований шлях оновлення застосунку на базі Concept Skeleton після виходу нової
+                    версії <code>php-concept/core</code>. Завжди перевіряйте
+                    <a href="https://github.com/php-concept/core/releases" target="_blank" rel="noopener">release notes</a>
+                    конкретної версії.
+                </p>
+
+                <h2 id="composer" class="border-bottom pb-2 mb-3 mt-5">1. Composer</h2>
+                <pre class="mb-4"><code class="language-bash">composer update php-concept/core --with-dependencies</code></pre>
+                <p>
+                    Зафіксуйте діапазон у <code>composer.json</code> (наприклад <code>^1.0</code>).
+                    Після оновлення перегляньте diff у <code>vendor/php-concept/core</code> або changelog на GitHub.
+                </p>
+
+                <h2 id="providers" class="border-bottom pb-2 mb-3 mt-5">2. Service providers</h2>
+                <p>
+                    Порівняйте <code>bootstrap/providers/app.php</code> і <code>console.php</code> із
+                    <a href="service-providers.html#http-providers">актуальним списком ядра</a>.
+                    Нові провайдери (наприклад <code>TelemetryServiceProvider</code>, <code>LocaleServiceProvider</code>)
+                    потрібно додати в правильному порядку.
+                </p>
+
+                <h2 id="config" class="border-bottom pb-2 mb-3 mt-5">3. Конфігурація</h2>
+                <ul>
+                    <li>Перевірте нові файли в <code>config/</code> skeleton (telemetry, masking, locale тощо).</li>
+                    <li>Ключі з <code>Concept\Core\Foundation\ConfigKey</code> — у <a href="configuration.html">Конфігурація</a>.</li>
+                    <li>Override для середовища: <code>config/{APP_ENV}/</code>.</li>
+                    <li>Оновіть <code>.env.example</code>, якщо з’явилися нові змінні.</li>
+                </ul>
+
+                <h2 id="breaking" class="border-bottom pb-2 mb-3 mt-5">4. Типові зміни API</h2>
+                <ul>
+                    <li><strong>URL</strong> — <code>UrlGeneratorInterface::uri()</code>, <code>url()</code>, <code>base()</code> (не Laravel <code>path()</code>/<code>route()</code>).</li>
+                    <li><strong>Маскування</strong> — <code>DataMaskerInterface</code>, <code>DataMaskerServiceProvider</code>.</li>
+                    <li><strong>Телеметрія</strong> — <code>TelemetryCollector</code>, не <code>EventServiceProvider</code> — див. <a href="telemetry.html">Телеметрія</a>.</li>
+                    <li><strong>Session</strong> — <code>session.cookie_domain</code>, <code>session.cookie_samesite</code> (не <code>session.domain</code>).</li>
+                </ul>
+
+                <h2 id="verify" class="border-bottom pb-2 mb-3 mt-5">5. Перевірка після оновлення</h2>
+                <ol>
+                    <li><code>php bin/console.php route:list</code> — маршрути на місці</li>
+                    <li><code>php bin/console.php db:migrate</code> — міграції (якщо змінювались)</li>
+                    <li>Головна сторінка, login, форми з CSRF, redirect після POST</li>
+                    <li>У dev: <code>APP_DEBUG=true</code>, за потреби <code>telemetry.enabled=true</code></li>
+                </ol>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Якщо після оновлення сервіс «не знаходиться» в контейнері — перевірте порядок провайдерів
+                        і наявність компонента в <code>config/components.php</code>
+                        (<a href="service-container.html">контейнер сервісів</a>).
+                    </p>
                 </div>
-                <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
+                <nav id="docs-next-prev" class="mt-5" aria-label="Навігація сторінкою"></nav>
             </main>
 
             <aside class="col-xl-3 d-none d-xl-block docs-toc-wrap py-4 py-lg-5">

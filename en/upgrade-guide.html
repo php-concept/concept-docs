@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Upgrade Guide — Concept Core Documentation">
-    <title>Upgrade Guide - Concept Core Documentation</title>
+    <meta name="description" content="Upgrade guide — Concept Core Documentation">
+    <title>Upgrade guide - Concept Core Documentation</title>
     <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
     <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
@@ -19,8 +19,9 @@
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
             <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="../en/upgrade-guide.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/upgrade-guide.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/upgrade-guide.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/upgrade-guide.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -40,9 +41,60 @@
             </aside>
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
-                <h1 class="display-6 fw-bold mb-4">Upgrade Guide</h1>
-                <div class="border border-secondary-subtle rounded text-center text-body-secondary p-5">
-                    <p class="mb-0">This page is a placeholder. Content will be added in a future update.</p>
+                <h1 class="display-6 fw-bold mb-4">Upgrade guide</h1>
+
+                <p>
+                    Recommended path to upgrade a Concept Skeleton-based application after a new
+                    <code>php-concept/core</code> release. Always check
+                    <a href="https://github.com/php-concept/core/releases" target="_blank" rel="noopener">release notes</a>
+                    for the specific version.
+                </p>
+
+                <h2 id="composer" class="border-bottom pb-2 mb-3 mt-5">1. Composer</h2>
+                <pre class="mb-4"><code class="language-bash">composer update php-concept/core --with-dependencies</code></pre>
+                <p>
+                    Pin a range in <code>composer.json</code> (e.g. <code>^1.0</code>).
+                    After updating, review the diff in <code>vendor/php-concept/core</code> or the changelog on GitHub.
+                </p>
+
+                <h2 id="providers" class="border-bottom pb-2 mb-3 mt-5">2. Service providers</h2>
+                <p>
+                    Compare <code>bootstrap/providers/app.php</code> and <code>console.php</code> with the
+                    <a href="service-providers.html#http-providers">current core list</a>.
+                    New providers (e.g. <code>TelemetryServiceProvider</code>, <code>LocaleServiceProvider</code>)
+                    must be added in the correct order.
+                </p>
+
+                <h2 id="config" class="border-bottom pb-2 mb-3 mt-5">3. Configuration</h2>
+                <ul>
+                    <li>Check new files in skeleton <code>config/</code> (telemetry, masking, locale, etc.).</li>
+                    <li>Keys from <code>Concept\Core\Foundation\ConfigKey</code> — in <a href="configuration.html">Configuration</a>.</li>
+                    <li>Environment override: <code>config/{APP_ENV}/</code>.</li>
+                    <li>Update <code>.env.example</code> if new variables appeared.</li>
+                </ul>
+
+                <h2 id="breaking" class="border-bottom pb-2 mb-3 mt-5">4. Typical API changes</h2>
+                <ul>
+                    <li><strong>URL</strong> — <code>UrlGeneratorInterface::uri()</code>, <code>url()</code>, <code>base()</code> (not Laravel <code>path()</code>/<code>route()</code>).</li>
+                    <li><strong>Masking</strong> — <code>DataMaskerInterface</code>, <code>DataMaskerServiceProvider</code>.</li>
+                    <li><strong>Telemetry</strong> — <code>TelemetryCollector</code>, not <code>EventServiceProvider</code> — see <a href="telemetry.html">Telemetry</a>.</li>
+                    <li><strong>Session</strong> — <code>session.cookie_domain</code>, <code>session.cookie_samesite</code> (not <code>session.domain</code>).</li>
+                </ul>
+
+                <h2 id="verify" class="border-bottom pb-2 mb-3 mt-5">5. Post-upgrade verification</h2>
+                <ol>
+                    <li><code>php bin/console.php route:list</code> — routes in place</li>
+                    <li><code>php bin/console.php db:migrate</code> — migrations (if changed)</li>
+                    <li>Home page, login, forms with CSRF, redirect after POST</li>
+                    <li>In dev: <code>APP_DEBUG=true</code>, optionally <code>telemetry.enabled=true</code></li>
+                </ol>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        If after upgrade a service is “not found” in the container — check provider order
+                        and component presence in <code>config/components.php</code>
+                        (<a href="service-container.html">service container</a>).
+                    </p>
                 </div>
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>

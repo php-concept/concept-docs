@@ -3,10 +3,11 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Directory structure options for Concept Core projects">
-    <title>Directory Structure - Concept Core Documentation</title>
+    <meta name="description" content="Project directory structure options on Concept Core">
+    <title>Directory structure - Concept Core Documentation</title>
     <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
     <link rel="stylesheet" href="../assets/css/docs.css">
 </head>
 <body data-page="directory-structure">
@@ -18,8 +19,9 @@
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
             <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="directory-structure.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/directory-structure.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/directory-structure.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/directory-structure.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -39,12 +41,336 @@
             </aside>
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
-                <h1 class="display-6 fw-bold mb-4">Directory Structure</h1>
+                <h1 class="display-6 fw-bold mb-4">Directory structure</h1>
+
                 <p>
-                    Full documentation is available in
-                    <a href="../uk/directory-structure.html">Ukrainian</a> (Структура каталогів).
+                    Concept Core does not impose any directory structure. The location of <strong>all</strong> folders —
+                    including <code>src</code>, <code>config</code>, <code>storage</code>, <code>database</code> —
+                    can be customized in <a href="setup.html#paths-php"><code>bootstrap/paths.php</code></a>
+                    and PSR-4 autoloading in <code>composer.json</code>.
                 </p>
-                <p>Topics: recommended project root, layered MVC, component-based modules.</p>
+                <p>
+                    <a href="installation.html">Concept Skeleton</a> ships a ready scaffold with
+                    <code>src/App/</code> layout (component-ready). Below is the recommended project root structure
+                    and three common approaches to organizing code inside <code>src</code>.
+                    These are guidelines, not a mandatory standard.
+                </p>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Root directories (<code>public</code>, <code>bootstrap</code>, <code>config</code>, etc.) —
+                        recommended convention for getting started. They can be renamed or moved if you update
+                        <a href="setup.html#paths-php"><code>paths.php</code></a> and web server settings.
+                    </p>
+                </div>
+
+                <h2 id="project-root" class="border-bottom pb-2 mb-3 mt-5">Recommended root structure</h2>
+                <p>
+                    Matches <a href="https://github.com/php-concept/concept-skeleton" target="_blank" rel="noopener">Concept Skeleton</a>
+                    and keys in <a href="setup.html#paths-php"><code>bootstrap/paths.php</code></a>:
+                </p>
+                <pre class="mb-4"><code class="language-text">project/
+├── public/                      # document root: index.php, assets, vendor/
+│   ├── index.php
+│   ├── assets/
+│   └── vendor/
+├── bootstrap/
+│   ├── app.php
+│   ├── paths.php
+│   └── providers/               # app.php, console.php
+├── bin/console.php
+├── config/                      # PHP config + config/{dev,production}/
+├── routes/                      # routes (loaded from config)
+├── resources/
+│   ├── lang/validator/          # PathName::VALIDATOR_TRANSLATIONS
+│   └── views/
+│       ├── errors/fallback/     # PathName::ERRORS_FALLBACK_VIEWS
+│       └── frontend/
+├── database/
+│   ├── migrations/              # PathName::MIGRATIONS
+│   └── seeders/                 # PathName::SEEDERS
+├── storage/
+│   ├── logs/                    # PathName::LOGS
+│   └── cache/                   # PathName::CACHE
+├── src/                         # PathName::SRC — application code
+├── tests/
+├── .env.example
+└── composer.json</code></pre>
+                <p>
+                    The path to each directory is set in
+                    <a href="setup.html#paths-php"><code>paths.php</code></a>
+                    via <code>PathName</code> constants (<code>PathName::CONFIG</code>, <code>PathName::SRC</code>,
+                    <code>PathName::LOGS</code>, etc.). Core accesses them through
+                    <code>PathManager::get(PathName::…)</code>, not hard-coded strings.
+                    For example, code can live in <code>app/</code> instead of <code>src/</code> — just change
+                    the value for <code>PathName::SRC</code> and Composer namespaces.
+                </p>
+
+                <h2 id="skeleton-default" class="border-bottom pb-2 mb-3 mt-5">Concept Skeleton default</h2>
+                <p>
+                    The starter template uses a <strong>component-ready</strong> layout: shared code in
+                    <code>src/App/</code>, global routes in <code>routes/web.php</code>, landing templates in
+                    <code>resources/views/frontend/</code>. Components (<code>src/Components/</code>) are added as needed.
+                </p>
+                <pre class="mb-4"><code class="language-text">src/App/
+├── Controllers/              # Concept\App\Controllers\* (IndexController)
+└── Extensions/Twig/          # Concept\App\Extensions\Twig\*
+
+routes/web.php                # global routes + middleware stack
+resources/views/frontend/     # @frontend/… — landing, shared pages</code></pre>
+                <p><strong>Composer (skeleton):</strong></p>
+                <pre class="mb-4"><code class="language-json">"autoload": {
+    "psr-4": {
+        "Concept\\": "src/",
+        "Database\\Seeders\\": "database/seeders/"
+    }
+}</code></pre>
+                <p>
+                    <code>paths.php</code>: full set of <code>PathName</code> keys
+                    (<a href="setup.html#paths-php">details</a>).
+                    Providers are already wired in <code>bootstrap/providers/</code> — see
+                    <a href="setup.html">Setup</a>.
+                </p>
+
+                <h2 id="src-variants" class="border-bottom pb-2 mb-3 mt-5">Organizing code in src</h2>
+                <p>
+                    Besides the skeleton layout (<code>src/App/</code>), you can choose layered MVC or modular components.
+                    All three variants are compatible with Concept Core.
+                </p>
+
+                <h2 id="variant-layered" class="border-bottom pb-2 mb-3 mt-5">1. Layered MVC (package by layer)</h2>
+                <p>
+                    Classic <strong>layered architecture</strong>: code is grouped by
+                    <em>type</em> (controllers, models, requests), not by module. In the PHP community this is often called
+                    <strong>package by layer</strong> — the opposite of “package by feature”.
+                </p>
+                <p>
+                    Layers sit directly in the code directory (e.g. <code>src/</code>), without intermediate folders
+                    like <code>App</code> or <code>Components</code>:
+                </p>
+                <pre class="mb-4"><code class="language-text">src/
+├── Controllers/       # Concept\Controllers\*
+├── Models/            # Concept\Models\*
+├── Requests/          # FormRequest, DTO requests
+├── Validation/
+│   └── Rules/
+├── Extensions/
+│   └── Twig/
+├── Services/          # optional: business logic
+└── Middlewares/       # optional: HTTP middleware</code></pre>
+                <p>
+                    Namespace follows PSR-4: with <code>"Concept\\": "src/"</code>, class
+                    <code>src/Controllers/HomeController.php</code> has namespace
+                    <code>Concept\Controllers</code>, not <code>Concept\App\Controllers</code>.
+                </p>
+                <p><strong>When to choose:</strong> small applications, single domain, few modules; team used to classic MVC (Symfony 2–4, early Laravel).</p>
+                <p><strong>Drawbacks:</strong> as the project grows, it is hard to find “everything about orders” — files are scattered across layers.</p>
+                <p><strong>Composer (example):</strong></p>
+                <pre class="mb-4"><code class="language-json">"autoload": {
+    "psr-4": {
+        "Concept\\": "src/"
+    }
+}</code></pre>
+                <p>
+                    <code>paths.php</code>: <code>PathName::SRC =&gt; 'src'</code>
+                    (<a href="setup.html#paths-php">details</a>).
+                </p>
+
+                <h2 id="variant-components" class="border-bottom pb-2 mb-3 mt-5">2. Components (modular monolith)</h2>
+                <p>
+                    <strong>Modular monolith</strong> with pluggable components: shared application core +
+                    isolated functional modules. This combines
+                    <em>package by feature</em> (inside each component) with MVC layers.
+                    Supported by the Concept Core component system.
+                </p>
+                <pre class="mb-4"><code class="language-text">src/
+├── App/                          # shared application code
+│   ├── Controllers/              # global controllers
+│   ├── Models/                   # BaseModel, shared traits
+│   ├── Requests/
+│   ├── Validation/Rules/
+│   ├── Extensions/Twig/
+│   └── Services/
+└── Components/                   # functional modules
+    ├── AuthAdmin/
+    │   ├── AuthAdminComponent.php
+    │   ├── config.php
+    │   ├── routes.php
+    │   ├── Controllers/
+    │   ├── Models/
+    │   ├── Requests/
+    │   ├── Dto/
+    │   ├── Middlewares/
+    │   ├── Commands/
+    │   ├── Services/
+    │   ├── Enums/
+    │   ├── Extensions/
+    │   ├── Views/                # module Twig (@auth-admin/…)
+    │   ├── Assets/               # JS/CSS → public via CLI
+    │   └── Database/
+    │       ├── Migrations/
+    │       └── Seeders/
+    ├── UserCabinet/
+    └── ProjectManager/</code></pre>
+                <p>
+                    Each component implements <code>ComponentInterface</code> (optionally via
+                    <code>BaseComponent</code>). Active modules are listed in
+                    <code>config/components.php</code> or <code>config/{env}/components.php</code>.
+                    Components can have their own routes, views, migrations, seeders, CLI commands, and assets.
+                    The <code>App</code> directory is for shared pieces (base models, Twig extensions, validation rules).
+                    Step-by-step example — <a href="creating-components.html">AuthAdmin</a>.
+                </p>
+                <p><strong>When to choose:</strong> several subsystems (admin, cabinet, public site), need to
+                    enable or disable modules via config, different teams work on separate components.</p>
+
+                <h2 id="compare" class="border-bottom pb-2 mb-3 mt-5">Comparison</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th></th>
+                                <th>Layered MVC</th>
+                                <th>Components</th>
+                                <th>Concept Skeleton</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Academic term</td>
+                                <td>Layered / package by layer</td>
+                                <td>Modular monolith, package by feature</td>
+                                <td>Component-ready <code>App/</code></td>
+                            </tr>
+                            <tr>
+                                <td>Project size</td>
+                                <td>Small — medium</td>
+                                <td>Medium — large</td>
+                                <td>Start — any</td>
+                            </tr>
+                            <tr>
+                                <td><code>src</code> organization</td>
+                                <td><code>Controllers/</code> at top level</td>
+                                <td><code>App/</code> + <code>Components/</code></td>
+                                <td><code>App/</code> (+ optional <code>Components/</code>)</td>
+                            </tr>
+                            <tr>
+                                <td>Namespace (example)</td>
+                                <td><code>Concept\Controllers\*</code></td>
+                                <td><code>Concept\App\*</code>, <code>Concept\Components\*</code></td>
+                                <td><code>Concept\App\*</code></td>
+                            </tr>
+                            <tr>
+                                <td>Routes</td>
+                                <td><code>routes/web.php</code></td>
+                                <td>+ <code>routes.php</code> in each component</td>
+                                <td><code>routes/web.php</code></td>
+                            </tr>
+                            <tr>
+                                <td>Concept Core</td>
+                                <td>Full support</td>
+                                <td>+ component subsystem</td>
+                                <td>Ready scaffold + providers</td>
+                            </tr>
+                            <tr>
+                                <td>Composer PSR-4</td>
+                                <td><code>Concept\\</code> → <code>src/</code></td>
+                                <td><code>Concept\\</code> → <code>src/</code></td>
+                                <td>+ <code>Database\\Seeders\\</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h2 id="views-storage" class="border-bottom pb-2 mb-3 mt-5">Views, lang, storage</h2>
+                <p>
+                    Paths are configured in <a href="setup.html#paths-php"><code>paths.php</code></a>
+                    via <code>Concept\Core\Foundation\PathName</code> constants.
+                    Core accesses them through <code>PathManager::get(PathName::…)</code>.
+                </p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th>What</th>
+                                <th>PathName</th>
+                                <th>Path in skeleton</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Shared Twig templates</td>
+                                <td><code>PathName::VIEWS</code></td>
+                                <td><code>resources/views/</code> (<code>@frontend/</code>, layouts)</td>
+                            </tr>
+                            <tr>
+                                <td>Fallback error templates</td>
+                                <td><code>PathName::ERRORS_FALLBACK_VIEWS</code></td>
+                                <td><code>resources/views/errors/fallback/</code></td>
+                            </tr>
+                            <tr>
+                                <td>Language files</td>
+                                <td><code>PathName::LANG</code></td>
+                                <td><code>resources/lang/</code></td>
+                            </tr>
+                            <tr>
+                                <td>Validator translations</td>
+                                <td><code>PathName::VALIDATOR_TRANSLATIONS</code></td>
+                                <td><code>resources/lang/validator/</code></td>
+                            </tr>
+                            <tr>
+                                <td>Module templates</td>
+                                <td>— (in component <code>config.php</code>)</td>
+                                <td><code>src/Components/{Name}/Views/</code> → <code>@auth-admin/…</code></td>
+                            </tr>
+                            <tr>
+                                <td>Application migrations</td>
+                                <td><code>PathName::MIGRATIONS</code></td>
+                                <td><code>database/migrations/</code> + paths in <code>config/migrations.php</code></td>
+                            </tr>
+                            <tr>
+                                <td>Application seeders</td>
+                                <td><code>PathName::SEEDERS</code></td>
+                                <td><code>database/seeders/</code> (namespace <code>Database\Seeders\</code>)</td>
+                            </tr>
+                            <tr>
+                                <td>Logs</td>
+                                <td><code>PathName::LOGS</code></td>
+                                <td><code>storage/logs/</code></td>
+                            </tr>
+                            <tr>
+                                <td>Cache</td>
+                                <td><code>PathName::CACHE</code></td>
+                                <td><code>storage/cache/</code> (Twig, Valinor, etc.)</td>
+                            </tr>
+                            <tr>
+                                <td>Component assets</td>
+                                <td>— (in component <code>config.php</code>)</td>
+                                <td><code>component:publish-assets</code> → <code>public/components/…</code> (<code>php bin/console.php component:publish-assets</code>)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>
+                    Full list of keys — in the <a href="setup.html#paths-keys">PathName table</a>.
+                    Migrations and seeders of individual components are registered in their <code>config.php</code>,
+                    not via global <code>PathName::MIGRATIONS</code> / <code>PathName::SEEDERS</code>.
+                </p>
+
+                <h2 id="choose" class="border-bottom pb-2 mb-3 mt-5">What to choose</h2>
+                <ul>
+                    <li><strong>Concept Skeleton</strong> — quick start: HTTP + Twig, <code>src/App/</code>, ready providers; add components as needed.</li>
+                    <li><strong>Layered MVC</strong> — simple start without <code>App/</code>, single domain, few modules.</li>
+                    <li><strong>Components</strong> — several subsystems, need module isolation and Concept core support.</li>
+                </ul>
+                <p>
+                    Structure can be changed at any time: update
+                    <a href="setup.html#paths-php"><code>paths.php</code></a>, <code>composer.json</code>, and config.
+                </p>
+                <p>
+                    Next: <a href="request-lifecycle.html">request lifecycle</a> and
+                    <a href="setup.html">setup</a> of entry points.
+                </p>
+
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>
 
@@ -55,6 +381,8 @@
     </div>
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/json.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
     <script src="../assets/js/nav-en.js"></script>
     <script src="../assets/js/docs.js"></script>

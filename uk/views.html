@@ -70,7 +70,7 @@
 ],</code></pre>
                 <p>Файл <code>src/Components/UserCabinet/Views/index.twig</code> → <code>@cabinet/index</code>.</p>
                 <p>
-                    Каталог <code>resources/views</code> (ключ <code>PathManager::VIEWS_DIR</code>) також додано
+                    Каталог <code>resources/views</code> (<code>PathName::VIEWS</code> у <code>paths.php</code>) також додано
                     як fallback без namespace — рідко потрібен, якщо всі шаблони в namespaced paths.
                 </p>
 
@@ -115,15 +115,19 @@ src/Components/UserCabinet/Views/
                 </p>
 
                 <h2 id="twig-urls" class="border-bottom pb-2 mb-3 mt-5">URL у шаблонах</h2>
-                <p>Розширення <code>UrlExtension</code> (<code>config/view.php</code>):</p>
-                <pre class="mb-4"><code class="language-twig">&lt;a href="{{ path('architecture') }}"&gt;Architecture&lt;/a&gt;
-&lt;a href="{{ route('cabinet.login') }}"&gt;Login&lt;/a&gt;
-&lt;a href="{{ path('admin.user.edit', { id: user.id }) }}"&gt;Edit&lt;/a&gt;
+                <p>
+                    У skeleton функції <code>uri()</code>, <code>url()</code>, <code>base_url()</code> реєструє
+                    <code>AppExtension</code>
+                    (<code>config/view.php</code> → <code>view.extensions</code>).
+                </p>
+                <pre class="mb-4"><code class="language-twig">&lt;a href="{{ uri('architecture') }}"&gt;Architecture&lt;/a&gt;
+&lt;a href="{{ url('cabinet.login') }}"&gt;Login&lt;/a&gt;
+&lt;a href="{{ uri('admin.user.edit', { id: user.id }) }}"&gt;Edit&lt;/a&gt;
 &lt;link rel="canonical" href="{{ base_url() }}"&gt;</code></pre>
                 <ul class="small">
-                    <li><code>path()</code> — відносний шлях за іменем маршруту</li>
-                    <li><code>route()</code> — повний URL</li>
-                    <li><code>base_url()</code> — база застосунку</li>
+                    <li><code>uri()</code> — відносний шлях за іменем маршруту (<code>UrlGeneratorInterface::uri()</code>)</li>
+                    <li><code>url()</code> — повний URL (<code>UrlGeneratorInterface::url()</code>)</li>
+                    <li><code>base_url()</code> — база застосунку (<code>UrlGeneratorInterface::base()</code>)</li>
                 </ul>
                 <p>Детальніше про імена маршрутів — <a href="routing.html#named-routes">маршрутизація</a>.</p>
 
@@ -264,8 +268,8 @@ src/Components/UserCabinet/Views/
     'view' =&gt; [
         'extensions' =&gt; [
             AppExtension::class,      // has_component()
-            ContextExtension::class,  // route_namespace
-            UrlExtension::class,      // path(), route(), base_url()
+            ContextExtension::class,  // route_namespace global
+            UrlExtension::class,      // uri(), url(), base_url()
         ],
         'paths' =&gt; [ /* namespace =&gt; шлях від кореня проєкту */ ],
         'contexts' =&gt; [
@@ -330,7 +334,8 @@ $view = $container-&gt;get(ViewInterface::class);
 $html = $view-&gt;render('@frontend/errors/404', ['exception' =&gt; $e]);</code></pre>
                 <p>
                     Розширення <code>.twig</code> додається автоматично, якщо не вказано.
-                    Події: <code>TemplateRendering</code>, <code>TemplateRendered</code> (телеметрія).
+                    Телеметрія: <code>TelemetryEvent::TPL_RENDERED</code> у <code>TwigView::render()</code>
+                    (<a href="telemetry.html#builtin-records">Телеметрія</a>).
                     У debug — <code>DebugExtension</code> і Twig Profiler.
                 </p>
 
@@ -343,7 +348,7 @@ $html = $view-&gt;render('@frontend/errors/404', ['exception' =&gt; $e]);</code>
                 </p>
                 <p>
                     Додаткові fallback-файли PHP — <code>resources/views/errors/fallback/</code>
-                    (<code>PathManager::ERRORS_FALLBACK_VIEWS_DIR</code>).
+                    (<code>PathName::ERRORS_FALLBACK_VIEWS</code>).
                 </p>
 
                 <h2 id="assets" class="border-bottom pb-2 mb-3 mt-5">Статика в шаблонах</h2>

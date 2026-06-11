@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="Requests & Validation — Concept Core Documentation">
-    <title>Requests & Validation - Concept Core Documentation</title>
+    <meta name="description" content="Requests and Validation — Concept Core Documentation">
+    <title>Requests and Validation - Concept Core Documentation</title>
     <link rel="stylesheet" href="../assets/vendor/bootstrap/css/bootstrap.min.css">
     <link rel="stylesheet" href="../assets/vendor/bootstrap-icons/bootstrap-icons.min.css">
     <link rel="stylesheet" href="../assets/vendor/highlight/styles/github-dark.min.css">
@@ -19,8 +19,9 @@
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
             <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="../en/requests.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/requests.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/requests.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/requests.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -40,11 +41,440 @@
             </aside>
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
-                <h1 class="display-6 fw-bold mb-4">Requests & Validation</h1>
+                <h1 class="display-6 fw-bold mb-4">Requests and Validation</h1>
+
                 <p>
-                    Full documentation is available in
-                    <a href="../uk/requests.html">Ukrainian</a>.
+                    Incoming HTTP data (query, form body, JSON) is validated through
+                    <strong>FormRequest</strong> classes. After successful validation you work with the
+                    <code>validated()</code> array or, optionally, a typed <strong>DTO</strong>
+                    built by the <a href="https://valinor.cuyz.io/latest/" target="_blank" rel="noopener">Valinor</a> library.
                 </p>
+                <p>
+                    The validator is <a href="https://github.com/rakitphp/validation" target="_blank" rel="noopener">Rakit Validation</a>
+                    (adapter in Concept Core). See also:
+                    <a href="controllers.html#method-args">controllers → method arguments</a>,
+                    <a href="middleware.html#core-middleware">HandleValidationExceptionMiddleware</a>.
+                </p>
+
+                <h2 id="architecture" class="border-bottom pb-2 mb-3 mt-5">Core classes</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Class</th><th>Role</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>Concept\Core\Http\Requests\FormRequest</code></td>
+                                <td><code>rules()</code>, <code>validate()</code>, <code>validated()</code>, <code>toDto()</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>RouteStrategy</code></td>
+                                <td>Resolves FormRequest from DI, calls <code>validate()</code> before action</td>
+                            </tr>
+                            <tr>
+                                <td><code>ValidationException</code></td>
+                                <td>Errors + <code>all()</code> for flash "old input"</td>
+                            </tr>
+                            <tr>
+                                <td><code>HandleValidationExceptionMiddleware</code></td>
+                                <td>422 JSON or flash + <code>back()</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>RequestFormat</code></td>
+                                <td><code>expectsJson()</code> — chooses error response format</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h2 id="flow" class="border-bottom pb-2 mb-3 mt-5">How it works</h2>
+                <ol>
+                    <li>The action declares type <code>MyRequest $request</code> (a <code>FormRequest</code> subclass).</li>
+                    <li><code>RouteStrategy</code> first runs <a href="route-interceptors.html">route interceptors</a>, then puts URL segments into request attributes.</li>
+                    <li>For a FormRequest parameter, the container creates an instance and calls <code>validate()</code> <em>before</em> entering the method.</li>
+                    <li>If rules fail — <code>ValidationException</code> with <code>errors()</code> and full <code>all()</code> → middleware returns 422 (JSON) or redirect back with flash.</li>
+                    <li>If all is well — the controller method runs; data is read via <code>validated()</code> or <code>toDto()</code>.</li>
+                </ol>
+
+                <h2 id="with-or-without-dto" class="border-bottom pb-2 mb-3 mt-5">With and without DTO</h2>
+                <p>Both approaches are supported. A DTO is not required.</p>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Approach</th>
+                                <th>When convenient</th>
+                                <th>In the controller</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>With DTO</strong></td>
+                                <td>Typed contract, passing to a service</td>
+                                <td><code>$dto = $request-&gt;toDto();</code></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Without DTO</strong></td>
+                                <td>
+                                    Direct insert / update to DB with <code>validated()</code> array
+                                </td>
+                                <td><code>-&gt;create($request-&gt;validated())</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="example-with-dto" class="mt-4">Example with DTO</h3>
+                <pre class="mb-4"><code class="language-php">class CreateProjectRequest extends FormRequest
+{
+    protected ?string $dtoClass = CreateProjectDto::class;
+
+    public function rules(): array
+    {
+        return [
+            'title' =&gt; ['required', 'min:3', 'max:255'],
+            'service_type' =&gt; ['required', 'in:' . implode(',', ProjectModel::SERVICE_TYPES)],
+            'budget' =&gt; ['required', 'max:100'],
+            'description' =&gt; ['required', 'min:10'],
+        ];
+    }
+}
+
+// Controller
+/** @var CreateProjectDto $data */
+$data = $request-&gt;toDto();
+$this-&gt;projectModel-&gt;newQuery()-&gt;create([
+    ProjectModel::FIELD_TITLE =&gt; $data-&gt;title,
+    // ...
+]);</code></pre>
+
+                <h3 id="example-without-dto" class="mt-4">Example without DTO</h3>
+                <p>
+                    <code>UpdateProjectStatusRequest</code> — without <code>$dtoClass</code>.
+                    The <code>validated()</code> array is passed directly to <code>create()</code> / <code>update()</code>
+                    (via a normalizer if needed):
+                </p>
+                <pre class="mb-4"><code class="language-php">class UpdateProjectStatusRequest extends FormRequest
+{
+    public function rules(): array
+    {
+        return [
+            'status' =&gt; ['required', 'in:' . implode(',', array_column(ProjectStatus::cases(), 'value'))],
+        ];
+    }
+}
+
+// Single key — DB update
+$project-&gt;update([
+    ProjectModel::FIELD_STATUS =&gt; $request-&gt;validated()['status'],
+]);
+
+// Multiple fields — create() with the whole array (after except / rules)
+$this-&gt;postModel-&gt;newQuery()-&gt;create(
+    $this-&gt;normalizePayload($request-&gt;validated())
+);</code></pre>
+                <p class="small text-body-secondary">
+                    In the controller you can call <code>validated()</code> even if <code>$dtoClass</code> is set
+                    in FormRequest — the DTO is then simply optional (<code>toDto()</code> is not used).
+                </p>
+
+                <h2 id="create-form-request" class="border-bottom pb-2 mb-3 mt-5">Creating a FormRequest</h2>
+                <p>
+                    Place the class in <code>Requests/</code> of a component or application
+                    (for example <code>Components/UserCabinet/Requests/LoginRequest.php</code>).
+                    Extend <code>Concept\Core\Http\Requests\FormRequest</code> and implement
+                    <code>rules()</code>. Container registration is not required — autowiring applies.
+                </p>
+
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+namespace Concept\Components\AuthAdmin\Requests\Users;
+
+use Concept\Components\AuthAdmin\Dto\User\StoreUserDto;
+use Concept\Components\AuthAdmin\Enums\UserStatus;
+use Concept\Core\Http\Requests\FormRequest;
+
+/** @extends FormRequest&lt;StoreUserDto&gt; */
+class StoreUserRequest extends FormRequest
+{
+    protected ?string $dtoClass = StoreUserDto::class;
+
+    /** Excluded from validated() / DTO after validation */
+    protected array $except = [
+        'password_confirmation',
+    ];
+
+    public function rules(): array
+    {
+        return [
+            'name' =&gt; ['required', 'min:3'],
+            'email' =&gt; ['required', 'email', 'unique:users,email'],
+            'password' =&gt; ['required', 'min:8'],
+            'password_confirmation' =&gt; ['required', 'min:8', 'same:password'],
+            'status' =&gt; ['required', 'in:' . implode(',', array_column(UserStatus::cases(), 'value'))],
+            'is_admin' =&gt; ['nullable', 'boolean'],
+        ];
+    }
+}</code></pre>
+                <p class="small text-body-secondary">
+                    Minimal login request without <code>$except</code> — <code>LoginRequest</code>
+                    (only <code>email</code> and <code>password</code>, DTO <code>LoginDto</code> with optional <code>remember</code>).
+                </p>
+
+                <h3 id="rules" class="mt-4"><code>rules()</code> rules</h3>
+                <p>Two formats (as in Rakit):</p>
+                <ul>
+                    <li>string: <code>'name' =&gt; 'required|min:3'</code></li>
+                    <li>array: <code>'email' =&gt; ['required', 'email', 'unique:users,email']</code></li>
+                </ul>
+                <p>
+                    Standard Rakit rules are available (<code>required</code>, <code>email</code>, <code>min</code>,
+                    <code>max</code>, <code>same</code>, <code>in</code>, <code>nullable</code>, <code>boolean</code>, etc.).
+                    (see <a href="#custom-rules">custom rules</a>).
+                </p>
+
+                <h3 id="aliases" class="mt-4"><code>aliases()</code> aliases</h3>
+                <p>
+                    Human-readable field names in error messages ("Project title" instead of "title").
+                    Optional method — defaults to an empty array. Merged with global aliases from
+                    <code>resources/lang/validator/{locale}.php</code> (<code>ValidationTranslationsLoader</code>).
+                </p>
+
+                <h3 id="messages" class="mt-4"><code>messages()</code> messages</h3>
+                <p>
+                    Override texts for specific rules in a given FormRequest
+                    (key — Rakit rule name, for example <code>'required' =&gt; 'Fill in :attribute'</code>).
+                    Global translations — in the same <code>resources/lang/validator/</code> files.
+                </p>
+
+                <h3 id="except-only" class="mt-4"><code>$except</code> and <code>$only</code></h3>
+                <ul>
+                    <li>
+                        <code>$except</code> — exclude fields from <code>validated()</code> result
+                        (for example <code>password_confirmation</code> after the <code>same:password</code> rule)
+                    </li>
+                    <li>
+                        <code>$only</code> — whitelist keys in <code>validated()</code>
+                        (rare; usually keys from <code>rules()</code> are enough)
+                    </li>
+                    <li>
+                        <code>_csrf_token</code> is excluded globally from <code>validated()</code>,
+                        even if it appears in the body
+                    </li>
+                </ul>
+                <p>
+                    <code>validated()</code> returns only keys present in <code>rules()</code>
+                    (intersection with valid data), minus <code>except</code> and global exclusions.
+                    Call <code>validated()</code> only after <code>validate()</code>
+                    (in the controller validation has already run; otherwise — <code>ValidationLogicException</code>).
+                </p>
+
+                <h3 id="all-method" class="mt-4">Where data comes from: <code>all()</code></h3>
+                <p>
+                    <code>all()</code> merges <strong>query string</strong> and <strong>parsed body</strong>
+                    (form fields or JSON after <code>ParseJsonBodyMiddleware</code>).
+                    This data goes to the validator. For JSON APIs, attach the appropriate middleware on the route group.
+                </p>
+
+                <h3 id="dto-class" class="mt-4"><code>$dtoClass</code> property</h3>
+                <ul>
+                    <li><code>protected ?string $dtoClass = MyDto::class;</code> — enable DTO mapping</li>
+                    <li><code>null</code> or omitted — only <code>validated()</code> works; <code>toDto()</code> returns <code>null</code></li>
+                </ul>
+                <p>
+                    PHPDoc <code>@extends FormRequest&lt;LoginDto&gt;</code> helps IDE/static analysis;
+                    for requests without DTO — <code>@extends FormRequest&lt;null&gt;</code> or no generic.
+                </p>
+
+                <h3 id="route-params" class="mt-4">Route parameters</h3>
+                <p>
+                    URL segments (<code>{id:number}</code>) are usually passed as a separate action argument:
+                    <code>update(UpdateUserRequest $request, int $id)</code>.
+                    In a FormRequest subclass, protected <code>getRouteParam('id')</code> is available —
+                    if you need to inject id into rules (for example <code>unique:users,email,{id}</code>).
+                </p>
+
+                <h3 id="logging" class="mt-4">Logging</h3>
+                <p>
+                    When <code>log.validation_data = true</code> in <code>config/log.php</code>
+                    (<code>ConfigKey::LOG_VALIDATION_DATA</code>), FormRequest logs input data in <code>all()</code>
+                    and the result of <code>validate()</code> — see
+                    <a href="configuration.html#file-log">Configuration → log.php</a>.
+                    The logger masks sensitive fields via <code>DataMaskerInterface</code>.
+                    Usually disabled in production.
+                </p>
+
+                <h2 id="controller-usage" class="border-bottom pb-2 mb-3 mt-5">Usage in a controller</h2>
+                <p>Declare FormRequest in the method signature — validation runs automatically:</p>
+                <pre class="mb-4"><code class="language-php">public function store(StoreUserRequest $request): ResponseInterface
+{
+    // Option 1: validated() array
+    $this-&gt;userModel-&gt;newQuery()-&gt;create(
+        $this-&gt;normalizeUserPayload($request-&gt;validated())
+    );
+    return $this-&gt;response-&gt;redirectByName('admin.users');
+}
+
+public function store(CreateProjectRequest $request): ResponseInterface
+{
+    // Option 2: DTO
+    /** @var CreateProjectDto $data */
+    $data = $request-&gt;toDto();
+    $this-&gt;projectModel-&gt;newQuery()-&gt;create([/* fields from $data */]);
+    return $this-&gt;response-&gt;redirectByName('cabinet.projects');
+}</code></pre>
+                <p>
+                    Call <code>toDto()</code> after successful validation (in the controller this is already guaranteed).
+                    Check for <code>null</code> if <code>$dtoClass</code> is not set or Caster is unavailable.
+                </p>
+
+                <h2 id="validation-errors" class="border-bottom pb-2 mb-3 mt-5">Validation errors</h2>
+                <p>On failed validation, <code>HandleValidationExceptionMiddleware</code>:</p>
+                <ul>
+                    <li>
+                        <strong>JSON / API</strong> — if <code>RequestFormat::expectsJson()</code>
+                        (<code>Accept: application/json</code> or <code>X-Requested-With: XMLHttpRequest</code>) —
+                        <code>422</code>, body <code>jsonError()</code> with <code>errors</code> field
+                    </li>
+                    <li>
+                        <strong>HTML form</strong> — flash <code>error</code>,
+                        <code>SessionKey::VALIDATION_ERRORS</code> (<code>_validation_errors</code>),
+                        <code>SessionKey::VALIDATION_DATA</code> (<code>_validation_data</code>),
+                        redirect <code>back()</code>
+                    </li>
+                </ul>
+                <p>
+                    Flash "old input" receives full <code>all()</code> (query + body), not just
+                    <code>validated()</code>. <code>ShareViewDataMiddleware</code> maps flash to Twig:
+                    <code>ViewKey::ERRORS</code> → <code>errors</code>,
+                    <code>ViewKey::OLD_INPUT</code> → <code>old</code>.
+                </p>
+                <pre class="mb-4"><code class="language-twig">&lt;label for="email"&gt;Email&lt;/label&gt;
+&lt;input id="email" type="email" name="email" required
+       value="{{ old.email|default('') }}"
+       class="input {{ errors.email is defined and errors.email ? 'is-invalid' : '' }}"
+       aria-describedby="email-error"&gt;
+{% if errors.email is defined and errors.email is not empty %}
+    &lt;div class="field-error" id="email-error" role="alert"&gt;
+        {{ errors.email is iterable ? errors.email|join(', ') : errors.email }}
+    &lt;/div&gt;
+{% endif %}</code></pre>
+
+                <h3 id="cast-errors" class="mt-4">DTO mapping errors</h3>
+                <p>
+                    If <code>toDto()</code> cannot build an object (type mismatch after validation),
+                    <code>ValidationCastException</code> is thrown (wrapper around Valinor <code>MappingError</code>).
+                    This is not the same as rule errors — handled by the general error handler, not validation middleware.
+                    Therefore FormRequest rules must align with DTO types (for example <code>boolean</code> for <code>bool $remember</code>).
+                </p>
+
+                <h2 id="custom-rules" class="border-bottom pb-2 mb-3 mt-5">Custom validation rules</h2>
+                <p>
+                    Registration in <code>config/validator.php</code>
+                    (<code>ValidationServiceProvider</code> → <code>ConfigKey::VALIDATOR_RULES</code>):
+                </p>
+                <pre class="mb-4"><code class="language-php">use Concept\App\Validation\Rules\ExistsRule;
+use Concept\App\Validation\Rules\UniqueRule;
+
+return [
+    'validator' =&gt; [
+        'rules' =&gt; [
+            'unique' =&gt; UniqueRule::class,
+            'exists' =&gt; ExistsRule::class,
+        ],
+    ],
+];</code></pre>
+                <p>
+                    A rule class implements <code>RuleInterface</code>, extends <code>Concept\Core\Components\Validator\Rule</code>.
+                    For example:
+                    <code>'email' =&gt; ['unique:users,email']</code> in <code>StoreUserRequest</code>,
+                    <code>'email' =&gt; ['exists:users,email']</code> in <code>ForgotPasswordRequest</code>.
+                    For update except id: <code>'unique:users,email,' . $this-&gt;getRouteParam('id') . ',id'</code>
+                    in <code>rules()</code> (third parameter — record id to ignore).
+                </p>
+
+                <h2 id="dto" class="border-bottom pb-2 mb-3 mt-5">DTO (Data Transfer Object)</h2>
+                <p>
+                    A DTO is an immutable object with readonly properties for already validated data.
+                    Base class <code>Concept\Core\Dto\Dto</code> implements <code>toArray()</code> by casting the object to an array.
+                </p>
+
+                <h3 id="create-dto" class="mt-4">How to create a DTO</h3>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+namespace Concept\Components\AuthAdmin\Dto\User;
+
+use Concept\Core\Dto\Contracts\DtoInterface;
+use Concept\Core\Dto\Dto;
+
+class StoreUserDto extends Dto implements DtoInterface
+{
+    public function __construct(
+        public readonly string $name,
+        public readonly string $email,
+        public readonly string $password,
+        public readonly string $status,
+        public readonly bool $is_admin = false,
+        public readonly ?string $verification_token = null,
+    ) {}
+}</code></pre>
+                <ul>
+                    <li>Property names match keys in <code>validated()</code> (snake_case in forms → snake_case in DTO)</li>
+                    <li>Constructor types must match what the validator returns + Valinor casting</li>
+                    <li>Optional fields — default in constructor or <code>?type</code></li>
+                    <li>Fields in <code>$except</code> do not end up in the DTO</li>
+                </ul>
+
+                <h3 id="valinor" class="mt-4">Valinor and <code>Caster</code></h3>
+                <p>
+                    Mapping is performed by <code>Concept\Core\Components\Caster\Caster</code> based on
+                    <a href="https://valinor.cuyz.io/latest/" target="_blank" rel="noopener">Valinor</a>
+                    (<code>cuyz/valinor</code> in core dependencies; a possible internal fork with the same
+                    <code>CuyZ\Valinor</code> API — then the same documentation applies).
+                    Describes mapping arrays to objects, strict types, nested structures — applicable to Concept Core DTOs.
+                </p>
+                <ul>
+                    <li><code>allowScalarValueCasting()</code> — string <code>"1"</code> → <code>int</code> / <code>bool</code> when needed</li>
+                    <li><code>allowSuperfluousKeys()</code> — extra keys in the array do not break mapping (convenient for forms)</li>
+                    <li>Mapper cache: <code>storage/cache/valinor</code> (faster repeated mapping)</li>
+                </ul>
+                <p>Useful Valinor documentation sections:</p>
+                <ul>
+                    <li><a href="https://valinor.cuyz.io/latest/how-to/map-input-data/" target="_blank" rel="noopener">How to map input data</a></li>
+                    <li><a href="https://valinor.cuyz.io/latest/how-to/handle-invalid-input/" target="_blank" rel="noopener">Handle invalid input</a></li>
+                    <li><a href="https://valinor.cuyz.io/latest/reference/feature-flags/" target="_blank" rel="noopener">Feature flags</a> (casting, superfluous keys)</li>
+                </ul>
+
+                <h3 id="to-dto-internals" class="mt-4">What <code>toDto()</code> does</h3>
+                <pre class="mb-4"><code class="language-php">// Simplified
+if ($this-&gt;dtoClass === null || !$this-&gt;caster) {
+    return null;
+}
+return $this-&gt;caster-&gt;cast($this-&gt;validated(), $this-&gt;dtoClass);</code></pre>
+                <p>
+                    First Rakit checks <strong>rules</strong>, then Valinor builds the <strong>structure</strong>.
+                    Business logic validation (email uniqueness in DB) — in <code>rules()</code>;
+                    type coercion — in DTO/Valinor.
+                </p>
+
+                <h2 id="checklist" class="border-bottom pb-2 mb-3 mt-5">Checklist</h2>
+                <ol>
+                    <li>Create <code>Requests/MyActionRequest.php</code> with <code>rules()</code> and optionally <code>aliases()</code>.</li>
+                    <li>If needed — <code>Dto/MyActionDto.php</code> and <code>protected ?string $dtoClass = ...</code>.</li>
+                    <li>Add type hint in controller: <code>public function store(MyActionRequest $request)</code>.</li>
+                    <li>Ensure global <code>HandleValidationExceptionMiddleware</code> is attached in routes.</li>
+                    <li>In Twig use <code>errors</code> / <code>old</code> to re-display the form.</li>
+                </ol>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        FormRequest is responsible for request input data. Authorization ("can this user do this") —
+                        in <a href="middleware.html">middleware</a> or services, not in <code>rules()</code>,
+                        when session context outside form fields is required.
+                    </p>
+                </div>
+
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>
 
@@ -56,6 +486,7 @@
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
     <script src="../assets/js/nav-en.js"></script>
     <script src="../assets/js/docs.js"></script>

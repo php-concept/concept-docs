@@ -19,8 +19,9 @@
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
             <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="../en/configuration.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/configuration.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/configuration.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/configuration.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -41,9 +42,335 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Configuration</h1>
-                <div class="border border-secondary-subtle rounded text-center text-body-secondary p-5">
-                    <p class="mb-0">This page is a placeholder. Content will be added in a future update.</p>
+
+                <p>
+                    Before this section, review <a href="setup.html">Setup</a> — bootstrap and <code>paths.php</code>.
+                    Concept Core collects settings from PHP files in <code>config/</code>, applies environment overrides
+                    (<code>APP_ENV</code>), and variables from <code>.env</code>. Loading is performed by
+                    <code>ConfigServiceProvider::boot()</code> on the first access to <code>ConfigInterface</code>.
+                    Access in code is through DI (<code>ConfigInterface</code>).
+                </p>
+
+                <h2 id="loading-order" class="border-bottom pb-2 mb-3 mt-5">Loading order</h2>
+                <p>
+                    Implemented in <code>ConfigServiceProvider</code>. Each subsequent step overrides the previous one
+                    for matching keys (except step 2 — <code>.env</code> is only read; merging happens at step 4).
+                </p>
+                <div class="docs-mermaid mb-4">
+                    <pre class="mermaid">flowchart LR
+    A["1. config/*.php"]
+    B["2. .env is read"]
+    C["3. config/APP_ENV/*.php"]
+    D["4. .env → config"]
+    E["app.timezone"]
+
+    A --> B --> C --> D --> E</pre>
                 </div>
+                <ol>
+                    <li><strong>Base <code>config/</code></strong> — all PHP files are merged with Noodlehaus Config.</li>
+                    <li><strong><code>.env</code></strong> — loaded via vlucas/phpdotenv; <code>APP_ENV</code> determines the override folder.</li>
+                    <li><strong><code>config/{APP_ENV}/</code></strong> — if the directory exists (<code>dev</code>, <code>production</code>…), its files are merged on top of the base config.</li>
+                    <li><strong><code>.env</code> variables</strong> — written into config (highest priority).</li>
+                    <li><strong>Timezone</strong> — <code>date_default_timezone_set()</code> from <code>app.timezone</code>.</li>
+                </ol>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        <code>APP_ENV</code> is read from <code>.env</code> at step 2 and is used only to select
+                        <code>config/{APP_ENV}/</code>. In the final config it appears as <code>app.env</code> at step 4.
+                    </p>
+                </div>
+
+                <h2 id="env-mapping" class="border-bottom pb-2 mb-3 mt-5">.env → config mapping</h2>
+                <p>
+                    Each environment variable is converted to a config key using the “first underscore” rule:
+                    the name is split into two parts (limit <code>explode('_', ..., 2)</code>), lowercased,
+                    then joined with a dot.
+                </p>
+                <pre class="mb-4"><code class="language-text">APP_DEBUG=true     → app.debug
+DB_HOST=127.0.0.1   → db.host
+LOG_MAX_FILES=14    → log.max_files</code></pre>
+                <p>
+                    Nesting deeper than the first level is not supported via <code>.env</code>: <code>APP_FOO_BAR_BAZ</code> becomes
+                    <code>app.foo_bar_baz</code>, not a nested array. Complex structures belong in <code>config/</code> PHP files.
+                </p>
+                <p>Boolean values in <code>.env</code> (<code>true</code>, <code>false</code>, <code>0</code>, <code>1</code>)
+                    are read correctly via <code>getBool()</code>.</p>
+
+                <h2 id="dotenv" class="border-bottom pb-2 mb-3 mt-5">.env file</h2>
+                <p>
+                    Copy <code>.env.example</code> to <code>.env</code> in the application root.
+                    <strong>Do not commit</strong> <code>.env</code> to the repository — only the example file.
+                </p>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle">
+                        <thead>
+                            <tr>
+                                <th>.env variable</th>
+                                <th>Config key</th>
+                                <th>Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>APP_NAME</code></td><td><code>app.name</code></td><td>Application name (console, logs)</td></tr>
+                            <tr><td><code>APP_TIMEZONE</code></td><td><code>app.timezone</code></td><td>PHP timezone (<code>Europe/Kyiv</code>, <code>UTC</code>)</td></tr>
+                            <tr><td><code>APP_ENV</code></td><td><code>app.env</code></td><td>Environment: <code>dev</code>, <code>production</code>, etc.; determines override folder</td></tr>
+                            <tr><td><code>APP_DEBUG</code></td><td><code>app.debug</code></td><td>Debug mode: Whoops, Twig cache off, Valinor FileWatchingCache, SQL log</td></tr>
+                            <tr><td><code>LOG_LEVEL</code></td><td><code>log.level</code></td><td>Monolog level: <code>debug</code>, <code>info</code>, <code>error</code>…</td></tr>
+                            <tr><td><code>LOG_MAX_FILES</code></td><td><code>log.max_files</code></td><td>Number of rotated log files</td></tr>
+                            <tr><td><code>LOG_QUERY</code></td><td><code>log.query</code></td><td>Log SQL queries and DB events</td></tr>
+                            <tr><td><code>LOG_VALIDATION_DATA</code></td><td><code>log.validation_data</code></td><td>Log FormRequest validation payload (with masking)</td></tr>
+                            <tr><td><code>DB_DRIVER</code></td><td><code>db.driver</code></td><td>DB driver (<code>mysql</code>)</td></tr>
+                            <tr><td><code>DB_HOST</code></td><td><code>db.host</code></td><td>DB host</td></tr>
+                            <tr><td><code>DB_PORT</code></td><td><code>db.port</code></td><td>Port (in config file; connection core does not read it yet)</td></tr>
+                            <tr><td><code>DB_DATABASE</code></td><td><code>db.database</code></td><td>Database name</td></tr>
+                            <tr><td><code>DB_USERNAME</code></td><td><code>db.username</code></td><td>DB user</td></tr>
+                            <tr><td><code>DB_PASSWORD</code></td><td><code>db.password</code></td><td>DB password</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h2 id="env-override" class="border-bottom pb-2 mb-3 mt-5">Override by APP_ENV</h2>
+                <p>
+                    If the directory <code>config/{APP_ENV value}/</code> exists, all PHP files from it are merged on top of
+                    the base <code>config/</code>. File names and array structure are the same; only the required keys change.
+                </p>
+                <p>In skeleton by default:</p>
+                <ul>
+                    <li><code>config/dev/app.php</code> — <code>app.debug = true</code></li>
+                    <li><code>config/dev/telemetry.php</code> — <code>telemetry.enabled = true</code></li>
+                    <li><code>config/production/app.php</code> — <code>app.debug = false</code></li>
+                    <li><code>config/*/components.php</code> — component registration per environment</li>
+                </ul>
+                <pre class="mb-4"><code class="language-text">config/
+├── app.php
+├── telemetry.php
+├── dev/
+│   ├── app.php
+│   ├── telemetry.php
+│   └── components.php
+└── production/
+    ├── app.php
+    └── components.php</code></pre>
+
+                <h2 id="config-files" class="border-bottom pb-2 mb-3 mt-5">config/ files</h2>
+                <p>Each file returns an array; the root key usually matches the file name (without <code>.php</code>).</p>
+
+                <h3 id="file-app" class="mt-4">app.php</h3>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Purpose</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>app.name</code></td><td>string</td><td><code>App</code></td><td>Application name (console, logs)</td></tr>
+                            <tr><td><code>app.version</code></td><td>string</td><td><code>1.0.0</code></td><td>Application version in Symfony Console</td></tr>
+                            <tr><td><code>app.timezone</code></td><td>string</td><td><code>UTC</code></td><td>PHP timezone (<code>date_default_timezone_set</code>)</td></tr>
+                            <tr><td><code>app.env</code></td><td>string</td><td>—</td><td>Environment from <code>APP_ENV</code> (loading step 4); determines <code>config/{APP_ENV}/</code></td></tr>
+                            <tr><td><code>app.locale</code></td><td>string</td><td><code>en</code></td><td>Application locale</td></tr>
+                            <tr><td><code>app.fallback_locale</code></td><td>string</td><td><code>en</code></td><td>Fallback for validator translations</td></tr>
+                            <tr><td><code>app.locale_resolver</code></td><td>class-string|null</td><td><code>null</code></td><td>Custom <code>LocaleResolverInterface</code></td></tr>
+                            <tr><td><code>app.debug</code></td><td>bool</td><td><code>false</code></td><td>Whoops (web), Twig cache off, Valinor <code>FileWatchingCache</code>, SQL log (together with <code>log.query</code>)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="file-db">db.php</h3>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead><tr><th>Key</th><th>Type</th><th>Purpose</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>db.driver</code></td><td>string</td><td>Illuminate DB driver</td></tr>
+                            <tr><td><code>db.host</code></td><td>string</td><td>Host</td></tr>
+                            <tr><td><code>db.port</code></td><td>string</td><td>Port (reserved in config)</td></tr>
+                            <tr><td><code>db.database</code></td><td>string</td><td>Database</td></tr>
+                            <tr><td><code>db.username</code></td><td>string</td><td>User</td></tr>
+                            <tr><td><code>db.password</code></td><td>string</td><td>Password</td></tr>
+                            <tr><td><code>db.charset</code></td><td>string</td><td>Encoding (<code>utf8mb4</code>)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="file-log">log.php</h3>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Purpose</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>log.name</code></td><td>string</td><td><code>app</code></td><td>Monolog channel name</td></tr>
+                            <tr><td><code>log.level</code></td><td>string</td><td><code>ERROR</code></td><td>Minimum level (<code>ERROR</code>, <code>debug</code>…)</td></tr>
+                            <tr><td><code>log.max_files</code></td><td>int</td><td><code>7</code></td><td>Files on rotation (<code>.env.example</code>: <code>14</code>)</td></tr>
+                            <tr><td><code>log.query</code></td><td>bool</td><td><code>false</code></td><td>Log SQL (also enabled when <code>app.debug</code>)</td></tr>
+                            <tr><td><code>log.validation_data</code></td><td>bool</td><td><code>false</code></td><td>Log validation data in FormRequest (with masking)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="file-session">session.php</h3>
+                <p>
+                    PHP session parameters (<code>SessionServiceProvider</code> → Symfony HttpFoundation → <code>session_start()</code>).
+                    Keys correspond to <code>ConfigKey::SESSION_*</code> constants.
+                </p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead><tr><th>Key</th><th>Type</th><th>Default</th><th>Description</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>session.cookie_lifetime</code></td><td>int</td><td><code>0</code></td><td>Cookie lifetime (0 — until browser closes)</td></tr>
+                            <tr><td><code>session.cookie_path</code></td><td>string</td><td><code>/</code></td><td>Cookie path</td></tr>
+                            <tr><td><code>session.cookie_secure</code></td><td>bool</td><td><code>false</code></td><td>HTTPS only</td></tr>
+                            <tr><td><code>session.cookie_httponly</code></td><td>bool</td><td><code>true</code></td><td>HttpOnly</td></tr>
+                            <tr><td><code>session.use_only_cookies</code></td><td>bool</td><td><code>true</code></td><td>No session id in URL</td></tr>
+                            <tr><td><code>session.cookie_domain</code></td><td>string</td><td><code>''</code></td><td>Cookie domain (<code>SESSION_COOKIE_DOMAIN</code> in <code>.env</code>)</td></tr>
+                            <tr><td><code>session.cookie_samesite</code></td><td>string</td><td><code>Lax</code></td><td><code>Lax</code>, <code>Strict</code>, <code>None</code> (<code>SESSION_COOKIE_SAMESITE</code>)</td></tr>
+                            <tr><td><code>session.use_strict_mode</code></td><td>bool</td><td><code>true</code></td><td>Strict session id mode</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="file-view">view.php</h3>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead><tr><th>Key</th><th>Type</th><th>Purpose</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>view.default_extension</code></td><td>string</td><td>Template extension (<code>.twig</code> or <code>.php</code> for Plates)</td></tr>
+                            <tr><td><code>view.extensions</code></td><td>array&lt;class-string&gt;</td><td>Twig / Plates extension classes</td></tr>
+                            <tr><td><code>view.paths</code></td><td>array</td><td>Namespace → path from app root (<code>frontend</code> → <code>resources/views/frontend</code>)</td></tr>
+                            <tr><td><code>view.contexts</code></td><td>array</td><td>URL prefix → view namespace (<code>/</code> → <code>frontend</code>)</td></tr>
+                            <tr><td><code>view.cache_dir</code></td><td>string</td><td>Subdirectory under <code>storage/cache/</code> for compiled Twig</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="file-routes">routes.php</h3>
+                <p>The <code>routes</code> key is a list of route files and route interceptors (see <a href="routing.html">Routing</a>, <a href="route-interceptors.html">Route interceptors</a>).</p>
+                <pre class="mb-4"><code class="language-php">return [
+    'routes' => [
+        'interceptors' => [
+            // RouteInterceptorInterface::class,
+        ],
+        'list' => [
+            dirname(__DIR__) . '/routes/web.php',
+        ],
+    ],
+];</code></pre>
+
+                <h3 id="file-components">components.php</h3>
+                <p>
+                    <code>components</code> is a list of FQCN classes implementing <code>ComponentInterface</code>.
+                    The environment may have <code>MyComponent::class => MyComponent::class</code> —
+                    the core iterates over array values. Components add routes, migrations, seeders, views, CLI commands.
+                </p>
+                <pre class="mb-4"><code class="language-php">return [
+    'components' => [
+        // AuthAdminComponent::class,
+    ],
+];</code></pre>
+
+                <h3 id="file-telemetry">telemetry.php</h3>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead><tr><th>Key</th><th>Type</th><th>Purpose</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>telemetry.enabled</code></td><td>bool</td><td>Bootstrap and HTTP telemetry (see <code>TelemetryCollector</code>)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="file-masking">masking.php</h3>
+                <p>
+                    Masking sensitive data before writing to logs and debug panels.
+                    Read by <code>DataMaskerServiceProvider</code> → <code>DataMaskerInterface</code>.
+                    Full description — <a href="data-masking.html">Data masking</a>.
+                </p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead><tr><th>Key</th><th>ConfigKey</th><th>Purpose</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>masking.patterns</code></td><td><code>MASKING_PATTERNS</code></td><td>Array of regex → replacement for strings (<code>RegexDataMaskerRule::apply</code>)</td></tr>
+                            <tr><td><code>masking.key_patterns</code></td><td><code>MASKING_KEY_PATTERNS</code></td><td>Regex for key names in arrays (password, token…)</td></tr>
+                            <tr><td><code>masking.rules</code></td><td><code>MASKING_RULES</code></td><td>List of <code>DataMaskerRuleInterface</code> classes (DI)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <pre class="mb-4"><code class="language-php">// config/masking.php (skeleton fragment)
+'masking' =&gt; [
+    'patterns' =&gt; [
+        '/[a-z0-9_\-\+\.]+@[a-z0-9\-]+\.[a-z]{2,}/i' =&gt; '***@***.***',
+    ],
+    'key_patterns' =&gt; [
+        '/.*password.*/i',
+        '/.*token.*/i',
+    ],
+    'rules' =&gt; [],
+],</code></pre>
+
+                <h3 id="file-validator">validator.php</h3>
+                <p><code>validator.rules</code> — custom validation rules (<code>unique</code>, <code>exists</code>, etc.).</p>
+
+                <h3 id="file-pagination">pagination.php</h3>
+                <p>
+                    <code>pagination.per_page</code> — convenient default for application code (in skeleton: <code>10</code>).
+                    The core does not read this key automatically; <code>HttpServiceProvider</code> only configures
+                    <code>Paginator::currentPageResolver</code> and <code>currentPathResolver</code> for Illuminate Pagination.
+                </p>
+
+                <h3 id="file-migrations">migrations.php</h3>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead><tr><th>Key</th><th>Purpose</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>migrations.table</code></td><td>Migration tracking table</td></tr>
+                            <tr><td><code>migrations.paths</code></td><td>Directories with migration classes</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="file-seeders">seeders.php</h3>
+                <p>
+                    <code>seeders.list</code> — array of seeder classes for <code>db:seed</code> (all at once).
+                    Single seeder: <code>db:seed -c "Fully\Qualified\SeederClass"</code> — full FQCN required.
+                </p>
+
+                <h3 id="file-commands">commands.php</h3>
+                <p>
+                    <code>commands</code> — list of Symfony Console command classes from core and application.
+                    Skeleton already registers <code>route:list</code>, <code>db:migrate</code>, <code>view:clear</code>, etc.
+                </p>
+
+                <h2 id="config-keys" class="border-bottom pb-2 mb-3 mt-5">ConfigKey constants</h2>
+                <p>
+                    Canonical keys read by the core are collected in
+                    <code>Concept\Core\Foundation\ConfigKey</code>. In your own code, prefer these constants
+                    over string literals:
+                </p>
+                <pre class="mb-4"><code class="language-php">use Concept\Core\Foundation\ConfigKey;
+
+$debug = $config->getBool(ConfigKey::APP_DEBUG);
+$routes = $config->get(ConfigKey::ROUTES_LIST, []);</code></pre>
+                <p class="small text-body-secondary">
+                    Full list of constants — in source code <code>code/core/src/Foundation/ConfigKey.php</code>
+                    and in the core README (Configuration section).
+                </p>
+
+                <h2 id="access" class="border-bottom pb-2 mb-3 mt-5">Access in code</h2>
+                <p>Inject <code>Concept\Core\Components\Config\Contracts\ConfigInterface</code>:</p>
+                <pre class="mb-4"><code class="language-php">public function __construct(
+    private readonly ConfigInterface $config,
+) {}
+
+$debug = $this->config->getBool('app.debug');
+$name = $this->config->getString('app.name');
+$routes = $this->config->get('routes', []);</code></pre>
+                <p>Methods: <code>get()</code>, <code>has()</code>, <code>set()</code>, <code>all()</code>,
+                    <code>getString()</code>, <code>getInt()</code>, <code>getBool()</code>.</p>
+
+                <h2 id="dev-tips" class="border-bottom pb-2 mb-3 mt-5">Development tips</h2>
+                <ul>
+                    <li>Locally set <code>APP_ENV=dev</code> and <code>APP_DEBUG=true</code> in <code>.env</code>.</li>
+                    <li>Secrets (passwords, API keys) — only in <code>.env</code>, not in <code>config/*.php</code>.</li>
+                    <li>Shared defaults — in <code>config/</code>; environment differences — in <code>config/dev/</code> or <code>config/production/</code>.</li>
+                    <li>For new environment variables, follow the <code>GROUP_NAME</code> → <code>group.name</code> convention.</li>
+                    <li>Clear Twig cache after template changes: <code>php bin/console.php view:clear</code>.</li>
+                </ul>
+
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>
 
@@ -55,7 +382,12 @@
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'dark', securityLevel: 'loose' });
+    </script>
     <script src="../assets/js/nav-en.js"></script>
     <script src="../assets/js/docs.js"></script>
 </body>

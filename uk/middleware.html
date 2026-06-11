@@ -44,10 +44,15 @@
                 <h1 class="display-6 fw-bold mb-4">Middleware</h1>
 
                 <p>
-                    Middleware — шар між маршрутизацією та контролером: фільтрує запит, додає контекст,
+                    Middleware — PSR-15 шар між маршрутизацією та handler: фільтрує запит, додає контекст,
                     перехоплює винятки або змінює відповідь. Concept Core використовує
-                    <code>Psr\Http\Server\MiddlewareInterface</code> (PSR-15) і League Route
+                    <code>Psr\Http\Server\MiddlewareInterface</code> і League Route
                     <code>lazyMiddleware()</code>.
+                </p>
+                <p>
+                    Middleware — не те саме, що <a href="route-interceptors.html">route interceptors</a>:
+                    interceptors спрацьовують у <code>RouteStrategy</code> після middleware, до виклику handler,
+                    і не формують PSR-15 ланцюжок.
                 </p>
                 <p>
                     Див. також: <a href="request-lifecycle.html#middleware">життєвий цикл → middleware</a>,
@@ -57,7 +62,7 @@
                 <h2 id="contract" class="border-bottom pb-2 mb-3 mt-5">Контракт PSR-15</h2>
                 <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
 
-namespace App\Http\Middlewares;
+namespace Concept\App\Http\Middlewares;
 
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -70,18 +75,19 @@ final class ExampleMiddleware implements MiddlewareInterface
         ServerRequestInterface $request,
         RequestHandlerInterface $handler
     ): ResponseInterface {
-        // До контролера: перевірки, зміна $request
+        // До handler: перевірки, зміна $request
 
         $response = $handler->handle($request);
 
-        // Після контролера: заголовки, логування
+        // Після handler: заголовки, логування
 
         return $response;
     }
 }</code></pre>
                 <p>
                     Клас реєструється в контейнері; League Route створює екземпляр через DI при
-                    <code>lazyMiddleware(MyMiddleware::class)</code>.
+                    <code>lazyMiddleware(MyMiddleware::class)</code> — залежності конструктора підставляються
+                    автоматично (<code>ReflectionContainer</code>).
                 </p>
 
                 <h2 id="registration" class="border-bottom pb-2 mb-3 mt-5">Де підключати</h2>
@@ -89,9 +95,12 @@ final class ExampleMiddleware implements MiddlewareInterface
                     <li><strong>Глобально</strong> — на початку <code>routes/web.php</code> (усі маршрути файлу).</li>
                     <li><strong>Група</strong> — <code>$router->group(...)->lazyMiddleware(...)</code>.</li>
                     <li><strong>Один маршрут</strong> — ланцюжок після <code>get()</code> / <code>post()</code>.</li>
-                    <li><strong>Компонент</strong> — у <code>Component/routes.php</code> (наприклад DebugBar у dev).</li>
+                    <li><strong>Компонент</strong> — у <code>Component/routes.php</code> (наприклад <code>AuthMiddleware</code> на групі <code>/admin</code>).</li>
                 </ul>
-                <p>Порядок реєстрації визначає порядок обгортання: перший доданий middleware — зовнішній шар (виконується першим на вході).</p>
+                <p>
+                    Порядок реєстрації визначає порядок обгортання: перший доданий middleware — зовнішній шар
+                    (виконується першим на вході). Мінімальний skeleton не підключає глобальний стек;
+                </p>
 
                 <h2 id="core-middleware" class="border-bottom pb-2 mb-3 mt-5">Middleware ядра</h2>
                 <p>Класи в <code>Concept\Core\Http\Middlewares</code>:</p>
@@ -107,79 +116,103 @@ final class ExampleMiddleware implements MiddlewareInterface
                         <tbody>
                             <tr>
                                 <td><code>HandleValidationExceptionMiddleware</code></td>
-                                <td>Ловить <code>ValidationException</code>: JSON 422 або flash + redirect назад</td>
+                                <td>Ловить <code>ValidationException</code> з FormRequest: JSON 422 (<code>RequestFormat::expectsJson()</code>) або flash + <code>ResponseFactory::back()</code></td>
                             </tr>
                             <tr>
                                 <td><code>VerifyCsrfTokenMiddleware</code></td>
-                                <td>CSRF для POST, PUT, DELETE</td>
+                                <td>CSRF для <code>POST</code>, <code>PUT</code>, <code>PATCH</code>, <code>DELETE</code>; при помилці — <code>CsrfException</code></td>
                             </tr>
                             <tr>
                                 <td><code>StorePreviousUrlMiddleware</code></td>
-                                <td>Зберігає URL у сесії для <code>back()</code> / safe redirect</td>
+                                <td>На GET (не AJAX) зберігає <code>_url_current</code> / <code>_url_previous</code> у сесії; задає <code>RequestAttribute::SAFE_BACK_URL</code></td>
                             </tr>
                             <tr>
                                 <td><code>ShareViewDataMiddleware</code></td>
-                                <td>Flash, помилки валідації, <code>csrf_token</code> у Twig</td>
+                                <td>Flash, помилки валідації, old input, <code>csrf_token</code> → <code>RequestAttribute::VIEW_PAYLOAD</code></td>
                             </tr>
                             <tr>
                                 <td><code>ParseJsonBodyMiddleware</code></td>
-                                <td>Парсить JSON body у <code>getParsedBody()</code> (API)</td>
+                                <td>Якщо <code>Content-Type</code> містить <code>json</code> — парсить body у <code>getParsedBody()</code></td>
                             </tr>
                             <tr>
                                 <td><code>ForceJsonResponseMiddleware</code></td>
-                                <td>Примусовий Accept/Content-Type JSON</td>
+                                <td>Встановлює <code>Accept: application/json</code> для внутрішньої логіки; у відповіді — <code>Content-Type: application/json</code></td>
                             </tr>
                         </tbody>
                     </table>
                 </div>
 
                 <h3 id="global-stack" class="mt-4">Типовий глобальний стек</h3>
-                <p>У <code>routes/web.php</code> часто підключають у такому порядку:</p>
                 <pre class="mb-4"><code class="language-php">$router->lazyMiddleware(HandleValidationExceptionMiddleware::class);
 $router->lazyMiddleware(VerifyCsrfTokenMiddleware::class);
 $router->lazyMiddleware(StorePreviousUrlMiddleware::class);
 $router->lazyMiddleware(ShareViewDataMiddleware::class);</code></pre>
                 <ol class="small">
-                    <li>Зовнішній try/catch валідації</li>
+                    <li>Зовнішній try/catch валідації (обгортає весь ланцюжок)</li>
                     <li>Перевірка CSRF до зміни стану</li>
                     <li>Фіксація URL перед рендером</li>
-                    <li>Підготовка даних для шаблонів</li>
+                    <li>Підготовка shared-даних для Twig (<code>ViewResponseFactory</code>)</li>
                 </ol>
 
                 <h2 id="csrf" class="border-bottom pb-2 mb-3 mt-5">CSRF</h2>
                 <p>
-                    Токен зберігається в сесії (<code>CsrfTokenManager</code>). У формах — поле
-                    <code>_csrf_token</code>; для AJAX — заголовки <code>X-CSRF-TOKEN</code> або
-                    <code>X-XSRF-TOKEN</code>.
+                    Токен зберігається в сесії під ключем <code>SessionKey::CSRF_TOKEN</code> (<code>_csrf_token</code>)
+                    через <code>CsrfTokenManager</code>. У формах — поле <code>_csrf_token</code>;
+                    для AJAX — заголовки <code>X-CSRF-TOKEN</code> або <code>X-XSRF-TOKEN</code>
+                    (константи <code>HttpHeader</code>).
                 </p>
                 <pre class="mb-4"><code class="language-twig">&lt;input type="hidden" name="_csrf_token" value="{{ csrf_token }}"&gt;</code></pre>
-                <p>У Twig змінна <code>csrf_token</code> з’являється через <code>ShareViewDataMiddleware</code>.</p>
-
-                <h2 id="auth-middleware" class="border-bottom pb-2 mb-3 mt-5">Middleware авторизації (приклад)</h2>
+                <p>
+                    У Twig змінна <code>csrf_token</code> (<code>ViewKey::CSRF_TOKEN</code>) потрапляє через
+                    <code>ShareViewDataMiddleware</code> → <code>ViewResponseFactory::create()</code>.
+                    Детальніше — <a href="csrf.html">Захист CSRF</a>.
+                </p>
+                <h2 id="auth-middleware" class="border-bottom pb-2 mb-3 mt-5">Middleware авторизації</h2>
                 <p>У застосунку — власні класи на групах маршрутів:</p>
                 <ul>
-                    <li><code>AuthMiddleware</code> — адмін-зона: сесія, роль admin, статус ACTIVE</li>
-                    <li><code>ActiveUserMiddleware</code> — кабінет: авторизація, статуси pending/blocked</li>
+                    <li><code>AuthMiddleware</code> (<code>AuthAdmin</code>) — сесія, роль admin, статус <code>ACTIVE</code>; redirect на <code>/admin/login</code></li>
+                    <li><code>ActiveUserMiddleware</code> (<code>UserCabinet</code>) — авторизація, статуси pending/blocked; <code>redirectByName('cabinet.login')</code></li>
                 </ul>
-                <p>При відмові — redirect на login (часто <code>redirectByName('cabinet.login')</code>), без виконання контролера.</p>
-                <pre class="mb-4"><code class="language-php">$router->group('/cabinet', function (RouteGroup $route) {
-  // ...
+                <pre class="mb-4"><code class="language-php">$router->group('/admin', function (RouteGroup $route) {
+    // ...
+})->lazyMiddleware(AuthMiddleware::class);
+
+$router->group('/cabinet', function (RouteGroup $route) {
+    // ...
 })->lazyMiddleware(ActiveUserMiddleware::class);</code></pre>
+                <p>При відмові контролер не виконується — middleware повертає redirect-відповідь.</p>
 
                 <h2 id="request-attributes" class="border-bottom pb-2 mb-3 mt-5">Атрибути запиту</h2>
-                <p>Middleware може передати дані далі через <code>$request->withAttribute()</code>:</p>
-                <ul>
-                    <li><code>RequestAttribute::VIEW_PAYLOAD</code> — контекст для Twig</li>
-                    <li><code>RequestAttribute::SAFE_BACK_URL</code> — безпечний URL для <code>ResponseFactory::back()</code></li>
-                </ul>
-                <p>Контролер або <code>ViewResponseFactory</code> читають атрибути з PSR-7 запиту.</p>
+                <p>Middleware передає дані далі через <code>$request->withAttribute()</code>:</p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead><tr><th>Константа</th><th>Хто задає</th><th>Хто читає</th></tr></thead>
+                        <tbody>
+                            <tr>
+                                <td><code>RequestAttribute::VIEW_PAYLOAD</code></td>
+                                <td><code>ShareViewDataMiddleware</code></td>
+                                <td><code>ViewResponseFactory</code> → <code>ViewInterface::share()</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>RequestAttribute::SAFE_BACK_URL</code></td>
+                                <td><code>StorePreviousUrlMiddleware</code></td>
+                                <td><code>ResponseFactory::back()</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>Ключі всередині <code>VIEW_PAYLOAD</code> (<code>ViewKey</code>): <code>errors</code>, <code>old</code>, <code>flashes</code>, <code>csrf_token</code>.</p>
+                <p>
+                    <code>ResponseFactory::back()</code> спочатку перевіряє заголовок <code>Referer</code>,
+                    потім <code>SAFE_BACK_URL</code>, і лише внутрішні URL (див. <a href="safe-redirects.html">безпечні редіректи</a>).
+                </p>
 
                 <h2 id="custom" class="border-bottom pb-2 mb-3 mt-5">Власний middleware</h2>
                 <ol>
-                    <li>Створіть клас з <code>MiddlewareInterface</code>.</li>
+                    <li>Створіть клас з <code>MiddlewareInterface</code> (наприклад у <code>src/App/Middlewares/</code> або в компоненті).</li>
                     <li>Залежності — через конструктор (контейнер підставить автоматично).</li>
-                    <li>Підключіть <code>lazyMiddleware</code> глобально, на групу або маршрут.</li>
-                    <li>Перевірте порядок відносно CSRF, auth і validation handler.</li>
+                    <li>Підключіть <code>lazyMiddleware()</code> глобально, на групу або маршрут.</li>
+                    <li>Перевірте порядок відносно CSRF, auth і <code>HandleValidationExceptionMiddleware</code>.</li>
                 </ol>
                 <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
                     <p class="mb-0">
@@ -190,6 +223,7 @@ $router->lazyMiddleware(ShareViewDataMiddleware::class);</code></pre>
 
                 <h2 id="cli" class="border-bottom pb-2 mb-3 mt-5">Перегляд middleware</h2>
                 <pre class="mb-4"><code class="language-bash">php bin/console.php route:list
+php bin/console.php route:list --full-middleware
 php bin/console.php route:list -F</code></pre>
                 <p>Колонка middleware показує глобальні та локальні класи для кожного маршруту.</p>
 
@@ -204,6 +238,9 @@ php bin/console.php route:list -F</code></pre>
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/bash.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/twig.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
     <script src="../assets/js/nav-uk.js"></script>
     <script src="../assets/js/docs.js"></script>

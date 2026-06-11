@@ -85,8 +85,9 @@ $this-&gt;container-&gt;add(ContainerInterface::class, fn () =&gt; $this-&gt;con
                 </p>
                 <pre class="mb-4"><code class="language-php">return [
     ConfigServiceProvider::class,
+    LocaleServiceProvider::class,
+    TelemetryServiceProvider::class,
     ErrorHandlerServiceProvider::class,
-    EventServiceProvider::class,
     HttpServiceProvider::class,
     SessionServiceProvider::class,
     // ...
@@ -94,7 +95,7 @@ $this-&gt;container-&gt;add(ContainerInterface::class, fn () =&gt; $this-&gt;con
 ];</code></pre>
                 <p><strong>Порядок має значення:</strong> наприклад, <code>ConfigServiceProvider</code> перед
                     <code>HttpServiceProvider</code> (роутер читає <code>config/routes</code>),
-                    <code>ViewServiceProvider</code> перед компонентами, які додають Twig paths.</p>
+                    <code>TwigServiceProvider</code> перед компонентами, які додають Twig paths.</p>
                 <p>
                     Детально — <a href="service-providers.html">Провайдери сервісів</a>.
                     Компоненти можуть додавати провайдери через <code>ComponentsServiceProvider</code>.
@@ -218,12 +219,12 @@ public function __construct(private readonly LoggerInterface $logger) {}</code><
                         </thead>
                         <tbody>
                             <tr><td><code>ConfigInterface</code></td><td>ConfigServiceProvider</td></tr>
-                            <tr><td><code>EventDispatcherInterface</code></td><td>EventServiceProvider</td></tr>
+                            <tr><td><code>TelemetryCollector</code></td><td>TelemetryServiceProvider</td></tr>
                             <tr><td><code>ServerRequestInterface</code>, <code>Router</code></td><td>HttpServiceProvider</td></tr>
                             <tr><td><code>UrlGeneratorInterface</code>, <code>ResponseFactoryInterface</code></td><td>HttpServiceProvider</td></tr>
                             <tr><td><code>ViewResponseFactoryInterface</code></td><td>HttpServiceProvider</td></tr>
                             <tr><td><code>SessionInterface</code>, <code>FlashBagInterface</code></td><td>SessionServiceProvider</td></tr>
-                            <tr><td><code>ViewInterface</code></td><td>ViewServiceProvider</td></tr>
+                            <tr><td><code>ViewInterface</code></td><td>TwigServiceProvider</td></tr>
                             <tr><td><code>ValidatorInterface</code></td><td>ValidationServiceProvider</td></tr>
                             <tr><td><code>DatabaseInterface</code>, <code>CapsuleManager</code></td><td>DatabaseServiceProvider</td></tr>
                             <tr><td><code>CasterInterface</code></td><td>CastingServiceProvider</td></tr>
@@ -282,11 +283,11 @@ public function register(): void
                     У провайдерах часто спочатку перевіряють <code>has(ConfigInterface::class)</code>, щоб уникнути циклічних залежностей на ранній стадії bootstrap.
                 </p>
 
-                <h2 id="events" class="border-bottom pb-2 mb-3 mt-5">Події реєстрації</h2>
+                <h2 id="telemetry" class="border-bottom pb-2 mb-3 mt-5">Телеметрія bootstrap</h2>
                 <p>
-                    Провайдери диспатчать <code>ServiceAwakening</code> при створенні ключових сервісів
-                    (для debug/телеметрії). Підписка — через <code>EventDispatcherInterface</code>
-                    (<a href="events.html">Події</a>).
+                    Провайдери ядра записують <code>FRAMEWORK_SERVICE_AWAKENING</code> при створенні ключових
+                    сервісів (якщо <code>telemetry.enabled</code>). Читання — через
+                    <code>TelemetryCollector</code> (<a href="telemetry.html">Телеметрія</a>).
                 </p>
 
                 <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">

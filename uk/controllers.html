@@ -52,7 +52,8 @@
                     Див. також:
                     <a href="routing.html">маршрутизація</a>,
                     <a href="request-lifecycle.html#controller">життєвий цикл → контролер</a>,
-                    <a href="middleware.html">middleware</a>.
+                    <a href="middleware.html">middleware</a>,
+                    <a href="route-interceptors.html">route interceptors</a>.
                 </p>
 
                 <h2 id="routing" class="border-bottom pb-2 mb-3 mt-5">Прив’язка до маршруту</h2>
@@ -70,10 +71,15 @@ $router->get('/projects/{id:number}', [CabinetProjectController::class, 'show'])
                 <h2 id="structure" class="border-bottom pb-2 mb-3 mt-5">Де розміщувати</h2>
                 <p>Типові варіанти (шляхи налаштовуються через <a href="setup.html#paths-php">paths.php</a>):</p>
                 <ul>
-                    <li><strong>Застосунок</strong> — <code>App/Controllers/</code> для сторінок «ядра» сайту</li>
-                    <li><strong>Компонент</strong> — <code>Components/{Name}/Controllers/</code>, маршрути в <code>Component/routes.php</code></li>
+                    <li><strong>Застосунок</strong> — <code>App/Controllers/</code> → namespace <code>Concept\App\Controllers</code></li>
+                    <li><strong>Компонент</strong> — <code>Components/{Name}/Controllers/</code> → <code>Concept\Components\{Name}\Controllers</code>, маршрути в <code>routes.php</code> компонента</li>
                 </ul>
-                <p>Один контролер — одна зона відповідальності (кабінет, адмін, публічна вітрина). Складну логіку виносьте в <code>Services/</code>.</p>
+                <p>
+                    Детальніше про дерева каталогів і namespaces — у
+                    <a href="directory-structure.html">структурі каталогів</a>.
+                    Один контролер — одна зона відповідальності (кабінет, адмін, публічна вітрина).
+                    Складну логіку виносьте в <code>Services/</code>.
+                </p>
 
                 <h2 id="example" class="border-bottom pb-2 mb-3 mt-5">Мінімальний приклад</h2>
                 <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
@@ -83,7 +89,7 @@ namespace Concept\App\Controllers;
 use Concept\Core\Components\View\Contracts\ViewResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 
-final class IndexController
+class IndexController
 {
     public function __construct(
         private readonly ViewResponseFactoryInterface $viewResponse,
@@ -97,6 +103,66 @@ final class IndexController
                 <p>
                     Шаблон <code>@frontend/index</code> — логічне ім’я Twig (префікс компонента/модуля).
                     Детальніше — у розділі <a href="views.html">Views</a>.
+                </p>
+
+                <h2 id="full-example" class="border-bottom pb-2 mb-3 mt-5">Повний приклад</h2>
+                <p>
+                    <code>UserController</code> компонента AuthAdmin — типовий CRUD: список, форми, FormRequest,
+                    flash + redirect після POST, окремий JSON-endpoint:
+                </p>
+                <pre class="mb-4"><code class="language-php">namespace Concept\Components\AuthAdmin\Controllers;
+
+class UserController
+{
+    public function __construct(
+        private readonly ResponseFactoryInterface $response,
+        private readonly ViewResponseFactoryInterface $viewResponse,
+        private readonly ConfigInterface $config,
+        private readonly AuthService $authService,
+        private readonly FlashBagInterface $flashBag,
+        private readonly UserModel $userModel,
+    ) {}
+
+    public function store(StoreUserRequest $request): ResponseInterface
+    {
+        $this->userModel
+            ->newQuery()
+            ->create($this->normalizeUserPayload($request->validated()));
+
+        $this->flashBag->add('success', 'User successfully created');
+
+        return $this->response->redirectByName('admin.users');
+    }
+
+    public function updatePassword(UpdateUserPasswordRequest $request, int $id): ResponseInterface
+    {
+        // ...
+        $data = $request->toDto();
+        $user->update([UserModel::FIELD_PASSWORD => $data->password]);
+        // ...
+    }
+
+    public function generateTokenApi(): ResponseInterface
+    {
+        return $this->response->json(['token' => bin2hex(random_bytes(32))]);
+    }
+}</code></pre>
+
+                <h2 id="lifecycle" class="border-bottom pb-2 mb-3 mt-5">RouteStrategy: від маршруту до action</h2>
+                <p>
+                    Після middleware League Route викликає <code>RouteStrategy::invokeRouteCallable()</code>.
+                    Порядок усередині стратегії:
+                </p>
+                <ol>
+                    <li><strong>Route interceptors</strong> — глобальні перевірки (ACL) до handler</li>
+                    <li><strong>prepareRequest()</strong> — сегменти URL → атрибути PSR-7; оновлення <code>ServerRequestInterface</code> у контейнері</li>
+                    <li><strong>getCallable()</strong> — резолв контролера з DI (constructor injection)</li>
+                    <li><strong>resolveArguments()</strong> — FormRequest, <code>ServerRequestInterface</code>, route params, defaults</li>
+                    <li><strong>invokeArgs()</strong> — виклик методу action</li>
+                </ol>
+                <p>
+                    Телеметрія <code>HTTP_ROUTE_CALLABLE_INVOKE</code> охоплює крок 5.
+                    Детальніше — <a href="request-lifecycle.html#controller">життєвий цикл</a>.
                 </p>
 
                 <h2 id="autowiring" class="border-bottom pb-2 mb-3 mt-5">Автовайринг і конструктор</h2>
@@ -247,7 +313,8 @@ public function index(): ResponseInterface
                 <pre class="mb-4"><code class="language-php">// Redirect за іменем маршруту
 return $this->response->redirectByName('cabinet.login');
 
-// JSON (API)
+// JSON (API) — json(), jsonSuccess(), jsonError()
+return $this->response->json(['token' =&gt; $token]);
 return $this->response->jsonSuccess(['id' =&gt; $id]);
 
 // Flash + redirect після POST
@@ -281,9 +348,35 @@ public function handle(ServerRequestInterface $request): ResponseInterface { /* 
 
                 <h2 id="form-request" class="border-bottom pb-2 mb-3 mt-5">FormRequest</h2>
                 <p>
-                    Type-hint нащадка <code>FormRequest</code> у action — автоматична валідація до входу в метод.
-                    Дані: <code>validated()</code> або <code>toDto()</code> (опційно).
-                    Повний опис — у розділі <a href="requests.html">Запити та валідація</a>.
+                    Type-hint нащадка <code>FormRequest</code> у action — <code>RouteStrategy</code> створює
+                    екземпляр з контейнера і викликає <code>validate()</code> <em>до</em> входу в метод.
+                    При помилці — <code>ValidationException</code>, яку перехоплює
+                    <code>HandleValidationExceptionMiddleware</code> (JSON 422 або flash + <code>back()</code>).
+                </p>
+                <pre class="mb-4"><code class="language-php">class StoreUserRequest extends FormRequest
+{
+    protected ?string $dtoClass = StoreUserDto::class;
+
+    protected array $except = ['password_confirmation'];
+
+    public function rules(): array
+    {
+        return [
+            'email' => ['required', 'email', 'unique:users,email'],
+            'password' => ['required', 'min:8'],
+            'password_confirmation' => ['required', 'same:password'],
+        ];
+    }
+}
+
+public function store(StoreUserRequest $request): ResponseInterface
+{
+    $this->userModel->newQuery()->create($request->validated());
+    return $this->response->redirectByName('admin.users');
+}</code></pre>
+                <p>
+                    Повний опис правил, DTO, <code>except</code>/<code>only</code> — у розділі
+                    <a href="requests.html">Запити та валідація</a>.
                 </p>
 
                 <h2 id="route-params" class="border-bottom pb-2 mb-3 mt-5">Параметри маршруту</h2>
@@ -295,29 +388,55 @@ public function handle(ServerRequestInterface $request): ResponseInterface { /* 
                 <pre class="mb-4"><code class="language-php">$router-&gt;get('/edit/{id:number}', [UserController::class, 'edit'])
     -&gt;setName('admin.user.edit');</code></pre>
 
+                <h2 id="route-interceptors" class="border-bottom pb-2 mb-3 mt-5">Route interceptors</h2>
+                <p>
+                    Глобальні ACL-перевірки за <code>setName()</code> маршруту виконуються в
+                    <code>RouteStrategy</code> <strong>до</strong> autowire action — через класи з
+                    <code>routes.interceptors</code>. Типова відмова — <code>throw</code> винятку;
+                    redirect або JSON 403 — у middleware, що обгортає handler.
+                </p>
+                <p>Детальні приклади — <a href="route-interceptors.html">Route interceptors</a>.</p>
+
                 <h2 id="auth" class="border-bottom pb-2 mb-3 mt-5">Авторизація</h2>
                 <p>
-                    Перевірку доступу зазвичай виносять у <a href="middleware.html#auth-middleware">middleware</a>
-                    на групу маршрутів. У контролері залишають бізнес-перевірки (наприклад, «проєкт належить користувачу»).
+                    Розділіть рівні перевірки:
                 </p>
-                <pre class="mb-4"><code class="language-php">$project = $this-&gt;findUserProject($user, $id);
-if ($project === null) {
-    $this-&gt;flashBag-&gt;add('error', 'Not found.');
-    return $this-&gt;response-&gt;redirectByName('cabinet.projects');
+                <ul>
+                    <li><strong>Middleware</strong> на групі — «чи залогінений», redirect на login (<a href="middleware.html#auth-middleware">приклади</a>)</li>
+                    <li><strong>Route interceptors</strong> — ACL за named route (<a href="route-interceptors.html">детальніше</a>)</li>
+                    <li><strong>Контролер</strong> — бізнес-обмеження (ресурс належить поточному користувачу)</li>
+                </ul>
+                <pre class="mb-4"><code class="language-php">public function show(int $id): ResponseInterface
+{
+    $user = $this->auth->user();
+    if (!$user instanceof UserModel) {
+        return $this->response->redirectByName('cabinet.login');
+    }
+
+    $project = $this->findUserProject($user, $id);
+    if ($project === null) {
+        $this->flashBag->add('error', 'Order not found.');
+        return $this->response->redirectByName('cabinet.projects');
+    }
+
+    return $this->viewResponse->create('@projects/cabinet/show', ['project' => $project]);
 }</code></pre>
 
                 <h2 id="patterns" class="border-bottom pb-2 mb-3 mt-5">Рекомендовані патерни</h2>
                 <ul>
                     <li><strong>Тонкий контролер</strong> — orchestration: запит → сервіс → відповідь</li>
                     <li><strong>Один action — одна відповідальність</strong> — <code>showLogin</code>, <code>login</code>, не «універсальний» метод</li>
-                    <li><strong>POST/PUT/DELETE</strong> — FormRequest + redirect (PRG), не повторний рендер форми</li>
+                    <li><strong>POST/PUT/PATCH/DELETE</strong> — FormRequest + redirect (PRG), не повторний рендер форми</li>
                     <li><strong>Іменовані маршрути</strong> — <code>redirectByName()</code> замість жорстких URL</li>
                 </ul>
 
                 <h2 id="alternatives" class="border-bottom pb-2 mb-3 mt-5">Closure та invokable</h2>
                 <p>
-                    Маршрут може вказувати на closure або клас з <code>__invoke</code> — підтримується League Route.
-                    У продакшн-коді переважно використовують класи контролерів для тестованості та DI.
+                    Маршрут може вказувати на closure або клас з <code>__invoke</code>.
+                    <code>RouteStrategy</code> autowire для них обмежений: FormRequest,
+                    <code>ServerRequestInterface</code>, сегменти URL і значення за замовчуванням.
+                    Довільні сервіси (<code>UserModel</code> тощо) у параметрах closure <strong>не</strong>
+                    резолвляться — для DI використовуйте класи контролерів.
                 </p>
 
                 <h2 id="telemetry" class="border-bottom pb-2 mb-3 mt-5">Діагностика</h2>
@@ -334,6 +453,7 @@ if ($project === null) {
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
     <script src="../assets/js/nav-uk.js"></script>
     <script src="../assets/js/docs.js"></script>

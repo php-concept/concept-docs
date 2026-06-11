@@ -45,26 +45,39 @@
 
                 <p>
                     Перед цим розділом перегляньте <a href="setup.html">Налаштування</a> — bootstrap і <code>paths.php</code>.
-                    Concept Core збирає налаштування з PHP-файлів у каталозі <code>config/</code>, далі застосовує
-                    оверрайди для середовища (<code>APP_ENV</code>) і змінні з <code>.env</code>.
-                    Доступ у коді — через <code>ConfigInterface</code> (контейнер DI).
+                    Concept Core збирає налаштування з PHP-файлів у <code>config/</code>, застосовує оверрайди середовища
+                    (<code>APP_ENV</code>) і змінні з <code>.env</code>. Завантаження виконує
+                    <code>ConfigServiceProvider::boot()</code> при першому зверненні до <code>ConfigInterface</code>.
+                    Доступ у коді — через DI (<code>ConfigInterface</code>).
                 </p>
 
                 <h2 id="loading-order" class="border-bottom pb-2 mb-3 mt-5">Порядок завантаження</h2>
-                <ol>
-                    <li>Усі PHP-файли з <code>config/</code> (бібліотека Noodlehaus Config).</li>
-                    <li>Файл <code>.env</code> у корені проєкту (vlucas/phpdotenv).</li>
-                    <li>Оверрайд з <code>config/{APP_ENV}/</code>, якщо така папка існує (наприклад <code>config/dev/</code>).</li>
-                    <li>Злиття змінних <code>.env</code> у конфіг (найвищий пріоритет).</li>
-                </ol>
                 <p>
-                    Після завантаження встановлюється часовий пояс з <code>app.timezone</code>.
+                    Реалізація в <code>ConfigServiceProvider</code>. Кожен наступний крок перекриває попередній
+                    для збіглих ключів (окрім кроку 2 — <code>.env</code> лише читається, злиття відбувається на кроці 4).
                 </p>
+                <div class="docs-mermaid mb-4">
+                    <pre class="mermaid">flowchart LR
+    A["1. config/*.php"]
+    B["2. .env читається"]
+    C["3. config/APP_ENV/*.php"]
+    D["4. .env → конфіг"]
+    E["app.timezone"]
+
+    A --> B --> C --> D --> E</pre>
+                </div>
+                <ol>
+                    <li><strong>Базовий <code>config/</code></strong> — усі PHP-файли зливаються Noodlehaus Config.</li>
+                    <li><strong><code>.env</code></strong> — завантажується через vlucas/phpdotenv; <code>APP_ENV</code> визначає папку оверрайду.</li>
+                    <li><strong><code>config/{APP_ENV}/</code></strong> — якщо каталог існує (<code>dev</code>, <code>production</code>…), його файли зливаються поверх базових.</li>
+                    <li><strong>Змінні <code>.env</code></strong> — записуються в конфіг (найвищий пріоритет).</li>
+                    <li><strong>Часовий пояс</strong> — <code>date_default_timezone_set()</code> з <code>app.timezone</code>.</li>
+                </ol>
 
                 <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
                     <p class="mb-0">
-                        Значення <code>APP_ENV</code> зчитується з <code>.env</code> <strong>до</strong> злиття змінних у конфіг
-                        і використовується лише для вибору папки оверрайду <code>config/{APP_ENV}/</code>.
+                        <code>APP_ENV</code> зчитується з <code>.env</code> на кроці 2 і використовується лише для вибору
+                        <code>config/{APP_ENV}/</code>. У фінальний конфіг воно потрапляє як <code>app.env</code> на кроці 4.
                     </p>
                 </div>
 
@@ -103,10 +116,11 @@ LOG_MAX_FILES=14    → log.max_files</code></pre>
                             <tr><td><code>APP_NAME</code></td><td><code>app.name</code></td><td>Назва застосунку (консоль, логи)</td></tr>
                             <tr><td><code>APP_TIMEZONE</code></td><td><code>app.timezone</code></td><td>Часовий пояс PHP (<code>Europe/Kyiv</code>, <code>UTC</code>)</td></tr>
                             <tr><td><code>APP_ENV</code></td><td><code>app.env</code></td><td>Середовище: <code>dev</code>, <code>production</code> тощо; визначає папку оверрайду</td></tr>
-                            <tr><td><code>APP_DEBUG</code></td><td><code>app.debug</code></td><td>Режим налагодження: Whoops, кеш Twig, лог SQL</td></tr>
+                            <tr><td><code>APP_DEBUG</code></td><td><code>app.debug</code></td><td>Режим налагодження: Whoops, кеш Twig off, Valinor FileWatchingCache, лог SQL</td></tr>
                             <tr><td><code>LOG_LEVEL</code></td><td><code>log.level</code></td><td>Рівень Monolog: <code>debug</code>, <code>info</code>, <code>error</code>…</td></tr>
                             <tr><td><code>LOG_MAX_FILES</code></td><td><code>log.max_files</code></td><td>Кількість ротаційних файлів логів</td></tr>
                             <tr><td><code>LOG_QUERY</code></td><td><code>log.query</code></td><td>Логувати SQL-запити та події БД</td></tr>
+                            <tr><td><code>LOG_VALIDATION_DATA</code></td><td><code>log.validation_data</code></td><td>Логувати payload валідації FormRequest (з маскуванням)</td></tr>
                             <tr><td><code>DB_DRIVER</code></td><td><code>db.driver</code></td><td>Драйвер БД (<code>mysql</code>)</td></tr>
                             <tr><td><code>DB_HOST</code></td><td><code>db.host</code></td><td>Хост БД</td></tr>
                             <tr><td><code>DB_PORT</code></td><td><code>db.port</code></td><td>Порт (у конфіг-файлі; ядро підключення поки не читає)</td></tr>
@@ -124,17 +138,21 @@ LOG_MAX_FILES=14    → log.max_files</code></pre>
                 </p>
                 <p>У skeleton за замовчуванням:</p>
                 <ul>
-                    <li><code>config/dev/</code> — <code>app.debug = true</code></li>
-                    <li><code>config/production/</code> — <code>app.debug = false</code></li>
+                    <li><code>config/dev/app.php</code> — <code>app.debug = true</code></li>
+                    <li><code>config/dev/telemetry.php</code> — <code>telemetry.enabled = true</code></li>
+                    <li><code>config/production/app.php</code> — <code>app.debug = false</code></li>
+                    <li><code>config/*/components.php</code> — реєстрація компонентів для середовища</li>
                 </ul>
                 <pre class="mb-4"><code class="language-text">config/
 ├── app.php
+├── telemetry.php
 ├── dev/
-│   ├── app.php          # debug: true
-│   └── components.php   # список компонентів
+│   ├── app.php
+│   ├── telemetry.php
+│   └── components.php
 └── production/
-    ├── app.php          # debug: false
-    └── components.php   # порожній список</code></pre>
+    ├── app.php
+    └── components.php</code></pre>
 
                 <h2 id="config-files" class="border-bottom pb-2 mb-3 mt-5">Файли config/</h2>
                 <p>Кожен файл повертає масив; кореневий ключ зазвичай збігається з іменем файлу (без <code>.php</code>).</p>
@@ -144,10 +162,14 @@ LOG_MAX_FILES=14    → log.max_files</code></pre>
                     <table class="table table-dark table-striped table-bordered align-middle small">
                         <thead><tr><th>Ключ</th><th>Тип</th><th>За замовч.</th><th>Призначення</th></tr></thead>
                         <tbody>
-                            <tr><td><code>app.name</code></td><td>string</td><td><code>App</code></td><td>Назва застосунку</td></tr>
-                            <tr><td><code>app.timezone</code></td><td>string</td><td><code>UTC</code></td><td>Часовий пояс</td></tr>
-                            <tr><td><code>app.locale</code></td><td>string</td><td><code>en</code></td><td>Локаль (для розширень)</td></tr>
-                            <tr><td><code>app.debug</code></td><td>bool</td><td><code>false</code></td><td>Debug-режим, Whoops, Twig cache off</td></tr>
+                            <tr><td><code>app.name</code></td><td>string</td><td><code>App</code></td><td>Назва застосунку (консоль, логи)</td></tr>
+                            <tr><td><code>app.version</code></td><td>string</td><td><code>1.0.0</code></td><td>Версія застосунку в Symfony Console</td></tr>
+                            <tr><td><code>app.timezone</code></td><td>string</td><td><code>UTC</code></td><td>Часовий пояс PHP (<code>date_default_timezone_set</code>)</td></tr>
+                            <tr><td><code>app.env</code></td><td>string</td><td>—</td><td>Середовище з <code>APP_ENV</code> (крок 4 завантаження); визначає <code>config/{APP_ENV}/</code></td></tr>
+                            <tr><td><code>app.locale</code></td><td>string</td><td><code>en</code></td><td>Локаль застосунку</td></tr>
+                            <tr><td><code>app.fallback_locale</code></td><td>string</td><td><code>en</code></td><td>Fallback для перекладів валідатора</td></tr>
+                            <tr><td><code>app.locale_resolver</code></td><td>class-string|null</td><td><code>null</code></td><td>Кастомний <code>LocaleResolverInterface</code></td></tr>
+                            <tr><td><code>app.debug</code></td><td>bool</td><td><code>false</code></td><td>Whoops (web), Twig cache off, Valinor <code>FileWatchingCache</code>, SQL log (разом із <code>log.query</code>)</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -171,37 +193,34 @@ LOG_MAX_FILES=14    → log.max_files</code></pre>
                 <h3 id="file-log">log.php</h3>
                 <div class="table-responsive mb-4">
                     <table class="table table-dark table-striped table-bordered align-middle small">
-                        <thead><tr><th>Ключ</th><th>Тип</th><th>Призначення</th></tr></thead>
+                        <thead><tr><th>Ключ</th><th>Тип</th><th>За замовч.</th><th>Призначення</th></tr></thead>
                         <tbody>
-                            <tr><td><code>log.name</code></td><td>string</td><td>Ім’я каналу Monolog</td></tr>
-                            <tr><td><code>log.level</code></td><td>string</td><td>Мінімальний рівень (<code>ERROR</code>, <code>debug</code>…)</td></tr>
-                            <tr><td><code>log.max_files</code></td><td>int</td><td>Файлів при ротації</td></tr>
-                            <tr><td><code>log.query</code></td><td>bool</td><td>Логувати SQL</td></tr>
-                            <tr><td><code>log.validation_data</code></td><td>bool</td><td>Логувати дані валідації у FormRequest</td></tr>
+                            <tr><td><code>log.name</code></td><td>string</td><td><code>app</code></td><td>Ім’я каналу Monolog</td></tr>
+                            <tr><td><code>log.level</code></td><td>string</td><td><code>ERROR</code></td><td>Мінімальний рівень (<code>ERROR</code>, <code>debug</code>…)</td></tr>
+                            <tr><td><code>log.max_files</code></td><td>int</td><td><code>7</code></td><td>Файлів при ротації (<code>.env.example</code>: <code>14</code>)</td></tr>
+                            <tr><td><code>log.query</code></td><td>bool</td><td><code>false</code></td><td>Логувати SQL (також увімкнено при <code>app.debug</code>)</td></tr>
+                            <tr><td><code>log.validation_data</code></td><td>bool</td><td><code>false</code></td><td>Логувати дані валідації у FormRequest (з маскуванням)</td></tr>
                         </tbody>
                     </table>
                 </div>
 
                 <h3 id="file-session">session.php</h3>
-                <p>Параметри PHP-сесії (передаються в <code>session_start()</code>).</p>
-                <p class="small text-body-secondary">
-                    Ядро читає <code>session.domain</code> та <code>session.samesite</code>; у файлі skeleton — <code>cookie_domain</code>
-                    та <code>cookie_samesite</code>. Для оверрайду через конфіг використовуйте ключі
-                    <code>session.domain</code> / <code>session.samesite</code> або змінні <code>SESSION_DOMAIN</code>,
-                    <code>SESSION_SAMESITE</code> у <code>.env</code>.
+                <p>
+                    Параметри PHP-сесії (<code>SessionServiceProvider</code> → Symfony HttpFoundation → <code>session_start()</code>).
+                    Ключі відповідають константам <code>ConfigKey::SESSION_*</code>.
                 </p>
                 <div class="table-responsive mb-4">
                     <table class="table table-dark table-striped table-bordered align-middle small">
-                        <thead><tr><th>Ключ у файлі</th><th>Тип</th><th>Опис</th></tr></thead>
+                        <thead><tr><th>Ключ</th><th>Тип</th><th>За замовч.</th><th>Опис</th></tr></thead>
                         <tbody>
-                            <tr><td><code>session.cookie_lifetime</code></td><td>int</td><td>Час життя cookie (0 — до закриття браузера)</td></tr>
-                            <tr><td><code>session.cookie_path</code></td><td>string</td><td>Шлях cookie</td></tr>
-                            <tr><td><code>session.cookie_secure</code></td><td>bool</td><td>Тільки HTTPS</td></tr>
-                            <tr><td><code>session.cookie_httponly</code></td><td>bool</td><td>HttpOnly</td></tr>
-                            <tr><td><code>session.use_only_cookies</code></td><td>bool</td><td>Без session id в URL</td></tr>
-                            <tr><td><code>session.cookie_domain</code></td><td>string</td><td>Домен cookie</td></tr>
-                            <tr><td><code>session.cookie_samesite</code></td><td>string</td><td><code>Lax</code>, <code>Strict</code>, <code>None</code></td></tr>
-                            <tr><td><code>session.use_strict_mode</code></td><td>bool</td><td>Строгий режим session id</td></tr>
+                            <tr><td><code>session.cookie_lifetime</code></td><td>int</td><td><code>0</code></td><td>Час життя cookie (0 — до закриття браузера)</td></tr>
+                            <tr><td><code>session.cookie_path</code></td><td>string</td><td><code>/</code></td><td>Шлях cookie</td></tr>
+                            <tr><td><code>session.cookie_secure</code></td><td>bool</td><td><code>false</code></td><td>Тільки HTTPS</td></tr>
+                            <tr><td><code>session.cookie_httponly</code></td><td>bool</td><td><code>true</code></td><td>HttpOnly</td></tr>
+                            <tr><td><code>session.use_only_cookies</code></td><td>bool</td><td><code>true</code></td><td>Без session id в URL</td></tr>
+                            <tr><td><code>session.cookie_domain</code></td><td>string</td><td><code>''</code></td><td>Домен cookie (<code>SESSION_COOKIE_DOMAIN</code> у <code>.env</code>)</td></tr>
+                            <tr><td><code>session.cookie_samesite</code></td><td>string</td><td><code>Lax</code></td><td><code>Lax</code>, <code>Strict</code>, <code>None</code> (<code>SESSION_COOKIE_SAMESITE</code>)</td></tr>
+                            <tr><td><code>session.use_strict_mode</code></td><td>bool</td><td><code>true</code></td><td>Строгий режим session id</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -211,31 +230,87 @@ LOG_MAX_FILES=14    → log.max_files</code></pre>
                     <table class="table table-dark table-striped table-bordered align-middle small">
                         <thead><tr><th>Ключ</th><th>Тип</th><th>Призначення</th></tr></thead>
                         <tbody>
-                            <tr><td><code>view.extensions</code></td><td>array&lt;class-string&gt;</td><td>Класи розширень Twig</td></tr>
-                            <tr><td><code>view.paths</code></td><td>array</td><td>Іменовані шляхи до шаблонів (від кореня проєкту)</td></tr>
-                            <tr><td><code>view.contexts</code></td><td>array</td><td>Префікс URL → ім’я набору шаблонів</td></tr>
+                            <tr><td><code>view.default_extension</code></td><td>string</td><td>Розширення шаблонів (<code>.twig</code> або <code>.php</code> для Plates)</td></tr>
+                            <tr><td><code>view.extensions</code></td><td>array&lt;class-string&gt;</td><td>Класи розширень Twig / Plates</td></tr>
+                            <tr><td><code>view.paths</code></td><td>array</td><td>Namespace → шлях від кореня застосунку (<code>frontend</code> → <code>resources/views/frontend</code>)</td></tr>
+                            <tr><td><code>view.contexts</code></td><td>array</td><td>Префікс URL → namespace views (<code>/</code> → <code>frontend</code>)</td></tr>
                             <tr><td><code>view.cache_dir</code></td><td>string</td><td>Підкаталог у <code>storage/cache/</code> для скомпільованих Twig</td></tr>
                         </tbody>
                     </table>
                 </div>
 
                 <h3 id="file-routes">routes.php</h3>
-                <p><code>routes</code> — масив шляхів до PHP-файлів маршрутів (підключаються League Route).</p>
-                <pre class="mb-4"><code class="language-php">'routes' => [
-    dirname(__DIR__) . '/routes/web.php',
-],</code></pre>
+                <p>Ключ <code>routes</code> — список файлів маршрутів і route interceptors (див. <a href="routing.html">Маршрутизація</a>, <a href="route-interceptors.html">Route interceptors</a>).</p>
+                <pre class="mb-4"><code class="language-php">return [
+    'routes' => [
+        'interceptors' => [
+            // RouteInterceptorInterface::class,
+        ],
+        'list' => [
+            dirname(__DIR__) . '/routes/web.php',
+        ],
+    ],
+];</code></pre>
 
                 <h3 id="file-components">components.php</h3>
                 <p>
-                    <code>components</code> — асоціативний масив <code>клас компонента => клас</code>.
-                    Компоненти реєструють маршрути, сервіси, Twig...
+                    <code>components</code> — список FQCN класів, що реалізують <code>ComponentInterface</code>.
+                    У середовищі може бути запис <code>MyComponent::class => MyComponent::class</code> —
+                    ядро ітерує значення масиву. Компоненти додають маршрути, migrations, seeders, views, CLI-команди.
                 </p>
+                <pre class="mb-4"><code class="language-php">return [
+    'components' => [
+        // AuthAdminComponent::class,
+    ],
+];</code></pre>
+
+                <h3 id="file-telemetry">telemetry.php</h3>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead><tr><th>Ключ</th><th>Тип</th><th>Призначення</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>telemetry.enabled</code></td><td>bool</td><td>Телеметрія bootstrap і HTTP (див. <code>TelemetryCollector</code>)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <h3 id="file-masking">masking.php</h3>
+                <p>
+                    Маскування чутливих даних перед записом у логи і debug-панелі.
+                    Читає <code>DataMaskerServiceProvider</code> → <code>DataMaskerInterface</code>.
+                    Повний опис — <a href="data-masking.html">Маскування даних</a>.
+                </p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead><tr><th>Ключ</th><th>ConfigKey</th><th>Призначення</th></tr></thead>
+                        <tbody>
+                            <tr><td><code>masking.patterns</code></td><td><code>MASKING_PATTERNS</code></td><td>Масив regex → заміна для рядків (<code>RegexDataMaskerRule::apply</code>)</td></tr>
+                            <tr><td><code>masking.key_patterns</code></td><td><code>MASKING_KEY_PATTERNS</code></td><td>Regex для імен ключів у масивах (password, token…)</td></tr>
+                            <tr><td><code>masking.rules</code></td><td><code>MASKING_RULES</code></td><td>Список класів <code>DataMaskerRuleInterface</code> (DI)</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <pre class="mb-4"><code class="language-php">// config/masking.php (фрагмент skeleton)
+'masking' =&gt; [
+    'patterns' =&gt; [
+        '/[a-z0-9_\-\+\.]+@[a-z0-9\-]+\.[a-z]{2,}/i' =&gt; '***@***.***',
+    ],
+    'key_patterns' =&gt; [
+        '/.*password.*/i',
+        '/.*token.*/i',
+    ],
+    'rules' =&gt; [],
+],</code></pre>
 
                 <h3 id="file-validator">validator.php</h3>
                 <p><code>validator.rules</code> — кастомні правила валідації (<code>unique</code>, <code>exists</code> тощо).</p>
 
                 <h3 id="file-pagination">pagination.php</h3>
-                <p><code>pagination.per_page</code> — кількість записів на сторінку за замовчуванням (Eloquent paginate).</p>
+                <p>
+                    <code>pagination.per_page</code> — зручне значення за замовчуванням для коду застосунку (у skeleton: <code>10</code>).
+                    Ядро не читає цей ключ автоматично; <code>HttpServiceProvider</code> лише налаштовує
+                    <code>Paginator::currentPageResolver</code> і <code>currentPathResolver</code> для Illuminate Pagination.
+                </p>
 
                 <h3 id="file-migrations">migrations.php</h3>
                 <div class="table-responsive mb-4">
@@ -255,7 +330,25 @@ LOG_MAX_FILES=14    → log.max_files</code></pre>
                 </p>
 
                 <h3 id="file-commands">commands.php</h3>
-                <p><code>commands</code> — список класів консольних команд (ядро + ваші команди).</p>
+                <p>
+                    <code>commands</code> — список класів Symfony Console команд ядра та застосунку.
+                    У skeleton уже зареєстровані <code>route:list</code>, <code>db:migrate</code>, <code>view:clear</code> тощо.
+                </p>
+
+                <h2 id="config-keys" class="border-bottom pb-2 mb-3 mt-5">Ключі ConfigKey</h2>
+                <p>
+                    Канонічні ключі, які читає ядро, зібрані в
+                    <code>Concept\Core\Foundation\ConfigKey</code>. У власному коді краще посилатися на ці константи,
+                    ніж на рядкові літерали:
+                </p>
+                <pre class="mb-4"><code class="language-php">use Concept\Core\Foundation\ConfigKey;
+
+$debug = $config->getBool(ConfigKey::APP_DEBUG);
+$routes = $config->get(ConfigKey::ROUTES_LIST, []);</code></pre>
+                <p class="small text-body-secondary">
+                    Повний перелік констант — у вихідному коді <code>code/core/src/Foundation/ConfigKey.php</code>
+                    та в README ядра (розділ Configuration).
+                </p>
 
                 <h2 id="access" class="border-bottom pb-2 mb-3 mt-5">Доступ у коді</h2>
                 <p>Інжектуйте <code>Concept\Core\Components\Config\Contracts\ConfigInterface</code>:</p>
@@ -289,7 +382,12 @@ $routes = $this->config->get('routes', []);</code></pre>
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: 'dark', securityLevel: 'loose' });
+    </script>
     <script src="../assets/js/nav-uk.js"></script>
     <script src="../assets/js/docs.js"></script>
 </body>

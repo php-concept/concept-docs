@@ -51,14 +51,45 @@
                 </p>
                 <p>
                     Див. також: <a href="middleware.html#csrf">Middleware → CSRF</a>,
-                    <a href="views.html">Представлення</a> (<code>csrf_token</code> у Twig).
+                    <a href="views.html#globals">Представлення → глобальні змінні</a> (<code>csrf_token</code>).
+                </p>
+
+                <h2 id="architecture" class="border-bottom pb-2 mb-3 mt-5">Класи ядра</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Клас</th><th>Роль</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>Concept\Core\Http\Security\CsrfTokenManager</code></td>
+                                <td>Генерація та <code>validate()</code> токена в сесії</td>
+                            </tr>
+                            <tr>
+                                <td><code>VerifyCsrfTokenMiddleware</code></td>
+                                <td>Перевірка POST / PUT / PATCH / DELETE</td>
+                            </tr>
+                            <tr>
+                                <td><code>ShareViewDataMiddleware</code></td>
+                                <td><code>ViewKey::CSRF_TOKEN</code> → Twig <code>csrf_token</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>Concept\Core\Http\Exceptions\Security\CsrfException</code></td>
+                                <td>419 Page Expired</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>
+                    <code>CsrfTokenManager</code> не має окремого service provider — резолвиться автовайрингом
+                    (залежність <code>SessionInterface</code>).
                 </p>
 
                 <h2 id="how-it-works" class="border-bottom pb-2 mb-3 mt-5">Як це працює</h2>
                 <ol>
                     <li>При першому зверненні <code>CsrfTokenManager::getToken()</code> генерує 64-символьний hex-токен (<code>random_bytes(32)</code>) і зберігає його в сесії під ключем <code>SessionKey::CSRF_TOKEN</code> (<code>_csrf_token</code>).</li>
                     <li><code>ShareViewDataMiddleware</code> передає токен у Twig як <code>{{ csrf_token }}</code>.</li>
-                    <li>Для <strong>POST</strong>, <strong>PUT</strong> і <strong>DELETE</strong> middleware порівнює токен із запиту з сесійним через <code>hash_equals()</code>.</li>
+                    <li>Для <strong>POST</strong>, <strong>PUT</strong>, <strong>PATCH</strong> і <strong>DELETE</strong> middleware порівнює токен із запиту з сесійним через <code>hash_equals()</code>.</li>
                     <li>Якщо токен відсутній або не збігається — кидається <code>CsrfException</code> (HTTP <strong>419</strong> Page Expired).</li>
                 </ol>
 
@@ -76,7 +107,9 @@ $router->lazyMiddleware(ShareViewDataMiddleware::class);</code></pre>
 
                 <h2 id="forms" class="border-bottom pb-2 mb-3 mt-5">Форми (HTML)</h2>
                 <p>У кожній формі, що змінює дані, додайте приховане поле з іменем <code>_csrf_token</code>:</p>
-                <pre class="mb-4"><code class="language-twig">&lt;form method="post" action="{{ url('cabinet.profile.update') }}"&gt;
+                <p>У layout додайте meta для AJAX (опційно):</p>
+                <pre class="mb-4"><code class="language-twig">&lt;meta name="csrf-token" content="{{ csrf_token }}"&gt;</code></pre>
+                <pre class="mb-4"><code class="language-twig">&lt;form method="post" action="{{ uri('cabinet.profile.update') }}"&gt;
     &lt;input type="hidden" name="_csrf_token" value="{{ csrf_token }}"&gt;
     {# ... поля форми ... #}
 &lt;/form&gt;</code></pre>
@@ -86,11 +119,12 @@ $router->lazyMiddleware(ShareViewDataMiddleware::class);</code></pre>
                 </p>
 
                 <h2 id="ajax" class="border-bottom pb-2 mb-3 mt-5">AJAX та API з браузера</h2>
-                <p>Middleware приймає токен також із заголовків (у порядку пріоритету після body):</p>
-                <ul>
-                    <li><code>X-CSRF-TOKEN</code> — значення як є</li>
-                    <li><code>X-XSRF-TOKEN</code> — значення з <code>urldecode()</code> (зручно для cookie-based схем)</li>
-                </ul>
+                <p><code>VerifyCsrfTokenMiddleware</code> шукає токен у такому порядку:</p>
+                <ol class="small">
+                    <li>Поле <code>_csrf_token</code> у <code>getParsedBody()</code> (форма або JSON body)</li>
+                    <li>Заголовок <code>X-CSRF-TOKEN</code> (<code>HttpHeader::X_CSRF_TOKEN</code>)</li>
+                    <li>Заголовок <code>X-XSRF-TOKEN</code> (<code>HttpHeader::X_XSRF_TOKEN</code>) — через <code>urldecode()</code></li>
+                </ol>
                 <pre class="mb-4"><code class="language-javascript">fetch('/api/profile', {
     method: 'POST',
     headers: {
@@ -116,7 +150,7 @@ $router->lazyMiddleware(ShareViewDataMiddleware::class);</code></pre>
 
                 <h2 id="programmatic" class="border-bottom pb-2 mb-3 mt-5">Програмний доступ</h2>
                 <p>У сервісах можна отримати менеджер із контейнера:</p>
-                <pre class="mb-4"><code class="language-php">use Concept\Core\Components\Csrf\CsrfTokenManager;
+                <pre class="mb-4"><code class="language-php">use Concept\Core\Http\Security\CsrfTokenManager;
 
 /** @var CsrfTokenManager $csrf */
 $csrf = $container->get(CsrfTokenManager::class);
@@ -126,8 +160,9 @@ $valid = $csrf->validate($submittedToken);</code></pre>
 
                 <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
                     <p class="mb-0">
-                        GET, HEAD, OPTIONS не перевіряються — це відповідає практиці «безпечних» методів.
-                        Не виконуйте зміну стану через GET.
+                        Захищені методи: <strong>POST</strong>, <strong>PUT</strong>, <strong>PATCH</strong>, <strong>DELETE</strong>
+                        (<code>VerifyCsrfTokenMiddleware::PROTECTED_METHODS</code>). GET, HEAD, OPTIONS не перевіряються —
+                        не виконуйте зміну стану через GET.
                     </p>
                 </div>
 
@@ -142,6 +177,7 @@ $valid = $csrf->validate($submittedToken);</code></pre>
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
     <script src="../assets/js/nav-uk.js"></script>
     <script src="../assets/js/docs.js"></script>

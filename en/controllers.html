@@ -19,8 +19,9 @@
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
             <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="../en/controllers.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/controllers.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/controllers.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/controllers.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -41,10 +42,406 @@
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
                 <h1 class="display-6 fw-bold mb-4">Controllers</h1>
+
                 <p>
-                    Full documentation is available in
-                    <a href="../uk/controllers.html">Ukrainian</a>.
+                    A controller is a class that handles an HTTP request after middleware and returns
+                    <code>Psr\Http\Message\ResponseInterface</code>. Concept Core has no mandatory
+                    base class: it is a plain PHP class with public methods bound to routes.
                 </p>
+                <p>
+                    See also:
+                    <a href="routing.html">routing</a>,
+                    <a href="request-lifecycle.html#controller">request lifecycle → controller</a>,
+                    <a href="middleware.html">middleware</a>,
+                    <a href="route-interceptors.html">route interceptors</a>.
+                </p>
+
+                <h2 id="routing" class="border-bottom pb-2 mb-3 mt-5">Binding to a route</h2>
+                <p>The route callable is an array <code>[Class::class, 'method']</code>:</p>
+                <pre class="mb-4"><code class="language-php">use Concept\App\Controllers\IndexController;
+
+$router->get('/', [IndexController::class, 'index'])->setName('home');
+$router->get('/projects/{id:number}', [CabinetProjectController::class, 'show'])
+    ->setName('cabinet.project.show');</code></pre>
+                <p>
+                    League Route resolves the controller from the DI container; constructor dependencies are injected automatically
+                    (<a href="#autowiring">autowiring</a>). The action method is invoked by <code>RouteStrategy</code>.
+                </p>
+
+                <h2 id="structure" class="border-bottom pb-2 mb-3 mt-5">Where to place them</h2>
+                <p>Typical options (paths configured via <a href="setup.html#paths-php">paths.php</a>):</p>
+                <ul>
+                    <li><strong>Application</strong> — <code>App/Controllers/</code> → namespace <code>Concept\App\Controllers</code></li>
+                    <li><strong>Component</strong> — <code>Components/{Name}/Controllers/</code> → <code>Concept\Components\{Name}\Controllers</code>, routes in the component <code>routes.php</code></li>
+                </ul>
+                <p>
+                    More on directory trees and namespaces — in
+                    <a href="directory-structure.html">directory structure</a>.
+                    One controller — one area of responsibility (cabinet, admin, public site).
+                    Move complex logic to <code>Services/</code>.
+                </p>
+
+                <h2 id="example" class="border-bottom pb-2 mb-3 mt-5">Minimal example</h2>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+namespace Concept\App\Controllers;
+
+use Concept\Core\Components\View\Contracts\ViewResponseFactoryInterface;
+use Psr\Http\Message\ResponseInterface;
+
+class IndexController
+{
+    public function __construct(
+        private readonly ViewResponseFactoryInterface $viewResponse,
+    ) {}
+
+    public function index(): ResponseInterface
+    {
+        return $this->viewResponse->create('@frontend/index');
+    }
+}</code></pre>
+                <p>
+                    Template <code>@frontend/index</code> is a logical Twig name (component/module prefix).
+                    More details — in the <a href="views.html">Views</a> section.
+                </p>
+
+                <h2 id="full-example" class="border-bottom pb-2 mb-3 mt-5">Full example</h2>
+                <p>
+                    <code>UserController</code> from the AuthAdmin component — typical CRUD: list, forms, FormRequest,
+                    flash + redirect after POST, separate JSON endpoint:
+                </p>
+                <pre class="mb-4"><code class="language-php">namespace Concept\Components\AuthAdmin\Controllers;
+
+class UserController
+{
+    public function __construct(
+        private readonly ResponseFactoryInterface $response,
+        private readonly ViewResponseFactoryInterface $viewResponse,
+        private readonly ConfigInterface $config,
+        private readonly AuthService $authService,
+        private readonly FlashBagInterface $flashBag,
+        private readonly UserModel $userModel,
+    ) {}
+
+    public function store(StoreUserRequest $request): ResponseInterface
+    {
+        $this->userModel
+            ->newQuery()
+            ->create($this->normalizeUserPayload($request->validated()));
+
+        $this->flashBag->add('success', 'User successfully created');
+
+        return $this->response->redirectByName('admin.users');
+    }
+
+    public function updatePassword(UpdateUserPasswordRequest $request, int $id): ResponseInterface
+    {
+        // ...
+        $data = $request->toDto();
+        $user->update([UserModel::FIELD_PASSWORD => $data->password]);
+        // ...
+    }
+
+    public function generateTokenApi(): ResponseInterface
+    {
+        return $this->response->json(['token' => bin2hex(random_bytes(32))]);
+    }
+}</code></pre>
+
+                <h2 id="lifecycle" class="border-bottom pb-2 mb-3 mt-5">RouteStrategy: from route to action</h2>
+                <p>
+                    After middleware, League Route calls <code>RouteStrategy::invokeRouteCallable()</code>.
+                    Order inside the strategy:
+                </p>
+                <ol>
+                    <li><strong>Route interceptors</strong> — global checks (ACL) before the handler</li>
+                    <li><strong>prepareRequest()</strong> — URL segments → PSR-7 attributes; update <code>ServerRequestInterface</code> in the container</li>
+                    <li><strong>getCallable()</strong> — resolve controller from DI (constructor injection)</li>
+                    <li><strong>resolveArguments()</strong> — FormRequest, <code>ServerRequestInterface</code>, route params, defaults</li>
+                    <li><strong>invokeArgs()</strong> — call the action method</li>
+                </ol>
+                <p>
+                    Telemetry <code>HTTP_ROUTE_CALLABLE_INVOKE</code> covers step 5.
+                    More details — <a href="request-lifecycle.html#controller">request lifecycle</a>.
+                </p>
+
+                <h2 id="autowiring" class="border-bottom pb-2 mb-3 mt-5">Autowiring and constructor</h2>
+                <p>
+                    During bootstrap, a <strong>League Container</strong> is created with a
+                    <code>ReflectionContainer</code> delegate: if a class is not registered explicitly, the container analyzes
+                    the constructor and recursively creates dependencies by type hint.
+                </p>
+                <pre class="mb-4"><code class="language-php">// Concept\Core\App::__construct()
+$this-&gt;container-&gt;delegate(new ReflectionContainer(cacheResolutions: true));</code></pre>
+                <p>
+                    For route <code>[UserController::class, 'index']</code>, League Route roughly does
+                    <code>$container-&gt;get(UserController::class)</code> — one controller instance per request
+                    (shared by default for the same class within one HTTP request).
+                </p>
+
+                <h3 id="constructor-deps" class="mt-4">What to inject in the constructor</h3>
+                <p>Declare dependencies explicitly — via parameter types. The controller "asks" for what it needs:</p>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Dependency type</th>
+                                <th>Example</th>
+                                <th>Notes</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td>Core contracts</td>
+                                <td><code>ResponseFactoryInterface</code>, <code>ConfigInterface</code></td>
+                                <td>Registered in Concept Core service providers</td>
+                            </tr>
+                            <tr>
+                                <td>Application / component services</td>
+                                <td><code>UserAuthService</code>, <code>AuthService</code></td>
+                                <td>Business logic; prefer interface dependency when available</td>
+                            </tr>
+                            <tr>
+                                <td>Models, repositories</td>
+                                <td><code>UserModel</code>, <code>ProjectModel</code></td>
+                                <td>Acceptable in MVC style; for complex domains — use a service wrapper</td>
+                            </tr>
+                            <tr>
+                                <td>HTTP / session infrastructure</td>
+                                <td><code>FlashBagInterface</code></td>
+                                <td>For flash messages after redirect</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <pre class="mb-4"><code class="language-php">public function __construct(
+    private readonly ResponseFactoryInterface $response,
+    private readonly ViewResponseFactoryInterface $viewResponse,
+    private readonly UserAuthService $auth,
+    private readonly FlashBagInterface $flashBag,
+    private readonly ProjectModel $projectModel,
+) {}</code></pre>
+                <p>
+                    If a class cannot be resolved (no binding, circular dependency) — container error at request time.
+                    Register custom implementations in a component or application <code>ServiceProvider</code>
+                    (more — <a href="service-container.html">Service container</a>,
+                    <a href="service-providers.html">Service providers</a>).
+                </p>
+
+                <h3 id="service-locator" class="mt-4">Do not use the container as a service locator</h3>
+                <p>
+                    <code>ContainerInterface</code> is registered in the container, but <strong>do not inject it into controllers</strong>
+                    and do not call <code>$this-&gt;container-&gt;get(...)</code> in action methods.
+                    This hides real dependencies, complicates tests, and makes refactoring harder.
+                </p>
+
+                <div>
+                    <div>
+                        <p class="small text-body-secondary mb-1">Bad (service locator)</p>
+                        <pre class="mb-0"><code class="language-php">public function __construct(
+    private readonly ContainerInterface $container,
+) {}
+
+public function index(): ResponseInterface
+{
+    $auth = $this-&gt;container-&gt;get(UserAuthService::class);
+    // ...
+}</code></pre>
+                    </div>
+                    <div>
+                        <p class="small text-body-secondary mb-1">Good (explicit dependencies)</p>
+                        <pre class="mb-0"><code class="language-php">public function __construct(
+    private readonly UserAuthService $auth,
+    private readonly ViewResponseFactoryInterface $viewResponse,
+) {}
+
+public function index(): ResponseInterface
+{
+    $user = $this-&gt;auth-&gt;user();
+    // ...
+}</code></pre>
+                    </div>
+                </div>
+
+                <h3 id="avoid-in-constructor" class="mt-4">What not to inject in the constructor</h3>
+                <ul>
+                    <li>
+                        <code>ContainerInterface</code>, <code>League\Container\Container</code> —
+                        service locator anti-pattern (see above)
+                    </li>
+                    <li>
+                        <code>Router</code> — for URLs use <code>UrlGeneratorInterface</code> / <code>redirectByName()</code>
+                    </li>
+                    <li>
+                        Superglobals (<code>$_GET</code>, <code>$_POST</code>) — only via FormRequest or PSR-7
+                    </li>
+                </ul>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        The container in <code>App::getContainer()</code> is for bootstrap, CLI, and service providers.
+                        In controllers, middleware, and domain services rely on constructor injection of concrete types.
+                    </p>
+                </div>
+
+                <h2 id="responses" class="border-bottom pb-2 mb-3 mt-5">Responses</h2>
+                <p>Every action returns <code>ResponseInterface</code>. Two main factories:</p>
+
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr>
+                                <th>Interface</th>
+                                <th>When to use</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>ViewResponseFactoryInterface</code></td>
+                                <td>HTML: <code>create('@cabinet/index', ['user' =&gt; $user])</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>ResponseFactoryInterface</code></td>
+                                <td>JSON, redirect, <code>back()</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <pre class="mb-4"><code class="language-php">// Redirect by route name
+return $this->response->redirectByName('cabinet.login');
+
+// JSON (API) — json(), jsonSuccess(), jsonError()
+return $this->response->json(['token' =&gt; $token]);
+return $this->response->jsonSuccess(['id' =&gt; $id]);
+
+// Flash + redirect after POST
+$this-&gt;flashBag-&gt;set('success', 'Saved');
+return $this-&gt;response-&gt;redirectByName('admin.users');</code></pre>
+                <p>
+                    Full description — <a href="responses.html">Responses</a>;
+                    Twig templates — <a href="views.html">Views</a>.
+                </p>
+
+                <h2 id="method-args" class="border-bottom pb-2 mb-3 mt-5">Method arguments</h2>
+                <p><code>RouteStrategy</code> fills action parameters in this priority:</p>
+                <ol>
+                    <li><strong>FormRequest</strong> — created from the container, validated before entering the method</li>
+                    <li><strong>ServerRequestInterface</strong> — current PSR-7 request</li>
+                    <li><strong>URL parameters</strong> — parameter name = name in <code>{id:number}</code>, with type casting via <code>Caster</code></li>
+                    <li><strong>Default values</strong> in the PHP signature</li>
+                </ol>
+                <pre class="mb-4"><code class="language-php">public function show(int $id): ResponseInterface { /* ... */ }
+
+public function update(UpdateUserRequest $request, int $id): ResponseInterface { /* ... */ }
+
+public function handle(ServerRequestInterface $request): ResponseInterface { /* ... */ }</code></pre>
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Services (<code>UserModel</code>, <code>ResponseFactoryInterface</code>, etc.) — via
+                        <a href="#autowiring">constructor (autowiring)</a>, not via <code>ContainerInterface::get()</code>.
+                        Method parameters — only FormRequest, <code>ServerRequestInterface</code>, and URL segments.
+                    </p>
+                </div>
+
+                <h2 id="form-request" class="border-bottom pb-2 mb-3 mt-5">FormRequest</h2>
+                <p>
+                    A type-hinted <code>FormRequest</code> subclass in the action — <code>RouteStrategy</code> creates
+                    an instance from the container and calls <code>validate()</code> <em>before</em> entering the method.
+                    On failure — <code>ValidationException</code>, caught by
+                    <code>HandleValidationExceptionMiddleware</code> (JSON 422 or flash + <code>back()</code>).
+                </p>
+                <pre class="mb-4"><code class="language-php">class StoreUserRequest extends FormRequest
+{
+    protected ?string $dtoClass = StoreUserDto::class;
+
+    protected array $except = ['password_confirmation'];
+
+    public function rules(): array
+    {
+        return [
+            'email' => ['required', 'email', 'unique:users,email'],
+            'password' => ['required', 'min:8'],
+            'password_confirmation' => ['required', 'same:password'],
+        ];
+    }
+}
+
+public function store(StoreUserRequest $request): ResponseInterface
+{
+    $this->userModel->newQuery()->create($request->validated());
+    return $this->response->redirectByName('admin.users');
+}</code></pre>
+                <p>
+                    Full description of rules, DTO, <code>except</code>/<code>only</code> — in
+                    <a href="requests.html">Requests and validation</a>.
+                </p>
+
+                <h2 id="route-params" class="border-bottom pb-2 mb-3 mt-5">Route parameters</h2>
+                <p>
+                    Segment <code>{id:number}</code> arrives in the method as <code>int $id</code> (when names match).
+                    The same <code>id</code> is also available as a request attribute:
+                    <code>$request-&gt;getAttribute('id')</code>.
+                </p>
+                <pre class="mb-4"><code class="language-php">$router-&gt;get('/edit/{id:number}', [UserController::class, 'edit'])
+    -&gt;setName('admin.user.edit');</code></pre>
+
+                <h2 id="route-interceptors" class="border-bottom pb-2 mb-3 mt-5">Route interceptors</h2>
+                <p>
+                    Global ACL checks by route <code>setName()</code> run in
+                    <code>RouteStrategy</code> <strong>before</strong> autowiring the action — via classes from
+                    <code>routes.interceptors</code>. Typical failure — <code>throw</code> an exception;
+                    redirect or JSON 403 — in middleware wrapping the handler.
+                </p>
+                <p>More examples — <a href="route-interceptors.html">Route interceptors</a>.</p>
+
+                <h2 id="auth" class="border-bottom pb-2 mb-3 mt-5">Authorization</h2>
+                <p>
+                    Separate levels of checks:
+                </p>
+                <ul>
+                    <li><strong>Middleware</strong> on a group — "is logged in", redirect to login (<a href="middleware.html#auth-middleware">examples</a>)</li>
+                    <li><strong>Route interceptors</strong> — ACL by named route (<a href="route-interceptors.html">more details</a>)</li>
+                    <li><strong>Controller</strong> — business constraints (resource belongs to current user)</li>
+                </ul>
+                <pre class="mb-4"><code class="language-php">public function show(int $id): ResponseInterface
+{
+    $user = $this->auth->user();
+    if (!$user instanceof UserModel) {
+        return $this->response->redirectByName('cabinet.login');
+    }
+
+    $project = $this->findUserProject($user, $id);
+    if ($project === null) {
+        $this->flashBag->add('error', 'Order not found.');
+        return $this->response->redirectByName('cabinet.projects');
+    }
+
+    return $this->viewResponse->create('@projects/cabinet/show', ['project' => $project]);
+}</code></pre>
+
+                <h2 id="patterns" class="border-bottom pb-2 mb-3 mt-5">Recommended patterns</h2>
+                <ul>
+                    <li><strong>Thin controller</strong> — orchestration: request → service → response</li>
+                    <li><strong>One action — one responsibility</strong> — <code>showLogin</code>, <code>login</code>, not a "universal" method</li>
+                    <li><strong>POST/PUT/PATCH/DELETE</strong> — FormRequest + redirect (PRG), not re-rendering the form</li>
+                    <li><strong>Named routes</strong> — <code>redirectByName()</code> instead of hard-coded URLs</li>
+                </ul>
+
+                <h2 id="alternatives" class="border-bottom pb-2 mb-3 mt-5">Closure and invokable</h2>
+                <p>
+                    A route can point to a closure or a class with <code>__invoke</code>.
+                    <code>RouteStrategy</code> autowiring for them is limited: FormRequest,
+                    <code>ServerRequestInterface</code>, URL segments, and default values.
+                    Arbitrary services (<code>UserModel</code>, etc.) in closure parameters are <strong>not</strong>
+                    resolved — use controller classes for DI.
+                </p>
+
+                <h2 id="telemetry" class="border-bottom pb-2 mb-3 mt-5">Diagnostics</h2>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php route:list</code></pre>
+
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>
 
@@ -56,6 +453,7 @@
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
     <script src="../assets/js/nav-en.js"></script>
     <script src="../assets/js/docs.js"></script>

@@ -19,8 +19,9 @@
             <a class="navbar-brand fw-semibold me-2" href="index.html">Concept <span class="text-primary">Core</span></a>
             <span class="badge text-bg-secondary d-none d-sm-inline">1.x</span>
             <ul class="navbar-nav flex-row docs-lang-nav ms-auto">
-                <li class="nav-item"><a class="nav-link py-1 active" href="../en/console-commands.html">EN</a></li>
-                <li class="nav-item"><a class="nav-link py-1" href="../uk/console-commands.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1 active" href="../en/console-commands.html">EN</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../uk/console-commands.html">UK</a></li>
+                <li class="nav-item"><a class="nav-link p-1" href="../index.html" title="Home"><i class="bi bi-house"></i></a></li>
             </ul>
         </div>
     </header>
@@ -40,11 +41,214 @@
             </aside>
 
             <main class="col-lg-9 col-xl-7 py-4 py-lg-5" id="docs-content">
-                <h1 class="display-6 fw-bold mb-4">Creating Commands</h1>
+                <h1 class="display-6 fw-bold mb-4">Creating Console Commands</h1>
+
                 <p>
-                    Full documentation is available in
-                    <a href="../uk/console-commands.html">Ukrainian</a>.
+                    A command is a class extending
+                    <code>Symfony\Component\Console\Command\Command</code>.
+                    Dependencies are passed through the <strong>constructor</strong> (container autowiring);
+                    logic lives in <code>execute()</code>.
                 </p>
+                <p>
+                    See also:
+                    <a href="console.html">Console</a>
+                    (<a href="console.html#providers">providers and dependencies</a>,
+                    <a href="console.html#disabled-commands"><code>DisabledCommand</code></a>),
+                    <a href="service-container.html#autowiring">autowiring</a>.
+                </p>
+                <p>
+                    Symfony documentation:
+                    <a href="https://symfony.com/doc/current/console.html#creating-a-command" target="_blank" rel="noopener">Creating a Command</a>,
+                    <a href="https://symfony.com/doc/current/console/input.html" target="_blank" rel="noopener">Input</a>,
+                    <a href="https://symfony.com/doc/current/console/style.html" target="_blank" rel="noopener">Output styling</a>.
+                </p>
+
+                <h2 id="minimal" class="border-bottom pb-2 mb-3 mt-5">Minimal command</h2>
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+namespace Concept\App\Console\Commands;
+
+use Symfony\Component\Console\Command\Command;
+use Symfony\Component\Console\Input\InputInterface;
+use Symfony\Component\Console\Output\OutputInterface;
+use Symfony\Component\Console\Style\SymfonyStyle;
+
+final class GreetCommand extends Command
+{
+    protected function configure(): void
+    {
+        $this-&gt;setName('app:greet')
+            -&gt;setDescription('Print a greeting');
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $io = new SymfonyStyle($input, $output);
+        $io-&gt;success('Hello from Concept Core');
+
+        return Command::SUCCESS;
+    }
+}</code></pre>
+
+                <h2 id="register-app" class="border-bottom pb-2 mb-3 mt-5">Application registration</h2>
+                <p>Add the class to <code>config/commands.php</code>:</p>
+                <pre class="mb-4"><code class="language-php">return [
+    'commands' =&gt; [
+        // ...core commands
+        GreetCommand::class,
+    ],
+];</code></pre>
+                <p>
+                    <code>ConsoleServiceProvider</code> calls <code>$container-&gt;get(GreetCommand::class)</code>
+                    and <code>addCommand()</code>. If the constructor needs services — they are resolved automatically
+                    through <code>ReflectionContainer</code>.
+                </p>
+                <p>
+                    If a dependency is not registered (required provider missing from
+                    <code>bootstrap/providers/console.php</code>), your command is replaced by a
+                    <code>DisabledCommand</code> — see <a href="console.html#disabled-commands">Console → disabled</a>.
+                </p>
+                <pre class="mb-4"><code class="language-bash">php bin/console.php app:greet</code></pre>
+
+                <h2 id="providers" class="border-bottom pb-2 mb-3 mt-5">Providers for your command</h2>
+                <p>Typical custom command dependencies and what to enable in CLI:</p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Constructor dependency</th><th>Provider in <code>console.php</code></th></tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><code>UserModel</code>, <code>DatabaseInterface</code></td><td><code>DatabaseServiceProvider</code></td></tr>
+                            <tr><td><code>ConfigInterface</code></td><td><code>ConfigServiceProvider</code></td></tr>
+                            <tr><td><code>RouterInterface</code></td><td><code>HttpServiceProvider</code></td></tr>
+                            <tr><td><code>LoggerInterface</code></td><td><code>LogServiceProvider</code></td></tr>
+                            <tr><td>component service</td><td>component provider + <code>ComponentsServiceProvider</code></td></tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>
+                    A command without a constructor (like <code>GreetCommand</code>) depends only on
+                    <code>ConsoleServiceProvider</code>. After changing <code>console.php</code>, rerun
+                    <code>php bin/console.php list</code> and confirm there is no red “disabled” warning.
+                </p>
+
+                <h2 id="options" class="border-bottom pb-2 mb-3 mt-5">Arguments and options</h2>
+                <p>Example — <code>UserListCommand</code> (<code>user:list</code>):</p>
+                <pre class="mb-4"><code class="language-php">use Concept\Components\AuthAdmin\Models\UserModel;
+use Symfony\Component\Console\Input\InputOption;
+
+class UserListCommand extends Command
+{
+    private const string COMMAND_NAME = 'user:list';
+
+    protected function configure(): void
+    {
+        $this-&gt;setName(self::COMMAND_NAME)
+            -&gt;setDescription('Display a list of registered users')
+            -&gt;addOption('limit', 'l', InputOption::VALUE_OPTIONAL, 'How many users?', 10);
+    }
+
+    protected function execute(InputInterface $input, OutputInterface $output): int
+    {
+        $io = new SymfonyStyle($input, $output);
+        $limit = is_numeric($input-&gt;getOption('limit'))
+            ? (int) $input-&gt;getOption('limit')
+            : 10;
+
+        $users = UserModel::query()-&gt;limit($limit)-&gt;get()-&gt;toArray();
+        $io-&gt;table(array_keys($users[0] ?? []), $users);
+
+        return Command::SUCCESS;
+    }
+}</code></pre>
+                <p>
+                    For consistency with <a href="database.html#queries">models via DI</a>, prefer injecting
+                    <code>UserModel</code> and calling <code>$this-&gt;userModel-&gt;newQuery()</code>:
+                </p>
+                <pre class="mb-4"><code class="language-php">public function __construct(
+    private readonly UserModel $userModel,
+) {
+    parent::__construct();
+}</code></pre>
+                <p class="small text-body-secondary">
+                    <code>DatabaseServiceProvider</code> is required in CLI — otherwise the command becomes disabled.
+                </p>
+
+                <h2 id="core-example" class="border-bottom pb-2 mb-3 mt-5">Core example: DI in a command</h2>
+                <p><code>RouteListCommand</code> receives <code>RouterInterface</code> — requires <code>HttpServiceProvider</code>:</p>
+                <pre class="mb-4"><code class="language-php">use Concept\Core\Http\Routing\Contracts\RouterInterface;
+
+public function __construct(private readonly RouterInterface $router)
+{
+    parent::__construct();
+}</code></pre>
+                <p>
+                    <code>DbMigrateCommand</code> — <code>Migrator</code> + <code>MigrationRegistry</code>.
+                    Complex core commands live in <code>Concept\Core\Console\Commands</code>.
+                </p>
+
+                <h2 id="component" class="border-bottom pb-2 mb-3 mt-5">Command in a component</h2>
+                <ol>
+                    <li>Create <code>Components/MyModule/Commands/MyCommand.php</code></li>
+                    <li>Add the class to <code>commands</code> in <code>Component/config.php</code></li>
+                    <li>Ensure the component is enabled in <code>config/components.php</code></li>
+                </ol>
+                <pre class="mb-4"><code class="language-php">// src/Components/AuthAdmin/config.php
+'commands' =&gt; [
+    UserListCommand::class,
+],</code></pre>
+                <p>
+                    During <code>ComponentsServiceProvider::boot()</code> commands are resolved from the container and
+                    added to <code>ConsoleApplication</code> via <code>addCommand()</code>.
+                    <code>ConsoleServiceProvider</code> must be registered <em>earlier</em> in
+                    <code>bootstrap/providers/console.php</code>.
+                </p>
+                <p>
+                    If a component command needs DB or HTTP services — the corresponding core providers are still required in CLI (see <a href="#providers">table above</a>).
+                </p>
+
+                <h2 id="output" class="border-bottom pb-2 mb-3 mt-5">Output and errors</h2>
+                <pre class="mb-4"><code class="language-php">$io = new SymfonyStyle($input, $output);
+
+$io-&gt;title('Import started');
+$io-&gt;writeln('Processing...');
+$io-&gt;success('Done');
+$io-&gt;warning('Partial import');
+$io-&gt;error('Failed');
+
+// table
+$io-&gt;table(['Column A', 'Column B'], $rows);
+
+// progress (long loops)
+$io-&gt;progressStart(count($items));
+foreach ($items as $item) {
+    // ...
+    $io-&gt;progressAdvance();
+}
+$io-&gt;progressFinish();</code></pre>
+                <p>
+                    On exception return <code>Command::FAILURE</code> or let Symfony print the stack trace
+                    (in dev with Whoops for CLI — plain text).
+                </p>
+
+                <h2 id="checklist" class="border-bottom pb-2 mb-3 mt-5">Checklist</h2>
+                <ol>
+                    <li>Unique command name (<code>module:action</code>, e.g. <code>billing:sync</code>)</li>
+                    <li><code>configure()</code> — name, description, arguments/options; <code>COMMAND_NAME</code> constant like in core</li>
+                    <li><code>execute()</code> — short orchestration, heavy work in a service; <code>Command::SUCCESS</code> / <code>FAILURE</code></li>
+                    <li>Registration in <code>config/commands.php</code> or <code>commands</code> in component <code>config.php</code></li>
+                    <li>CLI providers cover all constructor dependencies</li>
+                    <li>Verify: <code>php bin/console.php list</code> (no “disabled”) and <code>help your:command</code></li>
+                </ol>
+
+                <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
+                    <p class="mb-0">
+                        Do not duplicate HTTP controllers in CLI: move shared logic to <code>Services/</code>
+                        and call it from both web and command.
+                        A “disabled” command is almost always a missing provider in <code>console.php</code>, not a bug in <code>execute()</code>.
+                    </p>
+                </div>
+
                 <nav id="docs-next-prev" class="mt-5" aria-label="Page navigation"></nav>
             </main>
 
@@ -56,6 +260,8 @@
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/bash.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
     <script src="../assets/js/nav-en.js"></script>
     <script src="../assets/js/docs.js"></script>

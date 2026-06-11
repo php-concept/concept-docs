@@ -48,6 +48,38 @@
                     обмежує «назад» і fallback-URL лише внутрішніми адресами застосунку через
                     <code>StorePreviousUrlMiddleware</code> і <code>ResponseFactory::back()</code>.
                 </p>
+                <p>
+                    Див. також: <a href="responses.html#redirects">Відповіді → редіректи</a>,
+                    <a href="middleware.html#core-middleware">Middleware → StorePreviousUrlMiddleware</a>,
+                    <a href="requests.html#validation-errors">помилки валідації</a>.
+                </p>
+
+                <h2 id="architecture" class="border-bottom pb-2 mb-3 mt-5">Класи ядра</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Клас</th><th>Роль</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>StorePreviousUrlMiddleware</code></td>
+                                <td>Ланцюжок URL у сесії + <code>RequestAttribute::SAFE_BACK_URL</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>ResponseFactory::back()</code></td>
+                                <td>Referer → safe back → fallback, з перевіркою <code>isInternalUrl()</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>ResponseFactory::redirectByName()</code></td>
+                                <td>Редірект за іменем маршруту через <code>UrlGenerator::uri()</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>HandleValidationExceptionMiddleware</code></td>
+                                <td>HTML: flash + <code>back()</code> після <code>ValidationException</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
                 <h2 id="middleware" class="border-bottom pb-2 mb-3 mt-5">StorePreviousUrlMiddleware</h2>
                 <p>Middleware веде в сесії два URL:</p>
@@ -55,43 +87,86 @@
                     <li><code>SessionKey::CURRENT_URL</code> (<code>_url_current</code>) — остання GET-сторінка (не AJAX)</li>
                     <li><code>SessionKey::PREVIOUS_URL</code> (<code>_url_previous</code>) — попередня GET-сторінка</li>
                 </ul>
-                <p>На кожен запит у атрибут PSR-7 записується «безпечний URL назад»:</p>
+                <p>
+                    На <strong>GET</strong> (не AJAX) middleware зберігає повний URI запиту
+                    (<code>(string) $request-&gt;getUri()</code>, включно з query string).
+                    Якщо URI відрізняється від поточного в сесії — попередній <code>CURRENT_URL</code>
+                    стає <code>PREVIOUS_URL</code>, новий URI — <code>CURRENT_URL</code>.
+                </p>
+                <p>На кожен запит у PSR-7 атрибут <code>RequestAttribute::SAFE_BACK_URL</code> (<code>safe_back_url</code>):</p>
                 <ul>
                     <li><strong>GET</strong> — <code>PREVIOUS_URL</code> (сторінка, з якої прийшли)</li>
-                    <li><strong>POST</strong> (і інші методи) — <code>CURRENT_URL</code> (сторінка форми)</li>
+                    <li><strong>POST</strong>, <strong>PUT</strong>, <strong>PATCH</strong>, <strong>DELETE</strong> та інші не-GET — <code>CURRENT_URL</code> (сторінка форми)</li>
                 </ul>
-                <pre class="mb-4"><code class="language-php">// RequestAttribute::SAFE_BACK_URL на запиті
-$router->lazyMiddleware(StorePreviousUrlMiddleware::class);</code></pre>
+                <p>Типове місце в стеку — після CSRF, перед <code>ShareViewDataMiddleware</code>:</p>
+                <pre class="mb-4"><code class="language-php">$router->lazyMiddleware(HandleValidationExceptionMiddleware::class);
+$router->lazyMiddleware(VerifyCsrfTokenMiddleware::class);
+$router->lazyMiddleware(StorePreviousUrlMiddleware::class);
+$router->lazyMiddleware(ShareViewDataMiddleware::class);</code></pre>
                 <p>
-                    AJAX-запити (заголовок <code>X-Requested-With: XMLHttpRequest</code>) не оновлюють ланцюжок URL,
+                    AJAX-запити (<code>HttpHeader::X_REQUESTED_WITH</code> = <code>XMLHttpRequest</code>) не оновлюють ланцюжок URL,
                     щоб фонові poll-запити не зламали «назад» після сабміту форми.
+                    Атрибут <code>SAFE_BACK_URL</code> на таких запитах усе одно виставляється з сесії.
                 </p>
 
                 <h2 id="back" class="border-bottom pb-2 mb-3 mt-5">ResponseFactory::back()</h2>
                 <p>Контролер або middleware після валідації часто робить redirect назад:</p>
-                <pre class="mb-4"><code class="language-php">return $responseFactory->back();</code></pre>
-                <p>Алгоритм вибору цілі:</p>
-                <ol>
-                    <li><strong>Referer</strong> — якщо браузер надіслав заголовок і URL внутрішній</li>
-                    <li><strong>SAFE_BACK_URL</strong> — з атрибута запиту (з middleware)</li>
-                    <li><strong>Fallback</strong> — за замовчуванням <code>/</code> (другий аргумент <code>back()</code>)</li>
-                </ol>
-                <pre class="mb-4"><code class="language-php">return $responseFactory->back(
-    status: 302,
+                <pre class="mb-4"><code class="language-php">return $this-&gt;response-&gt;back();
+return $this-&gt;response-&gt;back(
+    status: HttpStatusCode::FOUND,
     fallback: '/cabinet'
 );</code></pre>
+                <p>Алгоритм вибору цілі:</p>
+                <ol>
+                    <li><strong>Referer</strong> — якщо заголовок не порожній (пріоритет №1)</li>
+                    <li><strong>SAFE_BACK_URL</strong> — з атрибута запиту, лише коли Referer відсутній</li>
+                    <li><strong>Перевірка</strong> — обраний URL проходить <code>isInternalUrl()</code>; інакше — fallback</li>
+                    <li><strong>Fallback</strong> — другий аргумент методу (за замовчуванням <code>/</code>)</li>
+                </ol>
+                <p class="small text-body-secondary">
+                    Зовнішній Referer (інший host) не використовується — спрацьовує fallback.
+                    Статус за замовчуванням — <code>HttpStatusCode::FOUND</code> (302).
+                </p>
 
                 <h2 id="internal-url" class="border-bottom pb-2 mb-3 mt-5">Що вважається «внутрішнім»</h2>
-                <p>Метод <code>isInternalUrl()</code> у <code>ResponseFactory</code>:</p>
+                <p>Приватний метод <code>ResponseFactory::isInternalUrl()</code>:</p>
                 <ul>
-                    <li>Відносний шлях, що починається з <code>/</code>, — дозволений</li>
-                    <li>Абсолютний URL — лише якщо <code>host</code> збігається з host поточного запиту</li>
-                    <li>Зовнішні домени, <code>javascript:</code>, протоколи інших сайтів — відхиляються → fallback</li>
+                    <li>Порожній рядок — відхиляється</li>
+                    <li>Без host у <code>parse_url()</code> — дозволено лише якщо рядок починається з <code>/</code></li>
+                    <li>З host — лише якщо <code>host</code> строго збігається з host поточного PSR-7 запиту</li>
+                    <li>Зовнішні домени, <code>//evil.com</code>, <code>javascript:</code> тощо — відхиляються → fallback</li>
                 </ul>
                 <p>
-                    Це захищає від open redirect навіть якщо зловмисник підставить Referer або параметр у сесії
-                    (сесійні URL теж мають бути своїми — middleware пише лише реальні URI застосунку).
+                    Перевірка застосовується лише в <code>back()</code>. Методи
+                    <code>redirect($url)</code> і <code>redirectByName()</code> не фільтрують ціль —
+                    не передавайте туди ненадійний input користувача.
                 </p>
+
+                <h2 id="redirect-methods" class="border-bottom pb-2 mb-3 mt-5">Три способи редіректу</h2>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Метод</th><th>Коли</th><th>Перевірка URL</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>back()</code></td>
+                                <td>Повернення на форму, помилка валідації</td>
+                                <td>Так (<code>isInternalUrl</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>redirectByName()</code></td>
+                                <td>PRG після POST, фіксована ціль</td>
+                                <td>Ні (шлях з генератора маршрутів)</td>
+                            </tr>
+                            <tr>
+                                <td><code>redirect($url)</code></td>
+                                <td>Відомий статичний шлях</td>
+                                <td>Ні (відповідальність розробника)</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
 
                 <h2 id="validation" class="border-bottom pb-2 mb-3 mt-5">Після помилок валідації</h2>
                 <p>
@@ -99,11 +174,15 @@ $router->lazyMiddleware(StorePreviousUrlMiddleware::class);</code></pre>
                     <code>back()</code> — користувач повертається на форму з тим самим URL, без довільного
                     <code>redirect($_GET['return'])</code>.
                 </p>
-                <p>Див. <a href="requests.html">Запити та валідація</a> та <a href="middleware.html">Middleware</a>.</p>
+                <p>
+                    Див. <a href="requests.html#validation-errors">Запити → помилки валідації</a>
+                    та <a href="middleware.html#core-middleware">Middleware</a>.
+                </p>
 
                 <h2 id="named-routes" class="border-bottom pb-2 mb-3 mt-5">Іменовані маршрути</h2>
-                <p>Для фіксованих цілей безпечніше іменований redirect — host контролюється генератором URL:</p>
-                <pre class="mb-4"><code class="language-php">return $responseFactory->redirectByName('cabinet.dashboard');</code></pre>
+                <p>Для фіксованих цілей безпечніше іменований redirect — шлях будує <code>UrlGeneratorInterface::uri()</code>:</p>
+                <pre class="mb-4"><code class="language-php">return $this-&gt;response-&gt;redirectByName('cabinet.home');
+return $this-&gt;response-&gt;redirectByName('admin.user.edit', ['id' =&gt; $id]);</code></pre>
                 <p>
                     Використовуйте <code>back()</code> для UX «повернутися на форму», а
                     <code>redirectByName()</code> — коли ціль завжди відома (login, dashboard).
@@ -127,6 +206,7 @@ $router->lazyMiddleware(StorePreviousUrlMiddleware::class);</code></pre>
 
     <script src="../assets/vendor/bootstrap/js/bootstrap.bundle.min.js"></script>
     <script src="../assets/vendor/highlight/highlight.min.js"></script>
+    <script src="../assets/vendor/highlight/languages/php.min.js"></script>
     <script src="../assets/vendor/clipboard/clipboard.min.js"></script>
     <script src="../assets/js/nav-uk.js"></script>
     <script src="../assets/js/docs.js"></script>
