@@ -104,11 +104,12 @@ return [
                     У <code>DatabaseServiceProvider::boot()</code> створюється глобальний
                     <code>Illuminate\Database\Capsule\Manager</code>, викликається <code>bootEloquent()</code>,
                     підключається <code>Dispatcher</code> для подій запитів.
-                    SQL логується при <code>app.debug</code> або <code>log.query</code>; за <code>log.query</code>
-                    також пишеться телеметрія <code>TelemetryEvent::DB_QUERY_EXECUTED</code>.
+                    SQL логується за <code>log.db_queries</code> (<code>QueryLogger</code> → <code>storage/logs/query.log</code>).
+                    Телеметрію <code>TelemetryEvent::DB_QUERY_EXECUTED</code> записують окремо за
+                    <code>telemetry.enabled</code> і <code>telemetry.db_queries</code>.
                 </p>
                 <p>
-                    Низькорівневий доступ — <code>Concept\Core\Components\Database\Contracts\DatabaseInterface</code>
+                    Низькорівневий доступ — <code>Concept\Core\Services\Database\Contracts\DatabaseInterface</code>
                     і метод <code>capsule()</code> (наприклад у правилах <code>unique</code> / <code>exists</code>).
                     Ключ <code>db.port</code> є в конфігу, але <code>getConnectionOptions()</code> ядра наразі
                     передає в Capsule лише <code>driver</code>, <code>host</code>, <code>database</code>,
@@ -226,7 +227,7 @@ return new class extends Migration
                 <p>
                     Класи сидерів перелічуються в <code>config/seeders.php</code> і в <code>seeders.list</code> компонента.
                     <code>SeederManager</code> викликає <code>run()</code> лише для класів, що реалізують
-                    <code>Concept\Core\Components\Database\Contracts\SeederInterface</code>.
+                    <code>Concept\Core\Services\Database\Contracts\SeederInterface</code>.
                     Зазвичай сидер також extends <code>Illuminate\Database\Seeder</code>.
                 </p>
                 <pre class="mb-4"><code class="language-php">// config/seeders.php
@@ -239,7 +240,7 @@ return [
 ];
 
 // database/seeders/PageSeeder.php — обов'язково SeederInterface
-use Concept\Core\Components\Database\Contracts\SeederInterface;
+use Concept\Core\Services\Database\Contracts\SeederInterface;
 use Illuminate\Database\Seeder;
 
 class PageSeeder extends Seeder implements SeederInterface

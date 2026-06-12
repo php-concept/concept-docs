@@ -104,11 +104,12 @@ return [
                     In <code>DatabaseServiceProvider::boot()</code> a global
                     <code>Illuminate\Database\Capsule\Manager</code> is created, <code>bootEloquent()</code> is called,
                     and a <code>Dispatcher</code> is attached for query events.
-                    SQL is logged when <code>app.debug</code> or <code>log.query</code> is enabled; with <code>log.query</code>,
-                    <code>TelemetryEvent::DB_QUERY_EXECUTED</code> telemetry is also written.
+                    SQL is logged when <code>log.db_queries</code> is enabled (<code>QueryLogger</code> → <code>storage/logs/query.log</code>).
+                    Telemetry <code>TelemetryEvent::DB_QUERY_EXECUTED</code> is recorded separately when
+                    <code>telemetry.enabled</code> and <code>telemetry.db_queries</code> are on.
                 </p>
                 <p>
-                    Low-level access — <code>Concept\Core\Components\Database\Contracts\DatabaseInterface</code>
+                    Low-level access — <code>Concept\Core\Services\Database\Contracts\DatabaseInterface</code>
                     and the <code>capsule()</code> method (for example in <code>unique</code> / <code>exists</code> rules).
                     The <code>db.port</code> key exists in config, but the core <code>getConnectionOptions()</code> currently
                     passes only <code>driver</code>, <code>host</code>, <code>database</code>,
@@ -226,7 +227,7 @@ return new class extends Migration
                 <p>
                     Seeder classes are listed in <code>config/seeders.php</code> and in the component <code>seeders.list</code>.
                     <code>SeederManager</code> calls <code>run()</code> only for classes that implement
-                    <code>Concept\Core\Components\Database\Contracts\SeederInterface</code>.
+                    <code>Concept\Core\Services\Database\Contracts\SeederInterface</code>.
                     A seeder usually also extends <code>Illuminate\Database\Seeder</code>.
                 </p>
                 <pre class="mb-4"><code class="language-php">// config/seeders.php
@@ -239,7 +240,7 @@ return [
 ];
 
 // database/seeders/PageSeeder.php — SeederInterface required
-use Concept\Core\Components\Database\Contracts\SeederInterface;
+use Concept\Core\Services\Database\Contracts\SeederInterface;
 use Illuminate\Database\Seeder;
 
 class PageSeeder extends Seeder implements SeederInterface

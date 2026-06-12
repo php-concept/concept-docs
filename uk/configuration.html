@@ -116,10 +116,10 @@ LOG_MAX_FILES=14    → log.max_files</code></pre>
                             <tr><td><code>APP_NAME</code></td><td><code>app.name</code></td><td>Назва застосунку (консоль, логи)</td></tr>
                             <tr><td><code>APP_TIMEZONE</code></td><td><code>app.timezone</code></td><td>Часовий пояс PHP (<code>Europe/Kyiv</code>, <code>UTC</code>)</td></tr>
                             <tr><td><code>APP_ENV</code></td><td><code>app.env</code></td><td>Середовище: <code>dev</code>, <code>production</code> тощо; визначає папку оверрайду</td></tr>
-                            <tr><td><code>APP_DEBUG</code></td><td><code>app.debug</code></td><td>Режим налагодження: Whoops, кеш Twig off, Valinor FileWatchingCache, лог SQL</td></tr>
+                            <tr><td><code>APP_DEBUG</code></td><td><code>app.debug</code></td><td>Режим налагодження: Whoops, кеш Twig off, Valinor FileWatchingCache</td></tr>
                             <tr><td><code>LOG_LEVEL</code></td><td><code>log.level</code></td><td>Рівень Monolog: <code>debug</code>, <code>info</code>, <code>error</code>…</td></tr>
                             <tr><td><code>LOG_MAX_FILES</code></td><td><code>log.max_files</code></td><td>Кількість ротаційних файлів логів</td></tr>
-                            <tr><td><code>LOG_QUERY</code></td><td><code>log.query</code></td><td>Логувати SQL-запити та події БД</td></tr>
+                            <tr><td><code>LOG_DB_QUERIES</code></td><td><code>log.db_queries</code></td><td>Логувати SQL у <code>storage/logs/query.log</code></td></tr>
                             <tr><td><code>LOG_VALIDATION_DATA</code></td><td><code>log.validation_data</code></td><td>Логувати payload валідації FormRequest (з маскуванням)</td></tr>
                             <tr><td><code>DB_DRIVER</code></td><td><code>db.driver</code></td><td>Драйвер БД (<code>mysql</code>)</td></tr>
                             <tr><td><code>DB_HOST</code></td><td><code>db.host</code></td><td>Хост БД</td></tr>
@@ -169,7 +169,7 @@ LOG_MAX_FILES=14    → log.max_files</code></pre>
                             <tr><td><code>app.locale</code></td><td>string</td><td><code>en</code></td><td>Локаль застосунку</td></tr>
                             <tr><td><code>app.fallback_locale</code></td><td>string</td><td><code>en</code></td><td>Fallback для перекладів валідатора</td></tr>
                             <tr><td><code>app.locale_resolver</code></td><td>class-string|null</td><td><code>null</code></td><td>Кастомний <code>LocaleResolverInterface</code></td></tr>
-                            <tr><td><code>app.debug</code></td><td>bool</td><td><code>false</code></td><td>Whoops (web), Twig cache off, Valinor <code>FileWatchingCache</code>, SQL log (разом із <code>log.query</code>)</td></tr>
+                            <tr><td><code>app.debug</code></td><td>bool</td><td><code>false</code></td><td>Whoops (web), Twig cache off, Valinor <code>FileWatchingCache</code></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -198,7 +198,7 @@ LOG_MAX_FILES=14    → log.max_files</code></pre>
                             <tr><td><code>log.name</code></td><td>string</td><td><code>app</code></td><td>Ім’я каналу Monolog</td></tr>
                             <tr><td><code>log.level</code></td><td>string</td><td><code>ERROR</code></td><td>Мінімальний рівень (<code>ERROR</code>, <code>debug</code>…)</td></tr>
                             <tr><td><code>log.max_files</code></td><td>int</td><td><code>7</code></td><td>Файлів при ротації (<code>.env.example</code>: <code>14</code>)</td></tr>
-                            <tr><td><code>log.query</code></td><td>bool</td><td><code>false</code></td><td>Логувати SQL (також увімкнено при <code>app.debug</code>)</td></tr>
+                            <tr><td><code>log.db_queries</code></td><td>bool</td><td><code>false</code></td><td>Логувати SQL через <code>QueryLogger</code> (<code>ConfigKey::LOG_DB_QUERIES</code>)</td></tr>
                             <tr><td><code>log.validation_data</code></td><td>bool</td><td><code>false</code></td><td>Логувати дані валідації у FormRequest (з маскуванням)</td></tr>
                         </tbody>
                     </table>
@@ -269,7 +269,9 @@ LOG_MAX_FILES=14    → log.max_files</code></pre>
                     <table class="table table-dark table-striped table-bordered align-middle small">
                         <thead><tr><th>Ключ</th><th>Тип</th><th>Призначення</th></tr></thead>
                         <tbody>
-                            <tr><td><code>telemetry.enabled</code></td><td>bool</td><td>Телеметрія bootstrap і HTTP (див. <code>TelemetryCollector</code>)</td></tr>
+                            <tr><td><code>telemetry.enabled</code></td><td>bool</td><td>Головний перемикач <code>TelemetryCollector</code> (<code>ConfigKey::TELEMETRY_ENABLED</code>)</td></tr>
+                            <tr><td><code>telemetry.db_queries</code></td><td>bool</td><td>Записувати події <code>DB_QUERY_EXECUTED</code> (незалежно від <code>log.db_queries</code>)</td></tr>
+                            <tr><td><code>telemetry.logs</code></td><td>bool</td><td>Дублювати записи Monolog як <code>LOG_RECORDED</code> через <code>TelemetryLogHandler</code></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -351,7 +353,7 @@ $routes = $config->get(ConfigKey::ROUTES_LIST, []);</code></pre>
                 </p>
 
                 <h2 id="access" class="border-bottom pb-2 mb-3 mt-5">Доступ у коді</h2>
-                <p>Інжектуйте <code>Concept\Core\Components\Config\Contracts\ConfigInterface</code>:</p>
+                <p>Інжектуйте <code>Concept\Core\Services\Config\Contracts\ConfigInterface</code>:</p>
                 <pre class="mb-4"><code class="language-php">public function __construct(
     private readonly ConfigInterface $config,
 ) {}

@@ -386,7 +386,7 @@ return [
     ],
 ];</code></pre>
                 <p>
-                    Клас правила реалізує <code>RuleInterface</code>, успадковує <code>Concept\Core\Components\Validator\Rule</code>.
+                    Клас правила реалізує <code>RuleInterface</code>, успадковує <code>Concept\Core\Services\Validator\Rule</code>.
                     Наприклад:
                     <code>'email' =&gt; ['unique:users,email']</code> у <code>StoreUserRequest</code>,
                     <code>'email' =&gt; ['exists:users,email']</code> у <code>ForgotPasswordRequest</code>.
@@ -428,7 +428,7 @@ class StoreUserDto extends Dto implements DtoInterface
 
                 <h3 id="valinor" class="mt-4">Valinor і <code>Caster</code></h3>
                 <p>
-                    Мапінг виконує <code>Concept\Core\Components\Caster\Caster</code> на базі
+                    Мапінг виконує <code>Concept\Core\Services\Caster\Caster</code> на базі
                     <a href="https://valinor.cuyz.io/latest/" target="_blank" rel="noopener">Valinor</a>
                     (<code>cuyz/valinor</code> у залежностях core; можливий внутрішній форк з тим самим API
                     <code>CuyZ\Valinor</code> — тоді актуальна та сама документація).

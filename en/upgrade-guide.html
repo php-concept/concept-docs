@@ -73,11 +73,12 @@
                     <li>Update <code>.env.example</code> if new variables appeared.</li>
                 </ul>
 
-                <h2 id="breaking" class="border-bottom pb-2 mb-3 mt-5">4. Typical API changes</h2>
+                <h2 id="breaking" class="border-bottom pb-2 mb-3 mt-5">4. Align with current core API</h2>
                 <ul>
+                    <li><strong>Configuration</strong> — keys in <a href="configuration.html">Configuration</a> and <code>Concept\Core\Foundation\ConfigKey</code>.</li>
+                    <li><strong>Telemetry</strong> — <code>TelemetryCollector</code>, events and flags in <a href="telemetry.html">Telemetry</a>.</li>
                     <li><strong>URL</strong> — <code>UrlGeneratorInterface::uri()</code>, <code>url()</code>, <code>base()</code> (not Laravel <code>path()</code>/<code>route()</code>).</li>
                     <li><strong>Masking</strong> — <code>DataMaskerInterface</code>, <code>DataMaskerServiceProvider</code>.</li>
-                    <li><strong>Telemetry</strong> — <code>TelemetryCollector</code>, not <code>EventServiceProvider</code> — see <a href="telemetry.html">Telemetry</a>.</li>
                     <li><strong>Session</strong> — <code>session.cookie_domain</code>, <code>session.cookie_samesite</code> (not <code>session.domain</code>).</li>
                 </ul>
 

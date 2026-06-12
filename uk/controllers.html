@@ -86,7 +86,7 @@ $router->get('/projects/{id:number}', [CabinetProjectController::class, 'show'])
 
 namespace Concept\App\Controllers;
 
-use Concept\Core\Components\View\Contracts\ViewResponseFactoryInterface;
+use Concept\Core\Services\View\Contracts\ViewResponseFactoryInterface;
 use Psr\Http\Message\ResponseInterface;
 
 class IndexController
@@ -161,7 +161,7 @@ class UserController
                     <li><strong>invokeArgs()</strong> — виклик методу action</li>
                 </ol>
                 <p>
-                    Телеметрія <code>HTTP_ROUTE_CALLABLE_INVOKE</code> охоплює крок 5.
+                    Телеметрія <code>HTTP_ROUTE_CALLABLE_INVOKED</code> охоплює крок 5.
                     Детальніше — <a href="request-lifecycle.html#controller">життєвий цикл</a>.
                 </p>
 

@@ -227,8 +227,8 @@ return $app;</code></pre>
                 <p><strong>Мінімум для HTTP</strong> — конфіг і маршрутизація (потрібні <code>config/app.php</code>, <code>config/routes.php</code> і файл маршрутів):</p>
                 <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
 
-use Concept\Core\Providers\ConfigServiceProvider;
-use Concept\Core\Providers\HttpServiceProvider;
+use Concept\Core\Providers\Bootstrap\ConfigServiceProvider;
+use Concept\Core\Providers\Http\HttpServiceProvider;
 
 return [
     ConfigServiceProvider::class,
@@ -248,14 +248,14 @@ return [
                 </p>
                 <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
 
-use Concept\Core\Providers\ComponentsServiceProvider;
-use Concept\Core\Providers\ConfigServiceProvider;
-use Concept\Core\Providers\ConsoleServiceProvider;
-use Concept\Core\Providers\DatabaseServiceProvider;
-use Concept\Core\Providers\ErrorHandlerServiceProvider;
-use Concept\Core\Providers\HttpServiceProvider;
-use Concept\Core\Providers\LogServiceProvider;
-use Concept\Core\Providers\SessionServiceProvider;
+use Concept\Core\Providers\Component\ComponentsServiceProvider;
+use Concept\Core\Providers\Bootstrap\ConfigServiceProvider;
+use Concept\Core\Providers\Console\ConsoleServiceProvider;
+use Concept\Core\Providers\Database\DatabaseServiceProvider;
+use Concept\Core\Providers\Bootstrap\ErrorHandlerServiceProvider;
+use Concept\Core\Providers\Http\HttpServiceProvider;
+use Concept\Core\Providers\Logging\LogServiceProvider;
+use Concept\Core\Providers\Http\SessionServiceProvider;
 
 return [
     ConfigServiceProvider::class,

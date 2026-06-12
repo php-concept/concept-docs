@@ -73,11 +73,12 @@
                     <li>Оновіть <code>.env.example</code>, якщо з’явилися нові змінні.</li>
                 </ul>
 
-                <h2 id="breaking" class="border-bottom pb-2 mb-3 mt-5">4. Типові зміни API</h2>
+                <h2 id="breaking" class="border-bottom pb-2 mb-3 mt-5">4. Звірка з поточним API ядра</h2>
                 <ul>
+                    <li><strong>Конфігурація</strong> — ключі в <a href="configuration.html">Конфігурація</a> і <code>Concept\Core\Foundation\ConfigKey</code>.</li>
+                    <li><strong>Телеметрія</strong> — <code>TelemetryCollector</code>, події та прапорці в <a href="telemetry.html">Телеметрія</a>.</li>
                     <li><strong>URL</strong> — <code>UrlGeneratorInterface::uri()</code>, <code>url()</code>, <code>base()</code> (не Laravel <code>path()</code>/<code>route()</code>).</li>
                     <li><strong>Маскування</strong> — <code>DataMaskerInterface</code>, <code>DataMaskerServiceProvider</code>.</li>
-                    <li><strong>Телеметрія</strong> — <code>TelemetryCollector</code>, не <code>EventServiceProvider</code> — див. <a href="telemetry.html">Телеметрія</a>.</li>
                     <li><strong>Session</strong> — <code>session.cookie_domain</code>, <code>session.cookie_samesite</code> (не <code>session.domain</code>).</li>
                 </ul>
 

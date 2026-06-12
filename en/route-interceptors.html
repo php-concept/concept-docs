@@ -119,6 +119,8 @@
                 <p>
                     Order in the array is the invocation order. The class is resolved from the DI container
                     (constructor dependencies are injected automatically).
+                    With <code>telemetry.enabled</code>, each interceptor is timed as
+                    <code>TelemetryEvent::HTTP_ROUTE_INTERCEPTOR_EXECUTED</code>.
                 </p>
 
                 <h2 id="acl-example" class="border-bottom pb-2 mb-3 mt-5">Example: access control check</h2>

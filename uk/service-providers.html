@@ -236,7 +236,7 @@ return [
     DebugBarServiceProvider::class,
     DataMaskerServiceProvider::class,  // якщо ще не в app.php
 ],</code></pre>
-                <pre class="mb-4"><code class="language-php">// Concept\Core\Providers\ComponentsServiceProvider
+                <pre class="mb-4"><code class="language-php">// Concept\Core\Providers\Component\ComponentsServiceProvider
 foreach ($registry-&gt;providers() as $providerClass) {
     $this-&gt;getContainer()-&gt;addServiceProvider(new $providerClass());
 }</code></pre>

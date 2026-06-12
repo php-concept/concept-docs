@@ -62,6 +62,8 @@
 return [
     'telemetry' => [
         'enabled' => false,
+        'db_queries' => false,
+        'logs' => false,
     ],
 ];
 
@@ -69,6 +71,8 @@ return [
 return [
     'telemetry' => [
         'enabled' => true,
+        'db_queries' => true,
+        'logs' => false,
     ],
 ];</code></pre>
                 <p>
@@ -90,7 +94,7 @@ return [
                             </tr>
                             <tr>
                                 <td><code>TelemetryCollector</code></td>
-                                <td>Зберігання подій: <code>start()</code>, <code>finish()</code>, <code>mark()</code>, <code>items()</code></td>
+                                <td>Зберігання подій: <code>start()</code>, <code>finish()</code>, <code>record()</code>, <code>mark()</code>, <code>items()</code></td>
                             </tr>
                             <tr>
                                 <td><code>TelemetryTrait</code></td>
@@ -104,6 +108,10 @@ return [
                                 <td><code>TelemetryItem</code></td>
                                 <td>Один запис: контекст, <code>started_at</code>, <code>finished_at</code>, <code>duration</code></td>
                             </tr>
+                            <tr>
+                                <td><code>TelemetryLogHandler</code></td>
+                                <td>Monolog handler: дзеркалить записи логів у <code>LOG_RECORDED</code> за <code>telemetry.logs</code></td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -114,7 +122,7 @@ return [
                 </p>
 
                 <h2 id="builtin-records" class="border-bottom pb-2 mb-3 mt-5">Вбудовані записи</h2>
-                <p>Ідентифікатори в <code>Concept\Core\Telemetry\TelemetryEvent</code>:</p>
+                <p>Ідентифікатори в <code>Concept\Core\Services\Telemetry\TelemetryEvent</code>:</p>
                 <div class="table-responsive mb-4">
                     <table class="table table-dark table-striped table-bordered align-middle small">
                         <thead>
@@ -132,9 +140,24 @@ return [
                                 <td><code>ComponentsServiceProvider::boot()</code> — кожен активний компонент</td>
                             </tr>
                             <tr>
-                                <td><code>HTTP_ROUTE_CALLABLE_INVOKE</code></td>
-                                <td><code>http.route_callable_invoke</code></td>
-                                <td>Виклик handler у <code>RouteStrategy</code> (<code>start</code>/<code>finish</code>, контекст: route, handler)</td>
+                                <td><code>FRAMEWORK_ROUTES_REGISTERED</code></td>
+                                <td><code>framework.routes_registered</code></td>
+                                <td><code>HttpServiceProvider</code> після завантаження route-файлів з <code>routes.list</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>HTTP_ROUTE_INTERCEPTOR_EXECUTED</code></td>
+                                <td><code>http.route_interceptor_executed</code></td>
+                                <td>Кожен route interceptor у <code>RouteStrategy::runInterceptors()</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>HTTP_ROUTE_CALLABLE_INVOKED</code></td>
+                                <td><code>http.route_callable_invoked</code></td>
+                                <td>Виклик handler у <code>RouteStrategy</code> (<code>start</code>/<code>finish</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>HTTP_REQUEST_HANDLED</code></td>
+                                <td><code>http.request_handled</code></td>
+                                <td>Кінець <code>App::run()</code> — method, path, memory, загальна тривалість</td>
                             </tr>
                             <tr>
                                 <td><code>TPL_RENDERED</code></td>
@@ -144,7 +167,12 @@ return [
                             <tr>
                                 <td><code>DB_QUERY_EXECUTED</code></td>
                                 <td><code>db.query_executed</code></td>
-                                <td>SQL listener у <code>DatabaseServiceProvider</code> (якщо <code>log.query</code>)</td>
+                                <td>SQL listener у <code>DatabaseServiceProvider</code> (якщо <code>telemetry.db_queries</code>)</td>
+                            </tr>
+                            <tr>
+                                <td><code>LOG_RECORDED</code></td>
+                                <td><code>log.recorded</code></td>
+                                <td>Запис Monolog через <code>TelemetryLogHandler</code> (якщо <code>telemetry.logs</code>)</td>
                             </tr>
                             <tr>
                                 <td><code>HTTP_FORM_REQUEST_VALIDATED</code></td>
@@ -164,15 +192,23 @@ return [
 );</code></pre>
 
                 <h3 id="start-finish" class="mt-4"><code>start()</code> / <code>finish()</code> — span</h3>
-                <pre class="mb-4"><code class="language-php">$id = $this->telemetry()?->start(TelemetryEvent::HTTP_ROUTE_CALLABLE_INVOKE, [
+                <pre class="mb-4"><code class="language-php">$id = $this->telemetry()?->start(TelemetryEvent::HTTP_ROUTE_CALLABLE_INVOKED, [
     'route' => $route,
     'handler' => 'UserController::index',
 ]);
 try {
     // ...
 } finally {
-    $this->telemetry()?->finish(TelemetryEvent::HTTP_ROUTE_CALLABLE_INVOKE, (string) $id);
+    $this->telemetry()?->finish(TelemetryEvent::HTTP_ROUTE_CALLABLE_INVOKED, (string) $id);
 }</code></pre>
+
+                <h3 id="record" class="mt-4"><code>record()</code> — миттєвий span</h3>
+                <p>Поєднує <code>start()</code> і <code>finish()</code> в одному виклику (SQL, routes, підсумок HTTP):</p>
+                <pre class="mb-4"><code class="language-php">$this->telemetry()?->record(
+    TelemetryEvent::DB_QUERY_EXECUTED,
+    [TelemetryKey::SQL => $query->sql],
+    $query->time / 1000
+);</code></pre>
 
                 <h3 id="read" class="mt-4">Читання даних</h3>
                 <pre class="mb-4"><code class="language-php">/** @var TelemetryCollector $telemetry */
@@ -253,9 +289,9 @@ public function heavyOperation(): void
                         (див. <a href="request-lifecycle.html">життєвий цикл</a>)
                     </li>
                     <li>
-                        <strong>Illuminate <code>QueryExecuted</code></strong> — внутрішній dispatcher Eloquent
-                        для listener SQL; Concept-телеметрія SQL — окремий шар у <code>DatabaseServiceProvider</code>
-                        і залежить від <code>log.query</code>
+                        <strong>Логування SQL vs телеметрія</strong> — <code>log.db_queries</code> пише у
+                        <code>query.log</code>; <code>telemetry.db_queries</code> наповнює <code>TelemetryCollector</code>.
+                        Прапорці незалежні.
                     </li>
                 </ul>
 

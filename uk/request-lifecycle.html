@@ -223,7 +223,8 @@ $response = $router->dispatch($request);
                 </p>
                 <p>
                     Якщо <code>telemetry.enabled</code>, <code>RouteStrategy</code> фіксує
-                    <code>TelemetryEvent::HTTP_ROUTE_CALLABLE_INVOKE</code> (час виконання handler).
+                    <code>TelemetryEvent::HTTP_ROUTE_INTERCEPTOR_EXECUTED</code> (кожен interceptor) і
+                    <code>TelemetryEvent::HTTP_ROUTE_CALLABLE_INVOKED</code> (час виконання handler).
                 </p>
 
                 <h2 id="response" class="border-bottom pb-2 mb-3 mt-5">7. Відповідь</h2>
@@ -250,7 +251,9 @@ $response = $router->dispatch($request);
                 <p>
                     Якщо <code>telemetry.enabled = true</code>, ядро записує етапи bootstrap і HTTP через
                     <code>TelemetryCollector</code>: пробудження сервісів (<code>FRAMEWORK_SERVICE_AWAKENING</code>),
-                    реєстрацію компонентів, виклик handler (<code>HTTP_ROUTE_CALLABLE_INVOKE</code>).
+                    реєстрацію компонентів, завантаження route-файлів (<code>FRAMEWORK_ROUTES_REGISTERED</code>),
+                    span interceptor і handler, підсумок запиту (<code>HTTP_REQUEST_HANDLED</code> у <code>App::run()</code>).
+                    Опційно: SQL (<code>telemetry.db_queries</code>) і дзеркало логів (<code>telemetry.logs</code>).
                 </p>
 
                 <h2 id="cli-note" class="border-bottom pb-2 mb-3 mt-5">CLI — окремий цикл</h2>

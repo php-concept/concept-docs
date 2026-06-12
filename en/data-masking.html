@@ -131,7 +131,7 @@ return [
                 <h2 id="logger" class="border-bottom pb-2 mb-3 mt-5">Logger integration</h2>
                 <p>
                     <code>LogServiceProvider</code> passes <code>DataMaskerInterface</code> to
-                    <code>Concept\Core\Components\Logger\Logger</code>. The Monolog processor masks
+                    <code>Concept\Core\Services\Logger\Logger</code>. The Monolog processor masks
                     <code>$record->context</code> before writing to file or stderr.
                 </p>
                 <pre class="mb-4"><code class="language-php">$logger->info('User updated', [
@@ -144,7 +144,7 @@ return [
                 </p>
 
                 <h2 id="manual" class="border-bottom pb-2 mb-3 mt-5">Manual usage</h2>
-                <pre class="mb-4"><code class="language-php">use Concept\Core\Components\DataMasker\Contracts\DataMaskerInterface;
+                <pre class="mb-4"><code class="language-php">use Concept\Core\Services\DataMasker\Contracts\DataMaskerInterface;
 
 /** @var DataMaskerInterface $masker */
 $masker = $container-&gt;get(DataMaskerInterface::class);
@@ -166,9 +166,9 @@ $safe = $masker-&gt;mask([
                     If you need full control — in your own provider (after <code>DataMaskerServiceProvider</code>)
                     you can override the binding:
                 </p>
-                <pre class="mb-4"><code class="language-php">use Concept\Core\Components\DataMasker\Contracts\DataMaskerInterface;
-use Concept\Core\Components\DataMasker\DataMasker;
-use Concept\Core\Components\DataMasker\RegexDataMaskerRule;
+                <pre class="mb-4"><code class="language-php">use Concept\Core\Services\DataMasker\Contracts\DataMaskerInterface;
+use Concept\Core\Services\DataMasker\DataMasker;
+use Concept\Core\Services\DataMasker\RegexDataMaskerRule;
 
 $masker = new DataMasker();
 $masker-&gt;addRule(new RegexDataMaskerRule(

@@ -119,6 +119,8 @@
                 <p>
                     Порядок у масиві — порядок виклику. Клас резолвиться з DI-контейнера
                     (залежності конструктора підставляються автоматично).
+                    За <code>telemetry.enabled</code> кожен interceptor фіксується як
+                    <code>TelemetryEvent::HTTP_ROUTE_INTERCEPTOR_EXECUTED</code>.
                 </p>
 
                 <h2 id="acl-example" class="border-bottom pb-2 mb-3 mt-5">Приклад: перевірка прав доступу</h2>

@@ -386,7 +386,7 @@ return [
     ],
 ];</code></pre>
                 <p>
-                    A rule class implements <code>RuleInterface</code>, extends <code>Concept\Core\Components\Validator\Rule</code>.
+                    A rule class implements <code>RuleInterface</code>, extends <code>Concept\Core\Services\Validator\Rule</code>.
                     For example:
                     <code>'email' =&gt; ['unique:users,email']</code> in <code>StoreUserRequest</code>,
                     <code>'email' =&gt; ['exists:users,email']</code> in <code>ForgotPasswordRequest</code>.
@@ -428,7 +428,7 @@ class StoreUserDto extends Dto implements DtoInterface
 
                 <h3 id="valinor" class="mt-4">Valinor and <code>Caster</code></h3>
                 <p>
-                    Mapping is performed by <code>Concept\Core\Components\Caster\Caster</code> based on
+                    Mapping is performed by <code>Concept\Core\Services\Caster\Caster</code> based on
                     <a href="https://valinor.cuyz.io/latest/" target="_blank" rel="noopener">Valinor</a>
                     (<code>cuyz/valinor</code> in core dependencies; a possible internal fork with the same
                     <code>CuyZ\Valinor</code> API — then the same documentation applies).

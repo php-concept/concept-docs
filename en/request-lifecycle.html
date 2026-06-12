@@ -223,7 +223,8 @@ $response = $router->dispatch($request);
                 </p>
                 <p>
                     If <code>telemetry.enabled</code>, <code>RouteStrategy</code> records
-                    <code>TelemetryEvent::HTTP_ROUTE_CALLABLE_INVOKE</code> (handler execution time).
+                    <code>TelemetryEvent::HTTP_ROUTE_INTERCEPTOR_EXECUTED</code> (per interceptor) and
+                    <code>TelemetryEvent::HTTP_ROUTE_CALLABLE_INVOKED</code> (handler execution time).
                 </p>
 
                 <h2 id="response" class="border-bottom pb-2 mb-3 mt-5">7. Response</h2>
@@ -250,7 +251,9 @@ $response = $router->dispatch($request);
                 <p>
                     If <code>telemetry.enabled = true</code>, the core records bootstrap and HTTP stages via
                     <code>TelemetryCollector</code>: service awakening (<code>FRAMEWORK_SERVICE_AWAKENING</code>),
-                    component registration, handler invocation (<code>HTTP_ROUTE_CALLABLE_INVOKE</code>).
+                    component registration, route file loading (<code>FRAMEWORK_ROUTES_REGISTERED</code>),
+                    interceptor and handler spans, full request summary (<code>HTTP_REQUEST_HANDLED</code> in <code>App::run()</code>).
+                    Optional: SQL (<code>telemetry.db_queries</code>) and log mirroring (<code>telemetry.logs</code>).
                 </p>
 
                 <h2 id="cli-note" class="border-bottom pb-2 mb-3 mt-5">CLI — separate cycle</h2>
