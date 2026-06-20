@@ -63,7 +63,7 @@
                         <tbody>
                             <tr>
                                 <td><code>StorePreviousUrlMiddleware</code></td>
-                                <td>URL chain in session + <code>RequestAttribute::SAFE_BACK_URL</code></td>
+                                <td>URL chain in session + <code>Concept\Core\Http\Requests\RequestAttribute::SAFE_BACK_URL</code></td>
                             </tr>
                             <tr>
                                 <td><code>ResponseFactory::back()</code></td>
@@ -93,7 +93,7 @@
                     If the URI differs from the current session value, the previous <code>CURRENT_URL</code>
                     becomes <code>PREVIOUS_URL</code>, and the new URI becomes <code>CURRENT_URL</code>.
                 </p>
-                <p>On every request the PSR-7 attribute <code>RequestAttribute::SAFE_BACK_URL</code> (<code>safe_back_url</code>) is set:</p>
+                <p>On every request the PSR-7 attribute <code>Concept\Core\Http\Requests\RequestAttribute::SAFE_BACK_URL</code> (<code>safe_back_url</code>) is set:</p>
                 <ul>
                     <li><strong>GET</strong> — <code>PREVIOUS_URL</code> (the page you came from)</li>
                     <li><strong>POST</strong>, <strong>PUT</strong>, <strong>PATCH</strong>, <strong>DELETE</strong>, and other non-GET methods — <code>CURRENT_URL</code> (the form page)</li>

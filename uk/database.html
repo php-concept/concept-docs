@@ -176,8 +176,8 @@ public function index(): ResponseInterface
 
                 <h2 id="migrations" class="border-bottom pb-2 mb-3 mt-5">Міграції</h2>
                 <p>
-                    Каталоги міграцій реєструються в <code>config/migrations.php</code> (додаток) і в
-                    <code>config.php</code> компонента (секція <code>migrations.paths</code>).
+                    Каталоги міграцій реєструються в <code>config/migrations.php</code> (додаток) і через
+                    <code>ComponentInterface::migrationPaths()</code>.
                     Під час <code>ComponentsServiceProvider::boot()</code> шляхи всіх увімкнених компонентів
                     додаються до <code>MigrationRegistry</code>.
                 </p>
@@ -189,10 +189,13 @@ return [
     ],
 ];
 
-// src/Components/AuthAdmin/config.php
-'migrations' =&gt; [
-    'paths' =&gt; ['src/Components/AuthAdmin/Database/Migrations'],
-],</code></pre>
+// AuthAdminComponent::migrationPaths()
+public function migrationPaths(): array
+{
+    return [
+        $this->pathManager->toRelative($this->componentDir . '/Database/Migrations'),
+    ];
+}</code></pre>
                 <p>
                     Файл міграції — анонімний клас, що розширює <code>Migration</code>, з методами <code>up()</code> / <code>down()</code>.
                     Приклад іменування файлів: <code>V2026_03_23_120000_CreatePagesTable.php</code>.
@@ -225,7 +228,8 @@ return new class extends Migration
 
                 <h2 id="seeders" class="border-bottom pb-2 mb-3 mt-5">Сидери</h2>
                 <p>
-                    Класи сидерів перелічуються в <code>config/seeders.php</code> і в <code>seeders.list</code> компонента.
+                    Класи сидерів перелічуються в <code>config/seeders.php</code> і в
+                    <code>ComponentInterface::seeders()</code>.
                     <code>SeederManager</code> викликає <code>run()</code> лише для класів, що реалізують
                     <code>Concept\Core\Services\Database\Contracts\SeederInterface</code>.
                     Зазвичай сидер також extends <code>Illuminate\Database\Seeder</code>.

@@ -72,7 +72,6 @@
 └── Components/
     └── AuthAdmin/                # example module
         ├── AuthAdminComponent.php
-        ├── config.php            # module metadata
         ├── routes.php            # HTTP routes
         ├── Controllers/
         ├── Middlewares/
@@ -108,7 +107,7 @@ routes/web.php                  # global routes + middleware stack</code></pre>
                 </div>
 
                 <h2 id="contract" class="border-bottom pb-2 mb-3 mt-5">ComponentInterface contract</h2>
-                <p>The component class implements <code>Concept\Core\Services\Component\Contracts\ComponentInterface</code> (in skeleton — via <code>BaseComponent</code>):</p>
+                <p>The component class implements <code>Concept\Core\Services\Component\Contracts\ComponentInterface</code> directly — metadata and registration data are returned from its methods:</p>
                 <div class="table-responsive mb-4">
                     <table class="table table-dark table-striped table-bordered align-middle small">
                         <thead>
@@ -123,12 +122,12 @@ routes/web.php                  # global routes + middleware stack</code></pre>
                             <tr><td><code>viewExtensions()</code></td><td><code>Twig\Extension\ExtensionInterface</code> classes</td></tr>
                             <tr><td><code>commands()</code></td><td>Symfony Console commands</td></tr>
                             <tr><td><code>seeders()</code></td><td>Seeder classes</td></tr>
-                            <tr><td><code>migrations()</code></td><td>Paths to migration directories</td></tr>
+                            <tr><td><code>migrationPaths()</code></td><td>Paths to migration directories</td></tr>
                             <tr><td><code>assets()</code></td><td>Map of <code>source → public</code> for <code>component:publish-assets</code></td></tr>
                         </tbody>
                     </table>
                 </div>
-                <p>Declared in the module <code>config.php</code>; <code>BaseComponent</code> reads it via Noodlehaus Config.</p>
+                <p>Use <code>PathManager</code> in the constructor to build paths relative to the application root (see <code>AuthAdminComponent</code>).</p>
 
                 <h2 id="registration" class="border-bottom pb-2 mb-3 mt-5">Application registration</h2>
                 <pre class="mb-4"><code class="language-php">// config/components.php
@@ -152,7 +151,7 @@ return [
                 <ol>
                     <li>Records telemetry <code>FRAMEWORK_COMPONENT_REGISTERED</code> (<a href="telemetry.html">Telemetry</a>)</li>
                     <li>Registers console commands, migration paths, and seeders</li>
-                    <li>Attaches nested service providers from <code>config.php</code></li>
+                    <li>Registers nested service providers from <code>providers()</code></li>
                     <li><code>require</code>s <code>routes.php</code> files (<code>$router</code> variable available)</li>
                     <li>In HTTP (not CLI) — adds Twig paths, extensions, and view contexts</li>
                 </ol>
@@ -164,7 +163,7 @@ return [
                     <li>Create <code>src/Components/MyFeature/</code> with subdirectories following AuthAdmin.</li>
                     <li>Move controllers, models, FormRequest, views, middleware into the component directory; update namespace to <code>Concept\Components\MyFeature\...</code>.</li>
                     <li>Extract feature routes from <code>routes/web.php</code> into <code>MyFeature/routes.php</code>.</li>
-                    <li>Add <code>MyFeatureComponent.php</code> (extends <code>BaseComponent</code>) and <code>config.php</code>.</li>
+                    <li>Add <code>MyFeatureComponent.php</code> implementing <code>ComponentInterface</code>.</li>
                     <li>Register the class in <code>config/components.php</code>.</li>
                     <li>Leave only shared code in <code>App/</code>: BaseModel, global layouts, utilities.</li>
                     <li>Run <code>php bin/console.php db:migrate</code> and <code>component:publish-assets</code> as needed.</li>
@@ -172,6 +171,43 @@ return [
                 <p>
                     If a module uses a shared layout (<code>@dashboard</code>), templates in <code>resources/views/dashboard/</code>
                     are not moved — the component only <code>extends</code> them in Twig.
+                </p>
+
+                <h2 id="shipped" class="border-bottom pb-2 mb-3 mt-5">Reference components</h2>
+                <p>The demo application ships several ready-made modules (code in <code>src/Components/</code>):</p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Component</th><th>Purpose</th><th>Registration</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>AuthAdmin</code></td>
+                                <td>Admin login, dashboard, user CRUD</td>
+                                <td><code>config/components.php</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>Acl</code></td>
+                                <td>Role-based access control, route interceptor, admin UI</td>
+                                <td><code>config/components.php</code> + <code>routes.interceptors</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>SettingsManager</code></td>
+                                <td>Typed application settings, admin CRUD, Twig helpers</td>
+                                <td><code>config/components.php</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>DebugBar</code></td>
+                                <td>PHP Debug Bar for HTML responses (dev only)</td>
+                                <td><code>config/dev/components.php</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>
+                    <code>Acl</code> also requires <code>AclRouteAuthorization</code> in <code>config/routes.php</code> and
+                    <code>HandleAccessDeniedMiddleware</code> as the first global middleware — see
+                    <a href="route-interceptors.html">Route interceptors</a>.
                 </p>
 
                 <h2 id="vs-app" class="border-bottom pb-2 mb-3 mt-5">Component vs App code</h2>

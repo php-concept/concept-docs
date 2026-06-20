@@ -55,10 +55,11 @@
                     <li>PSR-7 HTTP, PSR-11 DI (League Container + Reflection), PSR-15 middleware</li>
                     <li>League Route, <code>RouteStrategy</code> (FormRequest, route params, interceptors)</li>
                     <li>Illuminate Database (Eloquent, migrations, pagination)</li>
-                    <li>Rakit validation, Valinor DTO casting, Twig views</li>
-                    <li>Component registration: routes, migrations, seeders, views, CLI</li>
+                    <li>Rakit validation, Valinor DTO casting, Twig/Plates views</li>
+                    <li>Component registration: routes, migrationPaths, seeders, views, CLI</li>
                     <li>CSRF, data masker, safe redirects, telemetry hooks</li>
                     <li>Symfony Console, Whoops / production fallbacks</li>
+                    <li>Strict types PHP 8.4+</li>
                 </ul>
 
                 <h2 id="skeleton" class="border-bottom pb-2 mb-3 mt-5">Concept Skeleton</h2>
@@ -71,6 +72,45 @@
                 <p>
                     Static site (Bootstrap 5, Highlight.js): sections from installation through components,
                     Ukrainian and English versions. Content is verified against code in <code>code/core</code> and <code>code/skeleton</code>.
+                </p>
+
+                <h2 id="reference-components" class="border-bottom pb-2 mb-3 mt-5">Reference components</h2>
+                <p>
+                    The documentation examples are based on reference components shipped with skeleton-demo
+                    (<code>code/skeleton-demo/src/Components/</code>). Each implements <code>ComponentInterface</code> directly:
+                </p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Component</th><th>Purpose</th><th>Key methods</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>AuthAdmin</code></td>
+                                <td>Admin authentication, dashboard, user CRUD</td>
+                                <td><code>routes()</code>, <code>viewPaths()</code>, <code>commands()</code>, <code>assets()</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>Acl</code></td>
+                                <td>Route-level ACL, admin matrix UI, <code>AclRouteAuthorization</code></td>
+                                <td><code>providers()</code>, <code>seeders()</code>, <code>migrationPaths()</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>SettingsManager</code></td>
+                                <td>Centralized application settings storage</td>
+                                <td><code>providers()</code>, <code>viewPaths()</code>, <code>assets()</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>DebugBar</code></td>
+                                <td>PHP Debug Bar integration (dev only)</td>
+                                <td><code>providers()</code>, <code>assets()</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>
+                    See <a href="creating-components.html">Creating a component</a> for a step-by-step walkthrough
+                    using AuthAdmin, and <a href="route-interceptors.html">Route interceptors</a> for the Acl component.
                 </p>
 
                 <p class="small text-body-secondary">

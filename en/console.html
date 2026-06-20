@@ -110,7 +110,7 @@ $console-&gt;run();</code></pre>
                     <li><code>ConsoleServiceProvider</code> creates <code>Application</code> with name/version from <code>app.name</code> / <code>app.version</code></li>
                     <li>Classes from <code>config/commands.php</code> (<code>ConfigKey::COMMANDS</code>) are resolved from DI and added to the application</li>
                     <li>If a command dependency is unavailable — a <code>DisabledCommand</code> is registered with an error explanation</li>
-                    <li><code>ComponentsServiceProvider::boot()</code> adds commands from <code>commands</code> in each component <code>config.php</code></li>
+                    <li><code>ComponentsServiceProvider::boot()</code> adds commands from <code>ComponentInterface::commands()</code> on each active component</li>
                 </ol>
                 <pre class="mb-4"><code class="language-php">// config/commands.php (fragment)
 return [
@@ -275,7 +275,7 @@ Run command to see details. !!!</code></pre>
                             <tr><td><code>route:list</code></td><td>Route table; <code>-F</code> / <code>--full-middleware</code> — middleware FQCN</td></tr>
                             <tr><td><code>view:clear</code></td><td>Clear Twig cache directory (<code>storage/cache/{view.cache_dir}</code>)</td></tr>
                             <tr><td><code>component:list</code></td><td>List enabled components (<code>ComponentRegistry</code>)</td></tr>
-                            <tr><td><code>component:publish-assets</code></td><td>Copy <code>assets</code> from component <code>config.php</code> to <code>public/</code></td></tr>
+                            <tr><td><code>component:publish-assets</code></td><td>Copy assets from <code>ComponentInterface::assets()</code> to <code>public/</code></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -293,15 +293,18 @@ php bin/console.php view:clear</code></pre>
 
                 <h2 id="component-commands" class="border-bottom pb-2 mb-3 mt-5">Component commands</h2>
                 <p>
-                    A component adds commands in the <code>commands</code> section of its <code>config.php</code>.
+                    A component adds commands via <code>ComponentInterface::commands()</code>.
                     During <code>ComponentsServiceProvider::boot()</code> they are resolved from the container
                     and added to the same <code>ConsoleApplication</code>.
                     CLI does not register component view extensions/paths (only commands, migrations, seeders, providers).
                 </p>
-                <pre class="mb-4"><code class="language-php">// src/Components/AuthAdmin/config.php
-'commands' =&gt; [
-    UserListCommand::class,
-],
+                <pre class="mb-4"><code class="language-php">// AuthAdminComponent::commands()
+public function commands(): array
+{
+    return [
+        UserListCommand::class,
+    ];
+}
 
 // php bin/console.php user:list
 // php bin/console.php user:list --limit=5</code></pre>

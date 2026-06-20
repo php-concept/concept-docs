@@ -256,7 +256,7 @@ LOG_MAX_FILES=14    → log.max_files</code></pre>
                 <p>
                     <code>components</code> — список FQCN класів, що реалізують <code>ComponentInterface</code>.
                     У середовищі може бути запис <code>MyComponent::class => MyComponent::class</code> —
-                    ядро ітерує значення масиву. Компоненти додають маршрути, migrations, seeders, views, CLI-команди.
+                    ядро ітерує значення масиву. Компоненти додають маршрути, шляхи міграцій, seeders, views і CLI-команди через методи <code>ComponentInterface</code>.
                 </p>
                 <pre class="mb-4"><code class="language-php">return [
     'components' => [
@@ -306,6 +306,12 @@ LOG_MAX_FILES=14    → log.max_files</code></pre>
 
                 <h3 id="file-validator">validator.php</h3>
                 <p><code>validator.rules</code> — кастомні правила валідації (<code>unique</code>, <code>exists</code> тощо).</p>
+
+                <h3 id="file-caster">caster.php</h3>
+                <p>
+                    <code>caster.transformers</code> — список класів кастомних трансформаторів для мапінгу DTO через Valinor.
+                    Відповідає <code>ConfigKey::CASTER_TRANSFORMERS</code>.
+                </p>
 
                 <h3 id="file-pagination">pagination.php</h3>
                 <p>

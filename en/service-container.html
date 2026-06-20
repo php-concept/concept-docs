@@ -244,7 +244,7 @@ public function __construct(private readonly LoggerInterface $logger) {}</code><
                     <li>Create a class (preferably interface + implementation).</li>
                     <li>
                         Register in an application or component <code>ServiceProvider</code>
-                        (<code>providers</code> in component <code>config.php</code>).
+                        (<code>providers()</code> on the component class).
                     </li>
                     <li>Inject the type into a controller / service constructor.</li>
                 </ol>

@@ -124,11 +124,11 @@ final class ExampleMiddleware implements MiddlewareInterface
                             </tr>
                             <tr>
                                 <td><code>StorePreviousUrlMiddleware</code></td>
-                                <td>On GET (non-AJAX) stores <code>_url_current</code> / <code>_url_previous</code> in session; sets <code>RequestAttribute::SAFE_BACK_URL</code></td>
+                                <td>On GET (non-AJAX) stores <code>_url_current</code> / <code>_url_previous</code> in session; sets <code>Concept\Core\Http\Requests\RequestAttribute::SAFE_BACK_URL</code></td>
                             </tr>
                             <tr>
                                 <td><code>ShareViewDataMiddleware</code></td>
-                                <td>Flash, validation errors, old input, <code>csrf_token</code> → <code>RequestAttribute::VIEW_PAYLOAD</code></td>
+                                <td>Flash, validation errors, old input, <code>csrf_token</code> → <code>Concept\Core\Http\Requests\RequestAttribute::VIEW_PAYLOAD</code></td>
                             </tr>
                             <tr>
                                 <td><code>ParseJsonBodyMiddleware</code></td>
@@ -189,12 +189,12 @@ $router->group('/cabinet', function (RouteGroup $route) {
                         <thead><tr><th>Constant</th><th>Set by</th><th>Read by</th></tr></thead>
                         <tbody>
                             <tr>
-                                <td><code>RequestAttribute::VIEW_PAYLOAD</code></td>
+                                <td><code>Concept\Core\Http\Requests\RequestAttribute::VIEW_PAYLOAD</code></td>
                                 <td><code>ShareViewDataMiddleware</code></td>
                                 <td><code>ViewResponseFactory</code> → <code>ViewInterface::share()</code></td>
                             </tr>
                             <tr>
-                                <td><code>RequestAttribute::SAFE_BACK_URL</code></td>
+                                <td><code>Concept\Core\Http\Requests\RequestAttribute::SAFE_BACK_URL</code></td>
                                 <td><code>StorePreviousUrlMiddleware</code></td>
                                 <td><code>ResponseFactory::back()</code></td>
                             </tr>

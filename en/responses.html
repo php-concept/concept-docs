@@ -49,6 +49,9 @@
                     headers and body are sent to the PHP SAPI (FPM, Apache, built-in server).
                 </p>
                 <p>
+                    For accessing the current request anywhere in the application, the <code>RequestProxy</code> service can be used.
+                </p>
+                <p>
                     See also:
                     <a href="controllers.html">controllers</a>,
                     <a href="request-lifecycle.html#response">request lifecycle → response</a>,
@@ -97,7 +100,7 @@
                 </ul>
                 <p>
                     <code>ViewResponseFactory</code> merges data from the request attribute
-                    <code>RequestAttribute::VIEW_PAYLOAD</code> (flash, <code>errors</code>, <code>old</code>, CSRF
+                    <code>Concept\Core\Http\Requests\RequestAttribute::VIEW_PAYLOAD</code> (flash, <code>errors</code>, <code>old</code>, CSRF
                     from <a href="middleware.html#core-middleware">ShareViewDataMiddleware</a>), then renders Twig
                     and sets <code>Content-Type: text/html</code>.
                     For more on templates — <a href="views.html">Views</a>.
@@ -213,14 +216,14 @@ $response = $this-&gt;response-&gt;createResponse(HttpStatusCode::NO_CONTENT);
     $this-&gt;userModel-&gt;newQuery()-&gt;create(
         $this-&gt;normalizeUserPayload($request-&gt;validated())
     );
-    $this-&gt;flashBag-&gt;add('success', 'User successfully created');
+    $this-&gt;flashBag-&gt;addSuccess('User successfully created');
 
     return $this-&gt;response-&gt;redirectByName('admin.users');
 }</code></pre>
 
                 <h3 id="pattern-not-found" class="mt-4">Not found → flash + redirect</h3>
                 <pre class="mb-4"><code class="language-php">if (!($user instanceof UserModel)) {
-    $this-&gt;flashBag-&gt;add('error', 'User not found');
+    $this-&gt;flashBag-&gt;addError('User not found');
     return $this-&gt;response-&gt;redirectByName('admin.users');
 }
 

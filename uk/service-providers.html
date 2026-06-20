@@ -176,12 +176,13 @@ final class BillingServiceProvider extends AbstractServiceProvider implements Bo
                             <tr><td><code>LocaleServiceProvider</code></td><td><code>LocaleResolverInterface</code>, локаль застосунку</td></tr>
                             <tr><td><code>TelemetryServiceProvider</code></td><td><code>TelemetryCollector</code> — телеметрія bootstrap/HTTP</td></tr>
                             <tr><td><code>ErrorHandlerServiceProvider</code></td><td>Whoops після config (HTML/JSON/CLI)</td></tr>
-                            <tr><td><code>HttpServiceProvider</code></td><td>PSR-7, Router, URL generator, responses, routes з config</td></tr>
-                            <tr><td><code>SessionServiceProvider</code></td><td>Сесія, flash bag</td></tr>
+                            <tr><td><code>HttpServiceProvider</code></td><td>PSR-7, Router, URL generator, responses, <code>RequestProxy</code></td></tr>
+                            <tr><td><code>SessionServiceProvider</code></td><td>Сесія, flash bag (<code>FlashBagInterface</code>)</td></tr>
                             <tr><td><code>DataMaskerServiceProvider</code></td><td>Маскування чутливих даних у логах</td></tr>
-                            <tr><td><code>LogServiceProvider</code></td><td><code>LoggerInterface</code> (Monolog)</td></tr>
-                            <tr><td><code>ViewRegistryServiceProvider</code></td><td>Реєстри paths/extensions/contexts для Twig</td></tr>
-                            <tr><td><code>TwigServiceProvider</code></td><td><code>ViewInterface</code> (Twig environment)</td></tr>
+                            <tr><td><code>LogServiceProvider</code></td><td><code>LoggerInterface</code>, <code>QueryLogger</code>, <code>TelemetryLogHandler</code></td></tr>
+                            <tr><td><code>ViewRegistryServiceProvider</code></td><td>Реєстри шляхів/розширень/контекстів для Twig/Plates</td></tr>
+                            <tr><td><code>TwigServiceProvider</code></td><td><code>ViewInterface</code> (оточення Twig)</td></tr>
+                            <tr><td><code>PlatesServiceProvider</code></td><td><code>ViewInterface</code> (двигун Plates)</td></tr>
                             <tr><td><code>ValidationServiceProvider</code></td><td>Rakit validator, custom rules з config</td></tr>
                             <tr><td><code>DatabaseServiceProvider</code></td><td>Eloquent Capsule, migrations/seeders registries</td></tr>
                             <tr><td><code>CastingServiceProvider</code></td><td>Valinor <code>CasterInterface</code></td></tr>
@@ -228,14 +229,20 @@ return [
 
                 <h2 id="component-providers" class="border-bottom pb-2 mb-3 mt-5">Провайдери компонентів</h2>
                 <p>
-                    Компонент оголошує провайдери в <code>Component/config.php</code>.
+                    Компонент оголошує провайдери в методі <code>providers()</code>.
                     <code>ComponentsServiceProvider::boot()</code> підключає їх динамічно:
                 </p>
-                <pre class="mb-4"><code class="language-php">// src/Components/DebugBar/config.php
-'providers' =&gt; [
-    DebugBarServiceProvider::class,
-    DataMaskerServiceProvider::class,  // якщо ще не в app.php
-],</code></pre>
+                <pre class="mb-4"><code class="language-php">// AclComponent::providers()
+public function providers(): array
+{
+    return [AclServiceProvider::class];
+}
+
+// DebugBarComponent::providers()
+public function providers(): array
+{
+    return [DebugBarServiceProvider::class];
+}</code></pre>
                 <pre class="mb-4"><code class="language-php">// Concept\Core\Providers\Component\ComponentsServiceProvider
 foreach ($registry-&gt;providers() as $providerClass) {
     $this-&gt;getContainer()-&gt;addServiceProvider(new $providerClass());
@@ -243,7 +250,8 @@ foreach ($registry-&gt;providers() as $providerClass) {
                 <p>
                     Список активних компонентів — <code>config/components.php</code>
                     (у dev може бути <code>config/dev/components.php</code> з DebugBar).
-                    Клас компонента (<code>AuthAdminComponent</code>) читає свій <code>config.php</code>.
+                    Клас компонента (<code>AuthAdminComponent</code>, <code>AclComponent</code> тощо)
+                    реалізує <code>ComponentInterface</code> і повертає метадані з власних методів.
                 </p>
 
                 <h3 id="components-boot" class="mt-4">Що робить <code>ComponentsServiceProvider::boot()</code></h3>
@@ -277,10 +285,11 @@ foreach ($registry-&gt;providers() as $providerClass) {
                     вище в списку), listeners SQL. Capsule додається в контейнер уже налаштованим.
                 </p>
 
-                <h3 id="example-view" class="mt-4">TwigServiceProvider — Twig</h3>
+                <h3 id="example-view" class="mt-4">TwigServiceProvider / PlatesServiceProvider</h3>
                 <p>
-                    Збирає <code>Environment</code> Twig: cache, debug, extensions з config, paths з registries.
-                    Після boot компонентів у registries з’являються додаткові namespaces.
+                    Реєструє двигун представлень. Twig збирає <code>Environment</code> (кеш, debug, розширення з конфігу, шляхи з реєстрів).
+                    Plates надає альтернативу на чистих PHP-шаблонах.
+                    Після завантаження компонентів реєстри отримують додаткові простори імен, доступні двигуну.
                 </p>
                 <p>
                     Twig: <a href="https://twig.symfony.com/doc/" target="_blank" rel="noopener">twig.symfony.com</a>,
@@ -305,8 +314,8 @@ foreach ($registry-&gt;providers() as $providerClass) {
                 <h2 id="checklist" class="border-bottom pb-2 mb-3 mt-5">Чеклист нового модуля</h2>
                 <ol>
                     <li>Компонент у <code>config/components.php</code></li>
-                    <li>За потреби — <code>providers</code> у <code>Component/config.php</code></li>
-                    <li><code>routes.php</code>, <code>view.paths</code>, migrations — у config компонента</li>
+                    <li>За потреби — <code>providers()</code> у класі компонента</li>
+                    <li><code>routes.php</code>, <code>viewPaths()</code>, <code>migrationPaths()</code> — у методах компонента</li>
                     <li>Класи сервісів резолвляться через autowiring або binding у провайдері модуля</li>
                 </ol>
 

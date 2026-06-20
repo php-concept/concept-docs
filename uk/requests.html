@@ -424,6 +424,7 @@ class StoreUserDto extends Dto implements DtoInterface
                     <li>Типи в конструкторі мають відповідати тому, що поверне валідатор + Valinor casting</li>
                     <li>Необов’язкові поля — default у конструкторі або <code>?type</code></li>
                     <li>Поля з <code>$except</code> не потраплять у DTO</li>
+                    <li>Поля з <code>$only</code> обмежують те, що потрапляє у <code>validated()</code> та DTO</li>
                 </ul>
 
                 <h3 id="valinor" class="mt-4">Valinor і <code>Caster</code></h3>
@@ -437,6 +438,7 @@ class StoreUserDto extends Dto implements DtoInterface
                 <ul>
                     <li><code>allowScalarValueCasting()</code> — рядок <code>"1"</code> → <code>int</code> / <code>bool</code> за потреби</li>
                     <li><code>allowSuperfluousKeys()</code> — зайві ключі в масиві не ламають мапінг (зручно для форм)</li>
+                    <li>Трансформатори: власна логіка для складних типів через ключ конфігу <code>caster.transformers</code></li>
                     <li>Кеш мапера: <code>storage/cache/valinor</code> (швидший повторний мапінг)</li>
                 </ul>
                 <p>Корисні розділи документації Valinor:</p>

@@ -176,8 +176,8 @@ public function index(): ResponseInterface
 
                 <h2 id="migrations" class="border-bottom pb-2 mb-3 mt-5">Migrations</h2>
                 <p>
-                    Migration directories are registered in <code>config/migrations.php</code> (application) and in
-                    the component <code>config.php</code> (<code>migrations.paths</code> section).
+                    Migration directories are registered in <code>config/migrations.php</code> (application) and via
+                    <code>ComponentInterface::migrationPaths()</code> on each component class.
                     During <code>ComponentsServiceProvider::boot()</code> paths from all enabled components
                     are added to <code>MigrationRegistry</code>.
                 </p>
@@ -189,10 +189,13 @@ return [
     ],
 ];
 
-// src/Components/AuthAdmin/config.php
-'migrations' =&gt; [
-    'paths' =&gt; ['src/Components/AuthAdmin/Database/Migrations'],
-],</code></pre>
+// AuthAdminComponent::migrationPaths()
+public function migrationPaths(): array
+{
+    return [
+        $this->pathManager->toRelative($this->componentDir . '/Database/Migrations'),
+    ];
+}</code></pre>
                 <p>
                     A migration file is an anonymous class extending <code>Migration</code>, with <code>up()</code> / <code>down()</code> methods.
                     Example file naming: <code>V2026_03_23_120000_CreatePagesTable.php</code>.
@@ -225,7 +228,8 @@ return new class extends Migration
 
                 <h2 id="seeders" class="border-bottom pb-2 mb-3 mt-5">Seeders</h2>
                 <p>
-                    Seeder classes are listed in <code>config/seeders.php</code> and in the component <code>seeders.list</code>.
+                    Seeder classes are listed in <code>config/seeders.php</code> and via
+                    <code>ComponentInterface::seeders()</code> on each component class.
                     <code>SeederManager</code> calls <code>run()</code> only for classes that implement
                     <code>Concept\Core\Services\Database\Contracts\SeederInterface</code>.
                     A seeder usually also extends <code>Illuminate\Database\Seeder</code>.

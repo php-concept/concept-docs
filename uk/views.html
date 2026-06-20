@@ -44,13 +44,14 @@
                 <h1 class="display-6 fw-bold mb-4">Представлення</h1>
 
                 <p>
-                    HTML у Concept Core рендериться через <strong>Twig</strong>.
-                    Шаблони — файли <code>.twig</code> у каталозі views; у контролері відповідь збирається через
+                    HTML у Concept Core рендериться через <strong>Twig</strong> або <strong>Plates</strong>.
+                    Шаблони — файли <code>.twig</code> або <code>.php</code> у каталозі views; у контролері відповідь збирається через
                     <code>ViewResponseFactoryInterface::create()</code> (див. <a href="responses.html#html">Відповіді → HTML</a>).
                 </p>
                 <p>
                     Низькорівневий рендер — <code>ViewInterface::render()</code> (сервіси, error handler).
-                    Шляхи до views налаштовуються в <code>config/view.php</code> і в <code>config.php</code> компонентів.
+                    Шляхи до views налаштовуються в <code>config/view.php</code> і через
+                    <code>ComponentInterface::viewPaths()</code> / <code>viewContexts()</code> компонентів.
                 </p>
 
                 <h2 id="namespaces" class="border-bottom pb-2 mb-3 mt-5">Простори імен Twig</h2>
@@ -64,11 +65,14 @@
     'dashboard' =&gt; '/resources/views/dashboard',
 ],
 
-// src/Components/UserCabinet/config.php
-'paths' =&gt; [
-    'cabinet' =&gt; '/src/Components/UserCabinet/Views',
-],</code></pre>
-                <p>Файл <code>src/Components/UserCabinet/Views/index.twig</code> → <code>@cabinet/index</code>.</p>
+// AuthAdminComponent::viewPaths()
+public function viewPaths(): array
+{
+    return [
+        'auth-admin' => $this->pathManager->toRelative($this->componentDir . '/Views'),
+    ];
+}</code></pre>
+                <p>Файл <code>src/Components/AuthAdmin/Views/users/list.twig</code> → <code>@auth-admin/users/list</code>.</p>
                 <p>
                     Каталог <code>resources/views</code> (<code>PathName::VIEWS</code> у <code>paths.php</code>) також додано
                     як fallback без namespace — рідко потрібен, якщо всі шаблони в namespaced paths.
@@ -195,16 +199,17 @@ src/Components/UserCabinet/Views/
     '/' =&gt; 'frontend',
 ],
 
-// src/Components/AuthAdmin/config.php
-'contexts' =&gt; [
-    '/admin' =&gt; 'dashboard',
-],
+// AuthAdminComponent::viewContexts()
+public function viewContexts(): array
+{
+    return ['/admin' => 'dashboard'];
+},
 
-// src/Components/UserCabinet/config.php
-'contexts' =&gt; [
-    '/cabinet' =&gt; 'cabinet',
-    '/login' =&gt; 'cabinet',
-],</code></pre>
+// SettingsManagerComponent::viewContexts()
+public function viewContexts(): array
+{
+    return ['/admin' => 'dashboard'];
+},</code></pre>
 
                 <div class="table-responsive mb-4">
                     <table class="table table-dark table-striped table-bordered align-middle small">
@@ -287,20 +292,27 @@ src/Components/UserCabinet/Views/
 
                 <h2 id="components" class="border-bottom pb-2 mb-3 mt-5">Views у компонентах</h2>
                 <p>
-                    У <code>Component/config.php</code> секція <code>view</code>: <code>paths</code>, <code>contexts</code>,
-                    опційно <code>extensions</code>. Під час <code>ComponentsServiceProvider::boot()</code> дані
-                    додаються до реєстрів і підхоплюються Twig при HTTP-запиті (не в CLI).
+                    Компонент оголошує views через методи <code>viewPaths()</code>, <code>viewContexts()</code>
+                    і опційно <code>viewExtensions()</code>. Під час <code>ComponentsServiceProvider::boot()</code>
+                    дані додаються до реєстрів і підхоплюються Twig при HTTP-запиті (не в CLI).
                 </p>
-                <pre class="mb-4"><code class="language-php">// AuthAdmin — власне розширення + шаблони
-'view' =&gt; [
-    'extensions' =&gt; [ TwigExtension::class ],  // auth()
-    'paths' =&gt; [
-        'auth-admin' =&gt; '/src/Components/AuthAdmin/Views',
-    ],
-    'contexts' =&gt; [
-        '/admin' =&gt; 'dashboard',
-    ],
-],</code></pre>
+                <pre class="mb-4"><code class="language-php">// AuthAdminComponent — власне розширення + шаблони
+public function viewExtensions(): array
+{
+    return [TwigExtension::class];
+}
+
+public function viewPaths(): array
+{
+    return [
+        'auth-admin' => $this->pathManager->toRelative($this->componentDir . '/Views'),
+    ];
+}
+
+public function viewContexts(): array
+{
+    return ['/admin' => 'dashboard'];
+}</code></pre>
                 <p>
                     У Twig: <code>{{ auth().check() }}</code> (якщо підключено розширення компонента),
                     <code>{{ has_component('UserCabinet') }}</code> — з <code>AppExtension</code>.
@@ -324,8 +336,8 @@ src/Components/UserCabinet/Views/
     }
 }</code></pre>
                 <p>
-                    Зареєструйте клас у <code>view.extensions</code> (застосунок) або <code>view.extensions</code>
-                    компонента. У шаблоні: <code>{{ price|format_money }}</code>, <code>{{ format_money(price) }}</code>.
+                    Зареєструйте клас у <code>view.extensions</code> (застосунок) або в
+                    <code>viewExtensions()</code> компонента. У шаблоні: <code>{{ price|format_money }}</code>, <code>{{ format_money(price) }}</code>.
                 </p>
 
                 <h2 id="direct-render" class="border-bottom pb-2 mb-3 mt-5">Прямий виклик <code>ViewInterface</code></h2>
@@ -355,8 +367,8 @@ $html = $view-&gt;render('@frontend/errors/404', ['exception' =&gt; $e]);</code>
                 <p>
                     CSS/JS зазвичай лежать у <code>public/</code> і підключаються абсолютними шляхами
                     (<code>/assets/css/frontend.css</code>, <code>/vendor/bootstrap/...</code>).
-                    Компоненти можуть публікувати assets через <code>assets</code> у <code>config.php</code>
-                    (копіювання в <code>public/components/...</code>).
+                    Компоненти можуть публікувати assets через <code>assets()</code>
+                    (копіювання в <code>public/components/...</code> командою <code>component:publish-assets</code>).
                 </p>
 
                 <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">

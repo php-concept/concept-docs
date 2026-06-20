@@ -110,7 +110,7 @@ $console-&gt;run();</code></pre>
                     <li><code>ConsoleServiceProvider</code> створює <code>Application</code> з іменем/версією з <code>app.name</code> / <code>app.version</code></li>
                     <li>Класи з <code>config/commands.php</code> (<code>ConfigKey::COMMANDS</code>) резолвяться з DI і додаються в application</li>
                     <li>Якщо залежність команди недоступна — реєструється <code>DisabledCommand</code> з поясненням помилки</li>
-                    <li><code>ComponentsServiceProvider::boot()</code> додає команди з <code>commands</code> у <code>config.php</code> кожного компонента</li>
+                    <li><code>ComponentsServiceProvider::boot()</code> додає команди з <code>commands()</code> кожного компонента</li>
                 </ol>
                 <pre class="mb-4"><code class="language-php">// config/commands.php (фрагмент)
 return [
@@ -275,7 +275,7 @@ Run command to see details. !!!</code></pre>
                             <tr><td><code>route:list</code></td><td>Таблиця маршрутів; <code>-F</code> / <code>--full-middleware</code> — FQCN middleware</td></tr>
                             <tr><td><code>view:clear</code></td><td>Очистити каталог кешу Twig (<code>storage/cache/{view.cache_dir}</code>)</td></tr>
                             <tr><td><code>component:list</code></td><td>Список увімкнених компонентів (<code>ComponentRegistry</code>)</td></tr>
-                            <tr><td><code>component:publish-assets</code></td><td>Копіює <code>assets</code> з <code>config.php</code> компонентів у <code>public/</code></td></tr>
+                            <tr><td><code>component:publish-assets</code></td><td>Копіює assets з <code>ComponentInterface::assets()</code> у <code>public/</code></td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -293,18 +293,19 @@ php bin/console.php view:clear</code></pre>
 
                 <h2 id="component-commands" class="border-bottom pb-2 mb-3 mt-5">Команди компонентів</h2>
                 <p>
-                    Компонент додає команди в секції <code>commands</code> свого <code>config.php</code>.
+                    Компонент додає команди в методі <code>commands()</code>.
                     Під час <code>ComponentsServiceProvider::boot()</code> вони резолвяться з контейнера
                     і додаються в той самий <code>ConsoleApplication</code>.
                     У CLI не реєструються view extensions/paths компонентів (лише команди, міграції, сидери, провайдери).
                 </p>
-                <pre class="mb-4"><code class="language-php">// src/Components/AuthAdmin/config.php
-'commands' =&gt; [
-    UserListCommand::class,
-],
+                <pre class="mb-4"><code class="language-php">// AuthAdminComponent::commands()
+public function commands(): array
+{
+    return [UserListCommand::class];
+}
 
-// php bin/console.php user:list
-// php bin/console.php user:list --limit=5</code></pre>
+// php bin/console.php auth:user-list
+// php bin/console.php auth:user-list --limit=5</code></pre>
                 <p>
                     Власні команди додатку — у <code>config/commands.php</code> у секції
                     <code>// Custom Business Commands</code>. Детальніше — <a href="console-commands.html">Створення команд</a>.

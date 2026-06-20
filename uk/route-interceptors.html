@@ -105,8 +105,10 @@
                 </p>
 
                 <h2 id="registration" class="border-bottom pb-2 mb-3 mt-5">Реєстрація</h2>
-                <p>Додайте класи interceptors у <code>config/routes.php</code>:</p>
-                <pre class="mb-4"><code class="language-php">return [
+                <p>Додайте класи interceptors у <code>config/routes.php</code> (компонент Acl надає готовий interceptor):</p>
+                <pre class="mb-4"><code class="language-php">use Concept\Components\Acl\Authorization\AclRouteAuthorization;
+
+return [
     'routes' => [
         'interceptors' => [
             AclRouteAuthorization::class,
@@ -123,50 +125,82 @@
                     <code>TelemetryEvent::HTTP_ROUTE_INTERCEPTOR_EXECUTED</code>.
                 </p>
 
-                <h2 id="acl-example" class="border-bottom pb-2 mb-3 mt-5">Приклад: перевірка прав доступу</h2>
+                <h2 id="acl-example" class="border-bottom pb-2 mb-3 mt-5">Приклад: компонент Acl</h2>
                 <p>
                     Interceptor отримує об’єкт <code>League\Route\Route</code> і PSR-7 запит.
-                    Ім’я маршруту (<code>setName()</code>) зручно використовувати як ключ дозволу:
+                    Компонент <strong>Acl</strong> (<code>Concept\Components\Acl\Authorization\AclRouteAuthorization</code>)
+                    перевіряє named route через правила з БД і кидає <code>AccessDeniedException</code>:
                 </p>
                 <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
 
-namespace Concept\App\Http\Interceptors;
+namespace Concept\Components\Acl\Authorization;
 
-use Concept\App\Exceptions\AccessDeniedException;
-use Concept\App\Services\AclService;
+use Concept\Components\Acl\Authorization\Exceptions\AccessDeniedException;
+use Concept\Components\Acl\Contracts\AclInterface;
+use Concept\Components\Acl\Services\AclRouteRulesService;
 use Concept\Core\Http\Contracts\RouteInterceptorInterface;
+use Concept\Core\Services\Config\Contracts\ConfigInterface;
 use League\Route\Route;
 use Psr\Http\Message\ServerRequestInterface;
 
 final class AclRouteAuthorization implements RouteInterceptorInterface
 {
     public function __construct(
-        private readonly AclService $acl,
+        private readonly AclInterface $acl,
+        private readonly AclRouteRulesService $routeRules,
+        private readonly ConfigInterface $config,
     ) {}
 
     public function intercept(Route $route, ServerRequestInterface $request): void
     {
         $routeName = $route->getName();
-        if ($routeName === null) {
+        if (!is_string($routeName) || $routeName === '') {
             return;
         }
 
-        if (!$this->acl->canAccessRoute($routeName)) {
-            throw new AccessDeniedException(
-                sprintf('Access denied for route [%s]', $routeName)
-            );
+        $rule = $this->routeRules->resolve($routeName);
+        if ($rule === null) {
+            return;
         }
+
+        $resource = $rule['resource'];
+        $privilege = $rule['privilege'] ?? null;
+
+        if ($this->acl->isAllowed($resource, $privilege)) {
+            return;
+        }
+
+        $redirectRouteName = $rule['redirect_route_name'] ?? null;
+        if (!is_string($redirectRouteName) || $redirectRouteName === '') {
+            $redirectRouteName = $this->config->getString('acl.redirect_route_name', 'admin.dashboard');
+        }
+
+        throw new AccessDeniedException(
+            sprintf('Access denied for route [%s]', $routeName),
+            $redirectRouteName,
+        );
     }
 }</code></pre>
-                <p>Власний виняток застосунку (ядро не визначає такий тип):</p>
+                <p>Виняток компонента Acl (містить ім’я маршруту для redirect):</p>
                 <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
 
-namespace Concept\App\Exceptions;
+namespace Concept\Components\Acl\Authorization\Exceptions;
 
 use RuntimeException;
 
 final class AccessDeniedException extends RuntimeException
 {
+    public function __construct(
+        string $message,
+        private readonly string $redirectRouteName,
+    ) {
+        parent::__construct($message);
+    }
+
+    public function redirectRouteName(): string
+    {
+        return $this->redirectRouteName;
+    }
 }</code></pre>
 
                 <h2 id="exceptions" class="border-bottom pb-2 mb-3 mt-5">Що відбувається з винятком</h2>
@@ -186,17 +220,19 @@ final class AccessDeniedException extends RuntimeException
 
                 <h2 id="middleware-redirect" class="border-bottom pb-2 mb-3 mt-5">Redirect і 403 через middleware</h2>
                 <p>
-                    Middleware може перехопити виняток з interceptor (за аналогією з
-                    <code>HandleValidationExceptionMiddleware</code>) і повернути redirect або JSON:
+                    Компонент Acl надає <code>HandleAccessDeniedMiddleware</code>, який перехоплює
+                    <code>AccessDeniedException</code> (за аналогією з
+                    <code>HandleValidationExceptionMiddleware</code>) і повертає redirect або JSON:
                 </p>
                 <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
 
-namespace Concept\App\Http\Middlewares;
+namespace Concept\Components\Acl\Middlewares;
 
-use Concept\App\Exceptions\AccessDeniedException;
+use Concept\Components\Acl\Authorization\Exceptions\AccessDeniedException;
 use Concept\Core\Http\Contracts\ResponseFactoryInterface;
 use Concept\Core\Http\Protocol\HttpStatusCode;
-use Concept\Core\Http\RequestFormat;
+use Concept\Core\Http\Requests\RequestFormat;
+use Concept\Core\Services\Session\Contracts\FlashBagInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
@@ -205,8 +241,9 @@ use Psr\Http\Server\RequestHandlerInterface;
 final class HandleAccessDeniedMiddleware implements MiddlewareInterface
 {
     public function __construct(
-        private readonly ResponseFactoryInterface $response,
+        private readonly ResponseFactoryInterface $responseFactory,
         private readonly RequestFormat $requestFormat,
+        private readonly FlashBagInterface $flashBag,
     ) {}
 
     public function process(
@@ -215,20 +252,27 @@ final class HandleAccessDeniedMiddleware implements MiddlewareInterface
     ): ResponseInterface {
         try {
             return $handler->handle($request);
-        } catch (AccessDeniedException $e) {
+        } catch (AccessDeniedException $exception) {
             if ($this->requestFormat->expectsJson($request)) {
-                return $this->response->jsonError(
-                    $e->getMessage(),
+                return $this->responseFactory->jsonError(
+                    $exception->getMessage(),
                     HttpStatusCode::FORBIDDEN
                 );
             }
 
-            return $this->response->redirectByName('admin.login');
+            $this->flashBag->addError($exception->getMessage());
+
+            return $this->responseFactory->back(
+                HttpStatusCode::FOUND,
+                $exception->redirectRouteName()
+            );
         }
     }
 }</code></pre>
                 <p>Зареєструйте middleware <strong>зовні</strong> interceptor-ланцюжка (першим у файлі маршрутів):</p>
-                <pre class="mb-4"><code class="language-php">$router->lazyMiddleware(HandleAccessDeniedMiddleware::class);
+                <pre class="mb-4"><code class="language-php">use Concept\Components\Acl\Middlewares\HandleAccessDeniedMiddleware;
+
+$router->lazyMiddleware(HandleAccessDeniedMiddleware::class);
 $router->lazyMiddleware(HandleValidationExceptionMiddleware::class);
 // ... інші middleware</code></pre>
                 <p>
@@ -239,8 +283,8 @@ $router->lazyMiddleware(HandleValidationExceptionMiddleware::class);
                 <h2 id="auth-middleware-only" class="border-bottom pb-2 mb-3 mt-5">Альтернатива: лише middleware (redirect)</h2>
                 <p>
                     Якщо достатньо перевірки «залогінений / активний користувач» без ACL за named route,
-                    redirect можна зробити без interceptor
-                    <code>AuthMiddleware</code>:
+                    redirect можна зробити без interceptor — наприклад
+                    <code>AuthMiddleware</code> з компонента AuthAdmin:
                 </p>
                 <pre class="mb-4"><code class="language-php">public function process(
     ServerRequestInterface $request,
@@ -274,9 +318,9 @@ $router->lazyMiddleware(HandleValidationExceptionMiddleware::class);
     MW1 -->|"catch"| RESP["JSON 403 або redirect"]</pre>
                 </div>
                 <ol>
-                    <li><code>AuthMiddleware</code> на групі — груба перевірка сесії, redirect без винятку.</li>
-                    <li><code>AclRouteAuthorization</code> — тонка перевірка права на named route, <code>throw</code>.</li>
-                    <li><code>HandleAccessDeniedMiddleware</code> — перехоплює виняток, відповідає клієнту.</li>
+                    <li><code>AuthMiddleware</code> (AuthAdmin) на групі — груба перевірка сесії, redirect без винятку.</li>
+                    <li><code>AclRouteAuthorization</code> (Acl) — тонка перевірка права на named route, <code>throw</code>.</li>
+                    <li><code>HandleAccessDeniedMiddleware</code> (Acl) — перехоплює виняток, відповідає клієнту.</li>
                 </ol>
 
                 <h2 id="tips" class="border-bottom pb-2 mb-3 mt-5">Поради</h2>

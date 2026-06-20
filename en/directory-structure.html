@@ -194,7 +194,6 @@ resources/views/frontend/     # @frontend/… — landing, shared pages</code></
 └── Components/                   # functional modules
     ├── AuthAdmin/
     │   ├── AuthAdminComponent.php
-    │   ├── config.php
     │   ├── routes.php
     │   ├── Controllers/
     │   ├── Models/
@@ -213,10 +212,11 @@ resources/views/frontend/     # @frontend/… — landing, shared pages</code></
     ├── UserCabinet/
     └── ProjectManager/</code></pre>
                 <p>
-                    Each component implements <code>ComponentInterface</code> (optionally via
-                    <code>BaseComponent</code>). Active modules are listed in
+                    Each component implements <code>ComponentInterface</code> directly in its
+                    <code>{Name}Component.php</code> class. Active modules are listed in
                     <code>config/components.php</code> or <code>config/{env}/components.php</code>.
-                    Components can have their own routes, views, migrations, seeders, CLI commands, and assets.
+                    Routes, views, migrations, seeders, CLI commands, assets, and service providers are declared
+                    via interface methods (<code>routes()</code>, <code>viewPaths()</code>, <code>migrationPaths()</code>, etc.).
                     The <code>App</code> directory is for shared pieces (base models, Twig extensions, validation rules).
                     Step-by-step example — <a href="creating-components.html">AuthAdmin</a>.
                 </p>
@@ -319,7 +319,7 @@ resources/views/frontend/     # @frontend/… — landing, shared pages</code></
                             </tr>
                             <tr>
                                 <td>Module templates</td>
-                                <td>— (in component <code>config.php</code>)</td>
+                                <td><code>ComponentInterface::viewPaths()</code></td>
                                 <td><code>src/Components/{Name}/Views/</code> → <code>@auth-admin/…</code></td>
                             </tr>
                             <tr>
@@ -344,7 +344,7 @@ resources/views/frontend/     # @frontend/… — landing, shared pages</code></
                             </tr>
                             <tr>
                                 <td>Component assets</td>
-                                <td>— (in component <code>config.php</code>)</td>
+                                <td><code>ComponentInterface::assets()</code></td>
                                 <td><code>component:publish-assets</code> → <code>public/components/…</code> (<code>php bin/console.php component:publish-assets</code>)</td>
                             </tr>
                         </tbody>
@@ -352,8 +352,9 @@ resources/views/frontend/     # @frontend/… — landing, shared pages</code></
                 </div>
                 <p>
                     Full list of keys — in the <a href="setup.html#paths-keys">PathName table</a>.
-                    Migrations and seeders of individual components are registered in their <code>config.php</code>,
-                    not via global <code>PathName::MIGRATIONS</code> / <code>PathName::SEEDERS</code>.
+                    Component migrations and seeders are registered via <code>migrationPaths()</code> and
+                    <code>seeders()</code> on the component class, not via global
+                    <code>PathName::MIGRATIONS</code> / <code>PathName::SEEDERS</code>.
                 </p>
 
                 <h2 id="choose" class="border-bottom pb-2 mb-3 mt-5">What to choose</h2>

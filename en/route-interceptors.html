@@ -106,7 +106,11 @@
 
                 <h2 id="registration" class="border-bottom pb-2 mb-3 mt-5">Registration</h2>
                 <p>Add interceptor classes to <code>config/routes.php</code>:</p>
-                <pre class="mb-4"><code class="language-php">return [
+                <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
+
+use Concept\Components\Acl\Authorization\AclRouteAuthorization;
+
+return [
     'routes' => [
         'interceptors' => [
             AclRouteAuthorization::class,
@@ -123,50 +127,82 @@
                     <code>TelemetryEvent::HTTP_ROUTE_INTERCEPTOR_EXECUTED</code>.
                 </p>
 
-                <h2 id="acl-example" class="border-bottom pb-2 mb-3 mt-5">Example: access control check</h2>
+                <h2 id="acl-example" class="border-bottom pb-2 mb-3 mt-5">Example: Acl component</h2>
                 <p>
-                    An interceptor receives a <code>League\Route\Route</code> object and a PSR-7 request.
-                    The route name (<code>setName()</code>) is convenient as a permission key:
+                    The <code>Acl</code> reference component ships
+                    <code>Concept\Components\Acl\Authorization\AclRouteAuthorization</code>.
+                    It resolves route rules from the database and checks permissions via <code>AclInterface</code>:
                 </p>
                 <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
 
-namespace Concept\App\Http\Interceptors;
+namespace Concept\Components\Acl\Authorization;
 
-use Concept\App\Exceptions\AccessDeniedException;
-use Concept\App\Services\AclService;
+use Concept\Components\Acl\Authorization\Exceptions\AccessDeniedException;
+use Concept\Components\Acl\Contracts\AclInterface;
+use Concept\Components\Acl\Services\AclRouteRulesService;
 use Concept\Core\Http\Contracts\RouteInterceptorInterface;
+use Concept\Core\Services\Config\Contracts\ConfigInterface;
 use League\Route\Route;
 use Psr\Http\Message\ServerRequestInterface;
 
 final class AclRouteAuthorization implements RouteInterceptorInterface
 {
     public function __construct(
-        private readonly AclService $acl,
+        private readonly AclInterface $acl,
+        private readonly AclRouteRulesService $routeRules,
+        private readonly ConfigInterface $config,
     ) {}
 
     public function intercept(Route $route, ServerRequestInterface $request): void
     {
         $routeName = $route->getName();
-        if ($routeName === null) {
+        if (!is_string($routeName) || $routeName === '') {
             return;
         }
 
-        if (!$this->acl->canAccessRoute($routeName)) {
-            throw new AccessDeniedException(
-                sprintf('Access denied for route [%s]', $routeName)
-            );
+        $rule = $this->routeRules->resolve($routeName);
+        if ($rule === null) {
+            return;
         }
+
+        $resource = $rule['resource'];
+        $privilege = $rule['privilege'] ?? null;
+
+        if ($this->acl->isAllowed($resource, $privilege)) {
+            return;
+        }
+
+        $redirectRouteName = $rule['redirect_route_name'] ?? null;
+        if (!is_string($redirectRouteName) || $redirectRouteName === '') {
+            $redirectRouteName = $this->config->getString('acl.redirect_route_name', 'admin.dashboard');
+        }
+
+        throw new AccessDeniedException(
+            sprintf('Access denied for route [%s]', $routeName),
+            $redirectRouteName,
+        );
     }
 }</code></pre>
-                <p>Application-specific exception (the core does not define this type):</p>
+                <p>Component-specific exception (carries redirect route name for middleware):</p>
                 <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
 
-namespace Concept\App\Exceptions;
+namespace Concept\Components\Acl\Authorization\Exceptions;
 
 use RuntimeException;
 
 final class AccessDeniedException extends RuntimeException
 {
+    public function __construct(
+        string $message,
+        private readonly string $redirectRouteName,
+    ) {
+        parent::__construct($message);
+    }
+
+    public function redirectRouteName(): string
+    {
+        return $this->redirectRouteName;
+    }
 }</code></pre>
 
                 <h2 id="exceptions" class="border-bottom pb-2 mb-3 mt-5">What happens to the exception</h2>
@@ -186,17 +222,19 @@ final class AccessDeniedException extends RuntimeException
 
                 <h2 id="middleware-redirect" class="border-bottom pb-2 mb-3 mt-5">Redirect and 403 via middleware</h2>
                 <p>
-                    Middleware can catch an exception from an interceptor (similar to
-                    <code>HandleValidationExceptionMiddleware</code>) and return a redirect or JSON:
+                    The Acl component provides
+                    <code>Concept\Components\Acl\Middlewares\HandleAccessDeniedMiddleware</code>
+                    to catch <code>AccessDeniedException</code> and return JSON 403 or a safe redirect:
                 </p>
                 <pre class="mb-4"><code class="language-php">&lt;?php declare(strict_types=1);
 
-namespace Concept\App\Http\Middlewares;
+namespace Concept\Components\Acl\Middlewares;
 
-use Concept\App\Exceptions\AccessDeniedException;
+use Concept\Components\Acl\Authorization\Exceptions\AccessDeniedException;
 use Concept\Core\Http\Contracts\ResponseFactoryInterface;
 use Concept\Core\Http\Protocol\HttpStatusCode;
-use Concept\Core\Http\RequestFormat;
+use Concept\Core\Http\Requests\RequestFormat;
+use Concept\Core\Services\Session\Contracts\FlashBagInterface;
 use Psr\Http\Message\ResponseInterface;
 use Psr\Http\Message\ServerRequestInterface;
 use Psr\Http\Server\MiddlewareInterface;
@@ -205,30 +243,33 @@ use Psr\Http\Server\RequestHandlerInterface;
 final class HandleAccessDeniedMiddleware implements MiddlewareInterface
 {
     public function __construct(
-        private readonly ResponseFactoryInterface $response,
+        private readonly ResponseFactoryInterface $responseFactory,
         private readonly RequestFormat $requestFormat,
+        private readonly FlashBagInterface $flashBag,
     ) {}
 
-    public function process(
-        ServerRequestInterface $request,
-        RequestHandlerInterface $handler
-    ): ResponseInterface {
+    public function process(ServerRequestInterface $request, RequestHandlerInterface $handler): ResponseInterface
+    {
         try {
             return $handler->handle($request);
-        } catch (AccessDeniedException $e) {
+        } catch (AccessDeniedException $exception) {
             if ($this->requestFormat->expectsJson($request)) {
-                return $this->response->jsonError(
-                    $e->getMessage(),
+                return $this->responseFactory->jsonError(
+                    $exception->getMessage(),
                     HttpStatusCode::FORBIDDEN
                 );
             }
 
-            return $this->response->redirectByName('admin.login');
+            $this->flashBag->addError($exception->getMessage());
+
+            return $this->responseFactory->back(HttpStatusCode::FOUND, $exception->redirectRouteName());
         }
     }
 }</code></pre>
                 <p>Register middleware <strong>outside</strong> the interceptor chain (first in the route file):</p>
-                <pre class="mb-4"><code class="language-php">$router->lazyMiddleware(HandleAccessDeniedMiddleware::class);
+                <pre class="mb-4"><code class="language-php">use Concept\Components\Acl\Middlewares\HandleAccessDeniedMiddleware;
+
+$router->lazyMiddleware(HandleAccessDeniedMiddleware::class);
 $router->lazyMiddleware(HandleValidationExceptionMiddleware::class);
 // ... other middleware</code></pre>
                 <p>

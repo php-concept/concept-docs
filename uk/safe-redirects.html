@@ -63,7 +63,7 @@
                         <tbody>
                             <tr>
                                 <td><code>StorePreviousUrlMiddleware</code></td>
-                                <td>Ланцюжок URL у сесії + <code>RequestAttribute::SAFE_BACK_URL</code></td>
+                                <td>Ланцюжок URL у сесії + <code>Concept\Core\Http\Requests\RequestAttribute::SAFE_BACK_URL</code></td>
                             </tr>
                             <tr>
                                 <td><code>ResponseFactory::back()</code></td>
@@ -93,7 +93,7 @@
                     Якщо URI відрізняється від поточного в сесії — попередній <code>CURRENT_URL</code>
                     стає <code>PREVIOUS_URL</code>, новий URI — <code>CURRENT_URL</code>.
                 </p>
-                <p>На кожен запит у PSR-7 атрибут <code>RequestAttribute::SAFE_BACK_URL</code> (<code>safe_back_url</code>):</p>
+                <p>На кожен запит у PSR-7 атрибут <code>Concept\Core\Http\Requests\RequestAttribute::SAFE_BACK_URL</code> (<code>safe_back_url</code>):</p>
                 <ul>
                     <li><strong>GET</strong> — <code>PREVIOUS_URL</code> (сторінка, з якої прийшли)</li>
                     <li><strong>POST</strong>, <strong>PUT</strong>, <strong>PATCH</strong>, <strong>DELETE</strong> та інші не-GET — <code>CURRENT_URL</code> (сторінка форми)</li>

@@ -50,52 +50,83 @@
                 <p>Передумови: <a href="components-overview.html">концепція компонентів</a>, глобальний middleware у <code>routes/web.php</code>.</p>
 
                 <h2 id="step-1" class="border-bottom pb-2 mb-3 mt-5">1. Каталог і клас компонента</h2>
+                <p>
+                    Клас компонента напряму реалізує <code>ComponentInterface</code> — метадані, маршрути,
+                    міграції, views і assets оголошуються в методах (окремого <code>config.php</code> немає).
+                    Інжектуйте <code>PathManager</code>, щоб будувати шляхи відносно кореня застосунку.
+                </p>
                 <pre class="mb-4"><code class="language-php">// src/Components/AuthAdmin/AuthAdminComponent.php
 namespace Concept\Components\AuthAdmin;
 
-use Concept\Components\BaseComponent;
+use Concept\Components\AuthAdmin\Commands\UserListCommand;
+use Concept\Components\AuthAdmin\Database\Seeders\UserSeeder;
+use Concept\Components\AuthAdmin\Extensions\TwigExtension;
+use Concept\Core\Foundation\PathManager;
+use Concept\Core\Foundation\PathName;
 use Concept\Core\Services\Component\Contracts\ComponentInterface;
 
-class AuthAdminComponent extends BaseComponent implements ComponentInterface
+class AuthAdminComponent implements ComponentInterface
 {
-    protected string $componentDir = __DIR__;
-}</code></pre>
-                <p><code>$componentDir</code> вказує на корінь модуля — звідси читається <code>config.php</code> і будується шлях до <code>routes.php</code>.</p>
+    private const string NAME = 'AuthAdmin';
+    private const string VERSION = '1.0.0';
+    private const string DESCRIPTION = 'Admin authentication, dashboard and user management.';
+    private const string VIEW_NAMESPACE = 'auth-admin';
 
-                <h2 id="step-2" class="border-bottom pb-2 mb-3 mt-5">2. config.php модуля</h2>
-                <pre class="mb-4"><code class="language-php">// src/Components/AuthAdmin/config.php
-return [
-    'name' => 'AuthAdmin',
-    'description' => 'Admin authentication, dashboard and user management.',
-    'version' => '1.0.0',
-    'seeders' => [
-        'list' => [UserSeeder::class],
-    ],
-    'migrations' => [
-        'paths' => ['src/Components/AuthAdmin/Database/Migrations'],
-    ],
-    'commands' => [UserListCommand::class],
-    'view' => [
-        'extensions' => [TwigExtension::class],
-        'paths' => [
-            'auth-admin' => '/src/Components/AuthAdmin/Views',
-        ],
-        'contexts' => [
-            '/admin' => 'dashboard',
-        ],
-    ],
-    'assets' => [
-        'src/Components/AuthAdmin/Assets/admin-tokens.js'
-            => 'public/components/auth-admin/js/admin-tokens.js',
-    ],
-];</code></pre>
+    protected string $componentDir = __DIR__;
+
+    public function __construct(private readonly PathManager $pathManager) {}
+
+    public function name(): string { return self::NAME; }
+    public function version(): string { return self::VERSION; }
+    public function description(): string { return self::DESCRIPTION; }
+
+    public function routes(): ?string
+    {
+        return $this->componentDir . '/routes.php';
+    }
+
+    public function providers(): array { return []; }
+
+    public function seeders(): array { return [UserSeeder::class]; }
+
+    public function migrationPaths(): array
+    {
+        return [
+            $this->pathManager->toRelative($this->componentDir . '/Database/Migrations'),
+        ];
+    }
+
+    public function commands(): array { return [UserListCommand::class]; }
+
+    public function viewExtensions(): array { return [TwigExtension::class]; }
+
+    public function viewPaths(): array
+    {
+        return [
+            self::VIEW_NAMESPACE => $this->pathManager->toRelative($this->componentDir . '/Views'),
+        ];
+    }
+
+    public function viewContexts(): array
+    {
+        return ['/admin' => 'dashboard'];
+    }
+
+    public function assets(): array
+    {
+        return [
+            $this->pathManager->toRelative($this->componentDir . '/Assets/admin-tokens.js') =>
+                $this->pathManager->getRelative(PathName::PUBLIC, 'components/auth-admin/js/admin-tokens.js'),
+        ];
+    }
+}</code></pre>
                 <ul class="small">
-                    <li><code>view.paths</code> — шаблон <code>@auth-admin/login</code> → <code>Views/login.twig</code></li>
-                    <li><code>view.contexts</code> — URL під <code>/admin</code> отримують <code>route_namespace = dashboard</code> (див. <a href="views.html#route-namespace">Views</a>)</li>
-                    <li><code>providers</code> — опційно, як у DebugBar</li>
+                    <li><code>viewPaths()</code> — шаблон <code>@auth-admin/login</code> → <code>Views/login.twig</code></li>
+                    <li><code>viewContexts()</code> — URL під <code>/admin</code> отримують <code>route_namespace = dashboard</code> (див. <a href="views.html#route-namespace">Views</a>)</li>
+                    <li><code>providers()</code> — опційні DI-провайдери (див. <code>AclComponent</code>, <code>DebugBarComponent</code>)</li>
                 </ul>
 
-                <h2 id="step-3" class="border-bottom pb-2 mb-3 mt-5">3. Реєстрація в застосунку</h2>
+                <h2 id="step-2" class="border-bottom pb-2 mb-3 mt-5">2. Реєстрація в застосунку</h2>
                 <pre class="mb-4"><code class="language-php">// config/components.php
 use Concept\Components\AuthAdmin\AuthAdminComponent;
 
@@ -105,7 +136,7 @@ return [
     ],
 ];</code></pre>
 
-                <h2 id="step-4" class="border-bottom pb-2 mb-3 mt-5">4. Маршрути</h2>
+                <h2 id="step-3" class="border-bottom pb-2 mb-3 mt-5">3. Маршрути</h2>
                 <pre class="mb-4"><code class="language-php">// src/Components/AuthAdmin/routes.php
 /** @var Router $router */
 
@@ -127,7 +158,7 @@ $router->group('/admin/users', function (RouteGroup $route) {
                     Імена маршрутів (<code>admin.*</code>) використовуються в <code>redirectByName()</code> і Twig <code>uri()</code>.
                 </p>
 
-                <h2 id="step-5" class="border-bottom pb-2 mb-3 mt-5">5. Middleware авторизації</h2>
+                <h2 id="step-4" class="border-bottom pb-2 mb-3 mt-5">4. Middleware авторизації</h2>
                 <pre class="mb-4"><code class="language-php">// Middlewares/AuthMiddleware.php — перевірка сесії, роль admin, статус ACTIVE
 public function process(...): ResponseInterface
 {
@@ -139,7 +170,7 @@ public function process(...): ResponseInterface
 }</code></pre>
                 <p>Клас реєструється в DI автоматично; League Route створює екземпляр через контейнер.</p>
 
-                <h2 id="step-6" class="border-bottom pb-2 mb-3 mt-5">6. Контролер і FormRequest</h2>
+                <h2 id="step-5" class="border-bottom pb-2 mb-3 mt-5">5. Контролер і FormRequest</h2>
                 <pre class="mb-4"><code class="language-php">// Controllers/AdminController.php
 public function login(LoginRequest $request): ResponseInterface
 {
@@ -159,7 +190,7 @@ public function showLogin(): ResponseInterface
                     <code>HandleValidationExceptionMiddleware</code> працюють як для будь-якого контролера.
                 </p>
 
-                <h2 id="step-7" class="border-bottom pb-2 mb-3 mt-5">7. Views</h2>
+                <h2 id="step-6" class="border-bottom pb-2 mb-3 mt-5">6. Views</h2>
                 <pre class="mb-4"><code class="language-twig">{# Views/login.twig — namespace auth-admin, layout з App #}
 {% extends '@dashboard/layouts/auth.twig' %}
 
@@ -172,7 +203,7 @@ public function showLogin(): ResponseInterface
                     <code>@dashboard/...</code> з <code>resources/views/dashboard/</code>.
                 </p>
 
-                <h2 id="step-8" class="border-bottom pb-2 mb-3 mt-5">8. База даних</h2>
+                <h2 id="step-7" class="border-bottom pb-2 mb-3 mt-5">7. База даних</h2>
                 <p>Міграція в <code>Database/Migrations/V2026_03_24_120000_CreateUsersTable.php</code>, модель <code>UserModel</code>, сидер <code>UserSeeder</code>.</p>
                 <pre class="mb-4"><code class="language-bash">php bin/console.php db:migrate
 php bin/console.php db:seed -c "Concept\Components\AuthAdmin\Database\Seeders\UserSeeder"</code></pre>
@@ -181,28 +212,30 @@ php bin/console.php db:seed -c "Concept\Components\AuthAdmin\Database\Seeders\Us
                     <code>--class</code>). Коротке ім’я на кшталт <code>UserSeeder</code> не працює.
                     Без опції <code>db:seed</code> запускає всі зареєстровані сидери.
                 </p>
-                <p>Шлях міграцій з <code>config.php</code> потрапляє в <code>MigrationRegistry</code> при boot компонента.</p>
+                <p>Шляхи з <code>migrationPaths()</code> і класи з <code>seeders()</code> потрапляють у реєстри ядра при boot компонента.</p>
 
-                <h2 id="step-9" class="border-bottom pb-2 mb-3 mt-5">9. Assets і CLI</h2>
+                <h2 id="step-8" class="border-bottom pb-2 mb-3 mt-5">8. Assets і CLI</h2>
                 <pre class="mb-4"><code class="language-bash">php bin/console.php component:publish-assets
 php bin/console.php component:list</code></pre>
                 <p>Детальніше — <a href="component-cli.html">CLI та assets</a>.</p>
 
                 <h2 id="checklist" class="border-bottom pb-2 mb-3 mt-5">Чеклист нового компонента</h2>
                 <ol>
-                    <li><code>{Name}Component.php</code> + <code>config.php</code></li>
+                    <li><code>{Name}Component.php</code>, що реалізує <code>ComponentInterface</code></li>
                     <li>Запис у <code>config/components.php</code></li>
                     <li><code>routes.php</code> (за потреби)</li>
                     <li>Controllers, Services, Models, Requests/Dto</li>
-                    <li>Views + <code>view.paths</code> / <code>view.contexts</code></li>
-                    <li>Migrations / seeders / commands / assets — за потреби</li>
+                    <li>Views + <code>viewPaths()</code> / <code>viewContexts()</code></li>
+                    <li>Migrations / seeders / commands / assets — через методи інтерфейсу</li>
                     <li><code>db:migrate</code>, <code>component:publish-assets</code>, <code>route:list</code></li>
                 </ol>
 
                 <div class="alert alert-primary border-start border-primary border-4 rounded-end" role="note">
                     <p class="mb-0">
-                        Скопіюйте структуру <code>DemoComponent</code> для мінімального каркасу без бізнес-логіки,
-                        потім наповнюйте за зразком AuthAdmin.
+                        Інші еталонні компоненти в demo-застосунку:
+                        <strong>Acl</strong> (route interceptor + admin UI),
+                        <strong>SettingsManager</strong> (типізовані налаштування + Twig helpers),
+                        <strong>DebugBar</strong> (middleware і assets лише для dev).
                     </p>
                 </div>
 

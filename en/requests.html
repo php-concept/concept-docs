@@ -424,6 +424,7 @@ class StoreUserDto extends Dto implements DtoInterface
                     <li>Constructor types must match what the validator returns + Valinor casting</li>
                     <li>Optional fields — default in constructor or <code>?type</code></li>
                     <li>Fields in <code>$except</code> do not end up in the DTO</li>
+                    <li>Fields in <code>$only</code> restrict what ends up in <code>validated()</code> and DTO</li>
                 </ul>
 
                 <h3 id="valinor" class="mt-4">Valinor and <code>Caster</code></h3>
@@ -437,6 +438,7 @@ class StoreUserDto extends Dto implements DtoInterface
                 <ul>
                     <li><code>allowScalarValueCasting()</code> — string <code>"1"</code> → <code>int</code> / <code>bool</code> when needed</li>
                     <li><code>allowSuperfluousKeys()</code> — extra keys in the array do not break mapping (convenient for forms)</li>
+                    <li>Transformers: custom logic for complex types via <code>caster.transformers</code> config key</li>
                     <li>Mapper cache: <code>storage/cache/valinor</code> (faster repeated mapping)</li>
                 </ul>
                 <p>Useful Valinor documentation sections:</p>

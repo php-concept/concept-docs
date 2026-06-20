@@ -55,16 +55,35 @@
                     <li>PSR-7 HTTP, PSR-11 DI (League Container + Reflection), PSR-15 middleware</li>
                     <li>League Route, <code>RouteStrategy</code> (FormRequest, route params, interceptors)</li>
                     <li>Illuminate Database (Eloquent, міграції, pagination)</li>
-                    <li>Rakit validation, Valinor DTO casting, Twig views</li>
-                    <li>Компонентна реєстрація: routes, migrations, seeders, views, CLI</li>
+                    <li>Rakit validation, Valinor DTO casting, Twig/Plates views</li>
+                    <li>Компонентна реєстрація: routes, migrationPaths, seeders, views, CLI</li>
                     <li>CSRF, data masker, safe redirects, telemetry hooks</li>
                     <li>Symfony Console, Whoops / production fallbacks</li>
+                    <li>Строга типізація PHP 8.4+</li>
                 </ul>
 
                 <h2 id="skeleton" class="border-bottom pb-2 mb-3 mt-5">Concept Skeleton</h2>
                 <p>
                     Мінімальний застосунок для старту: <code>bootstrap/</code>, <code>config/</code>,
                     <code>routes/web.php</code>, один контролер і frontend-шаблон.
+                </p>
+
+                <h2 id="reference-components" class="border-bottom pb-2 mb-3 mt-5">Еталонні компоненти</h2>
+                <p>
+                    У <code>code/skeleton-demo/src/Components/</code> наведено повні приклади модулів,
+                    з якими звіряється документація:
+                </p>
+                <ul>
+                    <li><strong>AuthAdmin</strong> — автентифікація адмінки, CRUD користувачів, <code>AuthMiddleware</code>, сидер і CLI-команда <code>auth:user-list</code></li>
+                    <li><strong>Acl</strong> — Laminas Permissions ACL, адмін-UI для ролей/ресурсів/правил, <code>AclRouteAuthorization</code> (route interceptor) і <code>HandleAccessDeniedMiddleware</code></li>
+                    <li><strong>SettingsManager</strong> — централізовані налаштування застосунку в БД з кешем і адмін-формою</li>
+                    <li><strong>DebugBar</strong> — панель відладки для HTML (зазвичай лише в <code>config/dev/components.php</code>); публікує assets PHP Debug Bar через <code>assets()</code></li>
+                </ul>
+                <p>
+                    Кожен компонент — один клас <code>{Name}Component</code>, що реалізує
+                    <code>ComponentInterface</code> без окремого <code>config.php</code>.
+                    Детальніше — <a href="components-overview.html">Огляд компонентів</a> і
+                    <a href="creating-components.html">Створення компонентів</a>.
                 </p>
 
                 <h2 id="docs-1x" class="border-bottom pb-2 mb-3 mt-5">Документація 1.x</h2>

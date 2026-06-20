@@ -194,7 +194,6 @@ resources/views/frontend/     # @frontend/… — landing, спільні сто
 └── Components/                   # функціональні модулі
     ├── AuthAdmin/
     │   ├── AuthAdminComponent.php
-    │   ├── config.php
     │   ├── routes.php
     │   ├── Controllers/
     │   ├── Models/
@@ -213,8 +212,10 @@ resources/views/frontend/     # @frontend/… — landing, спільні сто
     ├── UserCabinet/
     └── ProjectManager/</code></pre>
                 <p>
-                    Кожен компонент реалізує <code>ComponentInterface</code> (можна реалізувати через
-                    <code>BaseComponent</code>). Активні модулі перелічуються в
+                    Кожен компонент — клас, що напряму реалізує <code>ComponentInterface</code>
+                    (<code>migrationPaths()</code>, <code>viewPaths()</code>, <code>seeders()</code>,
+                    <code>commands()</code>, <code>assets()</code>, <code>providers()</code> тощо).
+                    Активні модулі перелічуються в
                     <code>config/components.php</code> або <code>config/{env}/components.php</code>.
                     Компоненти можуть мати власні маршрути, views, міграції, сидери, CLI-команди та assets.
                     Каталог <code>App</code> — для спільних речей (базові моделі, Twig extensions, правила валідації).
@@ -319,7 +320,7 @@ resources/views/frontend/     # @frontend/… — landing, спільні сто
                             </tr>
                             <tr>
                                 <td>Шаблони модуля</td>
-                                <td>— (у <code>config.php</code> компонента)</td>
+                                <td><code>ComponentInterface::viewPaths()</code></td>
                                 <td><code>src/Components/{Name}/Views/</code> → <code>@auth-admin/…</code></td>
                             </tr>
                             <tr>
@@ -344,7 +345,7 @@ resources/views/frontend/     # @frontend/… — landing, спільні сто
                             </tr>
                             <tr>
                                 <td>Assets компонента</td>
-                                <td>— (у <code>config.php</code> компонента)</td>
+                                <td><code>ComponentInterface::assets()</code></td>
                                 <td><code>component:publish-assets</code> → <code>public/components/…</code> (<code>php bin/console.php component:publish-assets</code>)</td>
                             </tr>
                         </tbody>
@@ -352,7 +353,8 @@ resources/views/frontend/     # @frontend/… — landing, спільні сто
                 </div>
                 <p>
                     Повний перелік ключів — у <a href="setup.html#paths-keys">таблиці PathName</a>.
-                    Міграції та сидери окремих компонентів реєструються в їхньому <code>config.php</code>,
+                    Міграції та сидери окремих компонентів реєструються через
+                    <code>migrationPaths()</code> і <code>seeders()</code> класу компонента,
                     а не через глобальні <code>PathName::MIGRATIONS</code> / <code>PathName::SEEDERS</code>.
                 </p>
 

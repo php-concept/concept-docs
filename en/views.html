@@ -44,13 +44,15 @@
                 <h1 class="display-6 fw-bold mb-4">Views</h1>
 
                 <p>
-                    HTML in Concept Core is rendered via <strong>Twig</strong>.
-                    Templates are <code>.twig</code> files in the views directory; in a controller the response is built with
+                    HTML in Concept Core is rendered via <strong>Twig</strong> or <strong>Plates</strong>.
+                    Templates are <code>.twig</code> or <code>.php</code> files in the views directory; in a controller the response is built with
                     <code>ViewResponseFactoryInterface::create()</code> (see <a href="responses.html#html">Responses → HTML</a>).
                 </p>
                 <p>
                     Low-level rendering — <code>ViewInterface::render()</code> (services, error handler).
-                    View paths are configured in <code>config/view.php</code> and in component <code>config.php</code> files.
+                    View paths are configured in <code>config/view.php</code> and via
+                    <code>ComponentInterface::viewPaths()</code>, <code>viewContexts()</code>, and
+                    <code>viewExtensions()</code> on component classes.
                 </p>
 
                 <h2 id="namespaces" class="border-bottom pb-2 mb-3 mt-5">Twig namespaces</h2>
@@ -64,11 +66,14 @@
     'dashboard' =&gt; '/resources/views/dashboard',
 ],
 
-// src/Components/UserCabinet/config.php
-'paths' =&gt; [
-    'cabinet' =&gt; '/src/Components/UserCabinet/Views',
-],</code></pre>
-                <p>File <code>src/Components/UserCabinet/Views/index.twig</code> → <code>@cabinet/index</code>.</p>
+// AuthAdminComponent::viewPaths()
+public function viewPaths(): array
+{
+    return [
+        'auth-admin' =&gt; $this->pathManager->toRelative($this->componentDir . '/Views'),
+    ];
+}</code></pre>
+                <p>File <code>src/Components/AuthAdmin/Views/users/list.twig</code> → <code>@auth-admin/users/list</code>.</p>
                 <p>
                     The <code>resources/views</code> directory (<code>PathName::VIEWS</code> in <code>paths.php</code>) is also added
                     as a fallback without a namespace — rarely needed if all templates live in namespaced paths.
@@ -183,7 +188,7 @@ src/Components/UserCabinet/Views/
 
                 <h3 id="route-namespace-how" class="mt-4">How it is determined</h3>
                 <ol>
-                    <li>In <code>view.contexts</code> (application + components), define a map of <strong>URI prefix → context</strong>.</li>
+                    <li>In <code>view.contexts</code> (application) and <code>ComponentInterface::viewContexts()</code> (components), define a map of <strong>URI prefix → context</strong>.</li>
                     <li>
                         <code>ViewContextResolver</code> takes the request path and iterates prefixes from longest
                         (so <code>/admin/users</code> matches <code>/admin</code>, not <code>/</code>).
@@ -195,16 +200,13 @@ src/Components/UserCabinet/Views/
     '/' =&gt; 'frontend',
 ],
 
-// src/Components/AuthAdmin/config.php
-'contexts' =&gt; [
-    '/admin' =&gt; 'dashboard',
-],
-
-// src/Components/UserCabinet/config.php
-'contexts' =&gt; [
-    '/cabinet' =&gt; 'cabinet',
-    '/login' =&gt; 'cabinet',
-],</code></pre>
+// AuthAdminComponent::viewContexts()
+public function viewContexts(): array
+{
+    return [
+        '/admin' =&gt; 'dashboard',
+    ];
+}</code></pre>
 
                 <div class="table-responsive mb-4">
                     <table class="table table-dark table-striped table-bordered align-middle small">
@@ -287,20 +289,30 @@ src/Components/UserCabinet/Views/
 
                 <h2 id="components" class="border-bottom pb-2 mb-3 mt-5">Views in components</h2>
                 <p>
-                    In <code>Component/config.php</code>, the <code>view</code> section: <code>paths</code>, <code>contexts</code>,
-                    optionally <code>extensions</code>. During <code>ComponentsServiceProvider::boot()</code>, data
+                    In <code>AuthAdminComponent</code>, the <code>viewPaths()</code>, <code>viewContexts()</code>, and
+                    <code>viewExtensions()</code> methods declare Twig namespaces, URI contexts, and extensions.
+                    During <code>ComponentsServiceProvider::boot()</code>, data
                     is added to registries and picked up by Twig on HTTP requests (not in CLI).
                 </p>
-                <pre class="mb-4"><code class="language-php">// AuthAdmin — власне розширення + шаблони
-'view' =&gt; [
-    'extensions' =&gt; [ TwigExtension::class ],  // auth()
-    'paths' =&gt; [
-        'auth-admin' =&gt; '/src/Components/AuthAdmin/Views',
-    ],
-    'contexts' =&gt; [
+                <pre class="mb-4"><code class="language-php">// AuthAdminComponent — Twig extension + templates
+public function viewExtensions(): array
+{
+    return [TwigExtension::class];  // auth()
+}
+
+public function viewPaths(): array
+{
+    return [
+        'auth-admin' =&gt; $this->pathManager->toRelative($this->componentDir . '/Views'),
+    ];
+}
+
+public function viewContexts(): array
+{
+    return [
         '/admin' =&gt; 'dashboard',
-    ],
-],</code></pre>
+    ];
+}</code></pre>
                 <p>
                     In Twig: <code>{{ auth().check() }}</code> (if the component extension is loaded),
                     <code>{{ has_component('UserCabinet') }}</code> — from <code>AppExtension</code>.
@@ -325,7 +337,7 @@ src/Components/UserCabinet/Views/
 }</code></pre>
                 <p>
                     Register the class in <code>view.extensions</code> (application) or the component’s
-                    <code>view.extensions</code>. In templates: <code>{{ price|format_money }}</code>, <code>{{ format_money(price) }}</code>.
+                    <code>viewExtensions()</code> method. In templates: <code>{{ price|format_money }}</code>, <code>{{ format_money(price) }}</code>.
                 </p>
 
                 <h2 id="direct-render" class="border-bottom pb-2 mb-3 mt-5">Direct call to <code>ViewInterface</code></h2>
@@ -355,7 +367,7 @@ $html = $view-&gt;render('@frontend/errors/404', ['exception' =&gt; $e]);</code>
                 <p>
                     CSS/JS usually live in <code>public/</code> and are linked with absolute paths
                     (<code>/assets/css/frontend.css</code>, <code>/vendor/bootstrap/...</code>).
-                    Components can publish assets via <code>assets</code> in <code>config.php</code>
+                    Components can publish assets via <code>ComponentInterface::assets()</code>
                     (copied to <code>public/components/...</code>).
                 </p>
 

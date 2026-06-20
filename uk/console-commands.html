@@ -190,13 +190,14 @@ public function __construct(private readonly RouterInterface $router)
                 <h2 id="component" class="border-bottom pb-2 mb-3 mt-5">Команда в компоненті</h2>
                 <ol>
                     <li>Створіть <code>Components/MyModule/Commands/MyCommand.php</code></li>
-                    <li>Додайте клас у <code>commands</code> у <code>Component/config.php</code></li>
+                    <li>Додайте клас у <code>commands()</code> компонента</li>
                     <li>Переконайтеся, що компонент увімкнено в <code>config/components.php</code></li>
                 </ol>
-                <pre class="mb-4"><code class="language-php">// src/Components/AuthAdmin/config.php
-'commands' =&gt; [
-    UserListCommand::class,
-],</code></pre>
+                <pre class="mb-4"><code class="language-php">// AuthAdminComponent::commands()
+public function commands(): array
+{
+    return [UserListCommand::class];
+}</code></pre>
                 <p>
                     Під час <code>ComponentsServiceProvider::boot()</code> команди резолвяться з контейнера і
                     додаються в <code>ConsoleApplication</code> через <code>addCommand()</code>.
@@ -237,7 +238,7 @@ $io-&gt;progressFinish();</code></pre>
                     <li>Унікальне ім’я команди (<code>module:action</code>, наприклад <code>billing:sync</code>)</li>
                     <li><code>configure()</code> — name, description, arguments/options; константа <code>COMMAND_NAME</code> як у ядрі</li>
                     <li><code>execute()</code> — коротка orchestration, важке в сервісі; <code>Command::SUCCESS</code> / <code>FAILURE</code></li>
-                    <li>Реєстрація в <code>config/commands.php</code> або <code>commands</code> у <code>config.php</code> компонента</li>
+                    <li>Реєстрація в <code>config/commands.php</code> або в <code>commands()</code> компонента</li>
                     <li>Провайдери CLI покривають усі залежності конструктора</li>
                     <li>Перевірка: <code>php bin/console.php list</code> (без «disabled») і <code>help your:command</code></li>
                 </ol>

@@ -51,16 +51,19 @@
 
                 <h2 id="component-list" class="border-bottom pb-2 mb-3 mt-5">component:list</h2>
                 <pre class="mb-4"><code class="language-bash">php bin/console.php component:list</code></pre>
-                <p>Виводить таблицю: Name, Version, Class, Description — дані з <code>config.php</code> кожного активного модуля.</p>
+                <p>Виводить таблицю: Name, Version, Class, Description — дані з методів <code>name()</code>, <code>version()</code>, <code>description()</code> кожного активного модуля.</p>
                 <p>Якщо компонент не з’являється — перевірте <code>config/components.php</code> і що <code>ComponentsServiceProvider</code> зареєстрований останнім у HTTP-провайдерах.</p>
 
                 <h2 id="publish-assets" class="border-bottom pb-2 mb-3 mt-5">component:publish-assets</h2>
-                <p>Копіює файли та каталоги з мапи <code>assets</code> у <code>config.php</code> компонента:</p>
-                <pre class="mb-4"><code class="language-php">// src/Components/AuthAdmin/config.php
-'assets' => [
-    'src/Components/AuthAdmin/Assets/admin-tokens.js'
-        => 'public/components/auth-admin/js/admin-tokens.js',
-],</code></pre>
+                <p>Копіює файли та каталоги з мапи, яку повертає <code>ComponentInterface::assets()</code>:</p>
+                <pre class="mb-4"><code class="language-php">// AuthAdminComponent::assets()
+public function assets(): array
+{
+    return [
+        $this->pathManager->toRelative($this->componentDir . '/Assets/admin-tokens.js') =>
+            $this->pathManager->getRelative(PathName::PUBLIC, 'components/auth-admin/js/admin-tokens.js'),
+    ];
+}</code></pre>
                 <pre class="mb-4"><code class="language-bash">php bin/console.php component:publish-assets</code></pre>
                 <ul>
                     <li>Шляхи відносні до кореня проєкту (<code>PathManager::root()</code>)</li>
@@ -70,11 +73,12 @@
                 <p>Після зміни JS/CSS у <code>Component/Assets/</code> повторіть команду перед деплоєм.</p>
 
                 <h2 id="component-commands" class="border-bottom pb-2 mb-3 mt-5">Власні команди модуля</h2>
-                <p>Оголосіть класи в <code>config.php</code>:</p>
-                <pre class="mb-4"><code class="language-php">// AuthAdmin
-'commands' => [
-    UserListCommand::class,
-],</code></pre>
+                <p>Оголосіть класи в методі <code>commands()</code> компонента:</p>
+                <pre class="mb-4"><code class="language-php">// AuthAdminComponent::commands()
+public function commands(): array
+{
+    return [UserListCommand::class];
+}</code></pre>
                 <p>Команда — звичайний Symfony Console class, зареєстрований у контейнері (autowiring). Приклад:</p>
                 <pre class="mb-4"><code class="language-php">// Commands/UserListCommand.php
 final class UserListCommand extends Command
@@ -88,7 +92,7 @@ final class UserListCommand extends Command
                 <p>Див. <a href="console-commands.html">Створення команд</a>.</p>
 
                 <h2 id="migrations-seeders" class="border-bottom pb-2 mb-3 mt-5">Міграції та сидери</h2>
-                <p>Шляхи з <code>migrations.paths</code> і класи з <code>seeders.list</code> додаються в registries ядра:</p>
+                <p>Шляхи з <code>migrationPaths()</code> і класи з <code>seeders()</code> додаються в registries ядра:</p>
                 <pre class="mb-4"><code class="language-bash">php bin/console.php migration:list
 php bin/console.php db:migrate
 php bin/console.php db:seed

@@ -129,7 +129,7 @@ class UserController
             ->newQuery()
             ->create($this->normalizeUserPayload($request->validated()));
 
-        $this->flashBag->add('success', 'User successfully created');
+        $this->flashBag->addSuccess(, 'User successfully created');
 
         return $this->response->redirectByName('admin.users');
     }
@@ -415,7 +415,7 @@ public function store(StoreUserRequest $request): ResponseInterface
 
     $project = $this->findUserProject($user, $id);
     if ($project === null) {
-        $this->flashBag->add('error', 'Order not found.');
+        $this->flashBag->addError(, 'Order not found.');
         return $this->response->redirectByName('cabinet.projects');
     }
 

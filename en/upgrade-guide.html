@@ -73,9 +73,13 @@
                     <li>Update <code>.env.example</code> if new variables appeared.</li>
                 </ul>
 
-                <h2 id="breaking" class="border-bottom pb-2 mb-3 mt-5">4. Align with current core API</h2>
+                <h2 id="breaking" class="border-bottom pb-2 mb-3 mt-5">4. Align with current core API (v1.1+)</h2>
                 <ul>
                     <li><strong>Configuration</strong> — keys in <a href="configuration.html">Configuration</a> and <code>Concept\Core\Foundation\ConfigKey</code>.</li>
+                    <li><strong>Namespaces</strong> — <code>Components</code> renamed to <code>Services</code>, <code>RequestAttribute</code> moved to <code>Http\Requests</code>.</li>
+                    <li><strong>Component interface</strong> — components implement <code>ComponentInterface</code> directly; remove <code>BaseComponent</code> and per-component <code>config.php</code>. Move metadata and registration to class methods: <code>name()</code>, <code>viewPaths()</code>, <code>migrationPaths()</code>, <code>seeders()</code>, <code>commands()</code>, <code>assets()</code>, <code>providers()</code>, etc.</li>
+                    <li><strong>Component Interface</strong> — rename <code>migrations()</code> to <code>migrationPaths()</code>.</li>
+                    <li><strong>Flash Bag</strong> — <code>FlashBagInterface</code> now has typed methods: <code>addError()</code>, <code>addSuccess()</code>, etc.</li>
                     <li><strong>Telemetry</strong> — <code>TelemetryCollector</code>, events and flags in <a href="telemetry.html">Telemetry</a>.</li>
                     <li><strong>URL</strong> — <code>UrlGeneratorInterface::uri()</code>, <code>url()</code>, <code>base()</code> (not Laravel <code>path()</code>/<code>route()</code>).</li>
                     <li><strong>Masking</strong> — <code>DataMaskerInterface</code>, <code>DataMaskerServiceProvider</code>.</li>

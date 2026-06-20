@@ -190,13 +190,16 @@ public function __construct(private readonly RouterInterface $router)
                 <h2 id="component" class="border-bottom pb-2 mb-3 mt-5">Command in a component</h2>
                 <ol>
                     <li>Create <code>Components/MyModule/Commands/MyCommand.php</code></li>
-                    <li>Add the class to <code>commands</code> in <code>Component/config.php</code></li>
+                    <li>Add the class to <code>commands()</code> in the component class</li>
                     <li>Ensure the component is enabled in <code>config/components.php</code></li>
                 </ol>
-                <pre class="mb-4"><code class="language-php">// src/Components/AuthAdmin/config.php
-'commands' =&gt; [
-    UserListCommand::class,
-],</code></pre>
+                <pre class="mb-4"><code class="language-php">// AuthAdminComponent::commands()
+public function commands(): array
+{
+    return [
+        UserListCommand::class,
+    ];
+}</code></pre>
                 <p>
                     During <code>ComponentsServiceProvider::boot()</code> commands are resolved from the container and
                     added to <code>ConsoleApplication</code> via <code>addCommand()</code>.
@@ -236,7 +239,7 @@ $io-&gt;progressFinish();</code></pre>
                     <li>Unique command name (<code>module:action</code>, e.g. <code>billing:sync</code>)</li>
                     <li><code>configure()</code> — name, description, arguments/options; <code>COMMAND_NAME</code> constant like in core</li>
                     <li><code>execute()</code> — short orchestration, heavy work in a service; <code>Command::SUCCESS</code> / <code>FAILURE</code></li>
-                    <li>Registration in <code>config/commands.php</code> or <code>commands</code> in component <code>config.php</code></li>
+                    <li>Registration in <code>config/commands.php</code> or <code>commands()</code> on the component class</li>
                     <li>CLI providers cover all constructor dependencies</li>
                     <li>Verify: <code>php bin/console.php list</code> (no “disabled”) and <code>help your:command</code></li>
                 </ol>

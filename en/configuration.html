@@ -256,7 +256,7 @@ LOG_MAX_FILES=14    → log.max_files</code></pre>
                 <p>
                     <code>components</code> is a list of FQCN classes implementing <code>ComponentInterface</code>.
                     The environment may have <code>MyComponent::class => MyComponent::class</code> —
-                    the core iterates over array values. Components add routes, migrations, seeders, views, CLI commands.
+                    the core iterates over array values. Components add routes, migration paths, seeders, views, and CLI commands via <code>ComponentInterface</code> methods.
                 </p>
                 <pre class="mb-4"><code class="language-php">return [
     'components' => [
@@ -306,6 +306,12 @@ LOG_MAX_FILES=14    → log.max_files</code></pre>
 
                 <h3 id="file-validator">validator.php</h3>
                 <p><code>validator.rules</code> — custom validation rules (<code>unique</code>, <code>exists</code>, etc.).</p>
+
+                <h3 id="file-caster">caster.php</h3>
+                <p>
+                    <code>caster.transformers</code> — list of custom transformer classes for Valinor DTO mapping.
+                    Mapped to <code>ConfigKey::CASTER_TRANSFORMERS</code>.
+                </p>
 
                 <h3 id="file-pagination">pagination.php</h3>
                 <p>

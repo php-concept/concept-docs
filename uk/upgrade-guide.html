@@ -73,9 +73,12 @@
                     <li>Оновіть <code>.env.example</code>, якщо з’явилися нові змінні.</li>
                 </ul>
 
-                <h2 id="breaking" class="border-bottom pb-2 mb-3 mt-5">4. Звірка з поточним API ядра</h2>
+                <h2 id="breaking" class="border-bottom pb-2 mb-3 mt-5">4. Відповідність поточному API ядра (v1.1+)</h2>
                 <ul>
-                    <li><strong>Конфігурація</strong> — ключі в <a href="configuration.html">Конфігурація</a> і <code>Concept\Core\Foundation\ConfigKey</code>.</li>
+                    <li><strong>Конфігурація</strong> — ключі в <a href="configuration.html">Конфігурація</a> та <code>Concept\Core\Foundation\ConfigKey</code>.</li>
+                    <li><strong>Простори імен</strong> — <code>Components</code> перейменовано на <code>Services</code>, <code>RequestAttribute</code> перенесено в <code>Http\Requests</code>.</li>
+                    <li><strong>Інтерфейс компонентів</strong> — перейменуйте <code>migrations()</code> на <code>migrationPaths()</code>; видаліть <code>Component/config.php</code> і <code>BaseComponent</code> — реалізуйте <code>ComponentInterface</code> напряму з методами <code>migrationPaths()</code>, <code>viewPaths()</code>, <code>seeders()</code>, <code>commands()</code>, <code>assets()</code>, <code>providers()</code> (див. <a href="creating-components.html">Створення компонентів</a>).</li>
+                    <li><strong>Flash Bag</strong> — <code>FlashBagInterface</code> тепер має типізовані методи: <code>addError()</code>, <code>addSuccess()</code> тощо.</li>
                     <li><strong>Телеметрія</strong> — <code>TelemetryCollector</code>, події та прапорці в <a href="telemetry.html">Телеметрія</a>.</li>
                     <li><strong>URL</strong> — <code>UrlGeneratorInterface::uri()</code>, <code>url()</code>, <code>base()</code> (не Laravel <code>path()</code>/<code>route()</code>).</li>
                     <li><strong>Маскування</strong> — <code>DataMaskerInterface</code>, <code>DataMaskerServiceProvider</code>.</li>

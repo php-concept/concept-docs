@@ -49,6 +49,9 @@
                     заголовки та тіло потрапляють у PHP SAPI (FPM, Apache, built-in server).
                 </p>
                 <p>
+                    Для доступу до поточного запиту в будь-якому місці програми можна використовувати сервіс <code>RequestProxy</code>.
+                </p>
+                <p>
                     Див. також:
                     <a href="controllers.html">контролери</a>,
                     <a href="request-lifecycle.html#response">життєвий цикл → відповідь</a>,
@@ -97,7 +100,7 @@
                 </ul>
                 <p>
                     <code>ViewResponseFactory</code> зливає дані з атрибута запиту
-                    <code>RequestAttribute::VIEW_PAYLOAD</code> (flash, <code>errors</code>, <code>old</code>, CSRF
+                    <code>Concept\Core\Http\Requests\RequestAttribute::VIEW_PAYLOAD</code> (flash, <code>errors</code>, <code>old</code>, CSRF
                     з <a href="middleware.html#core-middleware">ShareViewDataMiddleware</a>), потім рендерить Twig
                     і виставляє <code>Content-Type: text/html</code>.
                     Детальніше про шаблони — <a href="views.html">Представлення</a>.
@@ -213,14 +216,14 @@ $response = $this-&gt;response-&gt;createResponse(HttpStatusCode::NO_CONTENT);
     $this-&gt;userModel-&gt;newQuery()-&gt;create(
         $this-&gt;normalizeUserPayload($request-&gt;validated())
     );
-    $this-&gt;flashBag-&gt;add('success', 'User successfully created');
+    $this-&gt;flashBag-&gt;addSuccess('User successfully created');
 
     return $this-&gt;response-&gt;redirectByName('admin.users');
 }</code></pre>
 
                 <h3 id="pattern-not-found" class="mt-4">Не знайдено → flash + redirect</h3>
                 <pre class="mb-4"><code class="language-php">if (!($user instanceof UserModel)) {
-    $this-&gt;flashBag-&gt;add('error', 'User not found');
+    $this-&gt;flashBag-&gt;addError('User not found');
     return $this-&gt;response-&gt;redirectByName('admin.users');
 }
 

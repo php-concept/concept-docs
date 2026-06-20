@@ -72,7 +72,6 @@
 └── Components/
     └── AuthAdmin/                # приклад модуля
         ├── AuthAdminComponent.php
-        ├── config.php            # метадані модуля
         ├── routes.php            # HTTP-маршрути
         ├── Controllers/
         ├── Middlewares/
@@ -108,7 +107,7 @@ routes/web.php                  # глобальні маршрути + middlewa
                 </div>
 
                 <h2 id="contract" class="border-bottom pb-2 mb-3 mt-5">Контракт ComponentInterface</h2>
-                <p>Клас компонента реалізує <code>Concept\Core\Services\Component\Contracts\ComponentInterface</code> (наприклад — через <code>BaseComponent</code>):</p>
+                <p>Клас компонента напряму реалізує <code>Concept\Core\Services\Component\Contracts\ComponentInterface</code> — метадані та дані реєстрації повертаються з його методів:</p>
                 <div class="table-responsive mb-4">
                     <table class="table table-dark table-striped table-bordered align-middle small">
                         <thead>
@@ -123,12 +122,12 @@ routes/web.php                  # глобальні маршрути + middlewa
                             <tr><td><code>viewExtensions()</code></td><td>Класи <code>Twig\Extension\ExtensionInterface</code></td></tr>
                             <tr><td><code>commands()</code></td><td>Symfony Console команди</td></tr>
                             <tr><td><code>seeders()</code></td><td>Класи сидерів</td></tr>
-                            <tr><td><code>migrations()</code></td><td>Шляхи до каталогів міграцій</td></tr>
+                            <tr><td><code>migrationPaths()</code></td><td>Шляхи до каталогів міграцій</td></tr>
                             <tr><td><code>assets()</code></td><td>Мапа <code>source → public</code> для <code>component:publish-assets</code></td></tr>
                         </tbody>
                     </table>
                 </div>
-                <p>Декларація в <code>config.php</code> модуля; <code>BaseComponent</code> читає її через Noodlehaus Config.</p>
+                <p>У конструкторі використовуйте <code>PathManager</code>, щоб будувати шляхи відносно кореня застосунку (див. <code>AuthAdminComponent</code>).</p>
 
                 <h2 id="registration" class="border-bottom pb-2 mb-3 mt-5">Реєстрація в застосунку</h2>
                 <pre class="mb-4"><code class="language-php">// config/components.php
@@ -152,7 +151,7 @@ return [
                 <ol>
                     <li>Записує телеметрію <code>FRAMEWORK_COMPONENT_REGISTERED</code> (<a href="telemetry.html">Телеметрія</a>)</li>
                     <li>Реєструє console-команди, шляхи міграцій і seeders</li>
-                    <li>Підключає nested service providers з <code>config.php</code></li>
+                    <li>Реєструє вкладені service providers з <code>providers()</code></li>
                     <li>Виконує <code>require</code> файлів <code>routes.php</code> (доступна змінна <code>$router</code>)</li>
                     <li>У HTTP (не CLI) — додає Twig paths, extensions і view contexts</li>
                 </ol>
@@ -164,7 +163,7 @@ return [
                     <li>Створіть <code>src/Components/MyFeature/</code> з підкаталогами за зразком AuthAdmin.</li>
                     <li>Перенесіть контролери, моделі, FormRequest, views, middleware у каталог компонента; оновіть namespace на <code>Concept\Components\MyFeature\...</code>.</li>
                     <li>Винесіть маршрути фічі з <code>routes/web.php</code> у <code>MyFeature/routes.php</code>.</li>
-                    <li>Додайте <code>MyFeatureComponent.php</code> (extends <code>BaseComponent</code>) і <code>config.php</code>.</li>
+                    <li>Додайте <code>MyFeatureComponent.php</code>, що реалізує <code>ComponentInterface</code>.</li>
                     <li>Зареєструйте клас у <code>config/components.php</code>.</li>
                     <li>Залиште в <code>App/</code> лише спільне: BaseModel, глобальні layouts, утиліти.</li>
                     <li>Запустіть <code>php bin/console.php db:migrate</code> і <code>component:publish-assets</code> за потреби.</li>
@@ -172,6 +171,43 @@ return [
                 <p>
                     Якщо модуль використовує спільний layout (<code>@dashboard</code>), шаблони в <code>resources/views/dashboard/</code>
                     не переносять — компонент лише <code>extends</code> їх у Twig.
+                </p>
+
+                <h2 id="shipped" class="border-bottom pb-2 mb-3 mt-5">Еталонні компоненти</h2>
+                <p>Demo-застосунок містить кілька готових модулів (код у <code>src/Components/</code>):</p>
+                <div class="table-responsive mb-4">
+                    <table class="table table-dark table-striped table-bordered align-middle small">
+                        <thead>
+                            <tr><th>Компонент</th><th>Призначення</th><th>Реєстрація</th></tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><code>AuthAdmin</code></td>
+                                <td>Адмін-логін, dashboard, CRUD користувачів</td>
+                                <td><code>config/components.php</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>Acl</code></td>
+                                <td>RBAC, route interceptor, admin UI</td>
+                                <td><code>config/components.php</code> + <code>routes.interceptors</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>SettingsManager</code></td>
+                                <td>Типізовані налаштування, admin CRUD, Twig helpers</td>
+                                <td><code>config/components.php</code></td>
+                            </tr>
+                            <tr>
+                                <td><code>DebugBar</code></td>
+                                <td>PHP Debug Bar для HTML (лише dev)</td>
+                                <td><code>config/dev/components.php</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+                <p>
+                    Для <code>Acl</code> також потрібні <code>AclRouteAuthorization</code> у <code>config/routes.php</code> і
+                    <code>HandleAccessDeniedMiddleware</code> першим глобальним middleware — див.
+                    <a href="route-interceptors.html">Route interceptors</a>.
                 </p>
 
                 <h2 id="vs-app" class="border-bottom pb-2 mb-3 mt-5">Компонент vs код у App</h2>
